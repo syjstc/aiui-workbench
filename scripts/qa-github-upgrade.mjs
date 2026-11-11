@@ -6,7 +6,7 @@ import { createReadStream } from 'node:fs';
 import assert from 'node:assert/strict';
 import { unzipSync } from 'fflate';
 import semver from 'semver';
-import { launchDesktop, portableEnvironment, closeDesktop } from './desktop-test.mjs';
+import { launchDesktop, portableEnvironment, closeDesktop, bounded } from './desktop-test.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { AppUpdates, validateManifest } from '../core/updates.mjs';
@@ -120,5 +120,9 @@ try {
     await confirmation(true); await assert.rejects(fs.access(directory), { code: 'ENOENT' }); report.upgradedRemovalVerified = true;
   });
   assert.deepEqual(report.errors, []); report.passed = true;
-} catch (error) { report.error = error.stack; if (page) { report.pageURL = page.url(); report.pageText = await page.locator('body').innerText({ timeout: 2000 }).catch(() => null); await page.screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 }).catch(() => {}); } await atomicJson(path.join(output, 'verification.json'), report); throw error; }
-finally { await stop(); await manager?.close(); await atomicJson(path.join(output, 'verification.json'), report); }
+} catch (error) { report.error = error.stack; console.error(error); if (page) { report.pageURL = page.url(); report.pageText = await page.locator('body').innerText({ timeout: 2000 }).catch(() => null); await page.screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 }).catch(() => {}); } await atomicJson(path.join(output, 'verification.json'), report); }
+finally {
+  try { await bounded(stop(), 30000); } catch (error) { report.cleanupError = error.message; report.passed = false; }
+  await manager?.close(); await atomicJson(path.join(output, 'verification.json'), report);
+  process.exit(report.passed ? 0 : 1);
+}

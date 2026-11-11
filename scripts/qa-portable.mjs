@@ -102,7 +102,7 @@ try {
   if (page) { report.pageURL = page.url(); report.pageText = await page.locator('body').innerText({ timeout: 2000 }).catch(() => null); await page.screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 }).catch(() => {}); }
   console.error(error); await atomicJson(path.join(output, 'verification.json'), report);
 } finally {
-  try { await bounded(stop(), 25000); } catch (error) { report.cleanupError = error.message; }
+  try { await bounded(stop(), 25000); } catch (error) { report.cleanupError = error.message; report.passed = false; }
   await atomicJson(path.join(output, 'verification.json'), report);
-  if (!report.passed) process.exit(1);
+  process.exit(report.passed ? 0 : 1);
 }
