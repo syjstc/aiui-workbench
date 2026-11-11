@@ -32,7 +32,7 @@
 
 打开“连接 AI 工具”，复制当前客户端生成的 MCP 配置。将其添加到支持 stdio MCP 的工具，然后让 AI 先调用 `aiui_context_get`。不需要把整个项目复制进另一套环境。
 
-![MCP 能力与工作流说明](screenshots/mcp-zh.png)
+![MCP 连接配置与任务示例](screenshots/mcp-zh.png)
 
 可以给 AI 这样的任务：
 

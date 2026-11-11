@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { signAsync } from '@electron/osx-sign';
+import { sign } from '@electron/osx-sign';
 import { ROOT, run } from '../core/util.mjs';
 import { APP_INFO } from '../core/version.mjs';
 
@@ -9,7 +9,7 @@ export async function signMac(app) {
   if (process.platform !== 'darwin' || !identity?.startsWith('Developer ID Application:')) throw new Error('Set MACOS_SIGN_IDENTITY to an installed Developer ID Application certificate.');
   // The tool discovers all nested Mach-O files, including ADB and scrcpy.
   // Entitlements are needed by Electron/V8 and the opt-in camera only.
-  await signAsync({ app, identity, platform: 'darwin', version: APP_INFO.devDependencies.electron,
+  await sign({ app, identity, platform: 'darwin', version: APP_INFO.devDependencies.electron,
     preAutoEntitlements: false, preEmbedProvisioningProfile: false,
     optionsForFile: file => ({ hardenedRuntime: true, entitlements: path.join(ROOT, 'electron/entitlements.mac.plist'), ...(file.includes('/vendor/') ? { entitlements: [] } : {}) }),
   });
