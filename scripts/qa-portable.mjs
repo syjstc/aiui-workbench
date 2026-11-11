@@ -14,7 +14,7 @@ await fs.mkdir(output, { recursive: true });
 const env = portableEnvironment(home);
 const report = { home, executablePath, platform: process.platform, arch: process.arch, checks: [], errors: [], systemPathEmpty: env.PATH === '', onlySystemUtilitiesOnPath: process.platform === 'win32', deviceInstallPerformed: false };
 let app, page, mcp;
-async function check(name, work) { await work(); report.checks.push({ name, passed: true }); console.log('PASS', name); }
+async function check(name, work) { report.stage = name; await atomicJson(path.join(output, 'verification.json'), report); await work(); report.checks.push({ name, passed: true }); console.log('PASS', name); await atomicJson(path.join(output, 'verification.json'), report); }
 async function until(work, timeout = 30000) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const value = await work(); if (value) return value; await sleep(150); } throw new Error('Portable check timed out'); }
 async function tool(name, args = {}) {
   const value = await mcp.callTool({ name, arguments: args });

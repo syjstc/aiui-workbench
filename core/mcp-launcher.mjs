@@ -15,8 +15,8 @@ export async function installMcpLauncher(home, { root = ROOT, executable = proce
   const env = { AIUI_WORKBENCH_HOME: home, ELECTRON_RUN_AS_NODE: '1' };
   if (platform === 'win32') {
     const systemRoot = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows';
-    // PowerShell's native command pipeline does not pass its own stdin through
-    // to the child. Copy raw streams so MCP framing and UTF-8 stay intact.
+    // Bypass PowerShell's text pipeline. A redirected stderr makes .NET pass
+    // all three standard handles explicitly, inheriting stdin/stdout unchanged.
     const script = [
       "$ErrorActionPreference='Stop'",
       "$target=Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $env:AIUI_WORKBENCH_HOME 'mcp/installation.json') | ConvertFrom-Json",
@@ -26,21 +26,15 @@ export async function installMcpLauncher(home, { root = ROOT, executable = proce
       "$info.WorkingDirectory=$target.root",
       "$info.UseShellExecute=$false",
       "$info.CreateNoWindow=$true",
-      "$info.RedirectStandardInput=$true",
-      "$info.RedirectStandardOutput=$true",
+      "$info.RedirectStandardInput=$false",
+      "$info.RedirectStandardOutput=$false",
       "$info.RedirectStandardError=$true",
       "$info.EnvironmentVariables['ELECTRON_RUN_AS_NODE']='1'",
       "$child=New-Object System.Diagnostics.Process",
       "$child.StartInfo=$info",
       "[void]$child.Start()",
-      "$source=[Console]::OpenStandardInput()",
-      "$buffer=New-Object byte[] 65536",
-      "$inputRead=$source.ReadAsync($buffer,0,$buffer.Length)",
-      "$outputCopy=$child.StandardOutput.BaseStream.CopyToAsync([Console]::OpenStandardOutput())",
       "$errorCopy=$child.StandardError.BaseStream.CopyToAsync([Console]::OpenStandardError())",
-      "$inputClosed=$false",
-      "while(-not $child.WaitForExit(25)){if(-not $inputClosed -and $inputRead.IsCompleted){$count=$inputRead.GetAwaiter().GetResult();if($count -eq 0){$child.StandardInput.Close();$inputClosed=$true}else{$child.StandardInput.BaseStream.Write($buffer,0,$count);$child.StandardInput.BaseStream.Flush();$inputRead=$source.ReadAsync($buffer,0,$buffer.Length)}}}",
-      "$outputCopy.GetAwaiter().GetResult()",
+      "$child.WaitForExit()",
       "$errorCopy.GetAwaiter().GetResult()",
       "exit $child.ExitCode",
     ].join('; ');

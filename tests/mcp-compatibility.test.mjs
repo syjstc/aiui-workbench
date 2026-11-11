@@ -187,21 +187,21 @@ for (const runtime of ['Node', 'Electron']) test(`Windows saved launcher exchang
     console.log('Direct Electron MCP transport passed');
   }
   const saved = (await installMcpLauncher(f.home, { executable })).mcpServers['aiui-workbench'];
-  async function invoke() {
+  async function invoke(stderr) {
     const client = new Client({ name: 'windows-stable-launcher-test', version: '1.0.0' }); f.clients.push(client);
-    const transport = new StdioClientTransport({ ...saved, env: { ...process.env, ...saved.env, PATH: '' }, stderr: 'pipe' });
-    transport.stderr.on('data', chunk => console.error('LAUNCHER STDERR', chunk.toString()));
+    const transport = new StdioClientTransport({ ...saved, env: { ...process.env, ...saved.env, PATH: '' }, stderr });
+    if (stderr === 'pipe') transport.stderr.on('data', chunk => console.error('LAUNCHER STDERR', chunk.toString()));
     await client.connect(transport, { timeout: 15000 });
     assert.deepEqual((await client.listTools()).tools, [futureTool]);
-    const text = '中文照片问题 & literal $ text 🌱';
+    const text = '中文照片问题 & literal $ text 🌱'.repeat(1000);
     const result = await client.callTool({ name: futureTool.name, arguments: { text, futureParameter: 27 } });
     assert.equal(JSON.parse(result.content[0].text).args.text, text);
     const version = client.getServerVersion().version; await client.close(); return version;
   }
-  assert.notEqual(await invoke(), '0.0.1');
+  for (const stderr of ['pipe', 'inherit']) assert.notEqual(await invoke(stderr), '0.0.1');
   const relocated = await retainedEntry(f);
   await installMcpLauncher(f.home, { root: path.dirname(path.dirname(relocated)), executable });
-  assert.equal(await invoke(), '0.0.1');
+  for (const stderr of ['pipe', 'inherit']) assert.equal(await invoke(stderr), '0.0.1');
 });
 
 test('real service discovery stays authenticated and validates arguments at the service', async t => {
