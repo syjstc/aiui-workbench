@@ -55,7 +55,7 @@ async function launch() {
   assert.equal(config.env.ELECTRON_RUN_AS_NODE, '1');
   mcp = new Client({ name: 'portable-qa', version: '1.0.0' });
   report.stage = 'connecting generated MCP launcher'; console.log('STAGE', report.stage); await atomicJson(path.join(output, 'verification.json'), report);
-  await mcp.connect(new StdioClientTransport({ command: config.command, args: config.args, env: { ...env, ...config.env } }));
+  await mcp.connect(new StdioClientTransport({ command: config.command, args: config.args, env: { ...env, ...config.env } }), { timeout: 15000 });
   return config;
 }
 try {
