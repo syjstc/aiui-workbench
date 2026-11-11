@@ -54,14 +54,27 @@ export class Projects {
     agentPath = await fs.realpath(agentPath);
     const existing = this.items.find(p => p.agentPath === agentPath);
     if (existing) { await this.refresh(existing.id); return existing; }
+    this.pendingImports ||= new Map();
+    if (this.pendingImports.has(agentPath)) return this.pendingImports.get(agentPath);
+    const pending = this.importNew(projectPath, agentPath).finally(() => this.pendingImports.delete(agentPath));
+    this.pendingImports.set(agentPath, pending);
+    return pending;
+  }
+  async importNew(projectPath, agentPath) {
     const app = await readJson(path.join(agentPath, 'app.json'));
     if (!Array.isArray(app.pages) && !Array.isArray(app.widgets)) throw new Error('所选目录不是 AIUI 项目：缺少页面或 Widget 声明');
     const item = { id: id(), projectPath, agentPath, toolchainId: this.getToolchain?.().id, importedAt: new Date().toISOString(), openedAt: new Date().toISOString(), platform: { status: 'unlinked' } };
+    // Status polling must never see a project before its name/pages/revision
+    // are available. Slow disks can otherwise expose an incomplete UI card.
+    await this.refreshItem(item, false);
     this.items.unshift(item);
-    try { await this.refresh(item.id); this.watch(item); return item; } catch (e) { this.items = this.items.filter(p => p !== item); throw e; }
+    try { await this.save(); this.watch(item); return item; } catch (e) { this.items = this.items.filter(p => p !== item); throw e; }
   }
   async refresh(projectId, save = true) {
-    const p = this.get(projectId), app = await readJson(path.join(p.agentPath, 'app.json'));
+    return this.refreshItem(this.get(projectId), save);
+  }
+  async refreshItem(p, save = true) {
+    const app = await readJson(path.join(p.agentPath, 'app.json'));
     const files = await collectFiles(p.agentPath);
     const revision = sourceRevision(files), changed = p.revision && p.revision !== revision;
     Object.assign(p, { name: app.agentName || app.name || path.basename(p.projectPath), description: app.agentDesc || app.description || '', version: app.version || '未声明', engine: app.engine || '*', pages: app.pages || [], widgets: app.widgets || [], permissions: app.permissions || [], revision, fileCount: files.length, size: files.reduce((n,f) => n+f.data.length, 0), missing: false, error: null });
