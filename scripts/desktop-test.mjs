@@ -2,6 +2,10 @@ import { spawn } from 'node:child_process';
 import { _electron, chromium } from 'playwright';
 
 export async function launchDesktop(options) {
+  const env = { ...options.env };
+  // On Windows an empty value still enables Electron's Node-only mode.
+  if (!env.ELECTRON_RUN_AS_NODE) delete env.ELECTRON_RUN_AS_NODE;
+  options = { ...options, env };
   if (process.platform !== 'win32' || !options.executablePath) return _electron.launch(options);
   // Playwright's Electron launcher uses cmd.exe on Windows. Launch the native
   // app directly so an empty PATH tests the app without a shell dependency.
