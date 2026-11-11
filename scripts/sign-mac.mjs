@@ -1,15 +1,27 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { sign } from '@electron/osx-sign';
+import { sign, walk } from '@electron/osx-sign';
 import { ROOT, run } from '../core/util.mjs';
 import { APP_INFO } from '../core/version.mjs';
 
 export async function signMac(app) {
   const identity = process.env.MACOS_SIGN_IDENTITY;
   if (process.platform !== 'darwin' || !identity?.startsWith('Developer ID Application:')) throw new Error('Set MACOS_SIGN_IDENTITY to an installed Developer ID Application certificate.');
-  // The tool discovers all nested Mach-O files, including ADB and scrcpy.
+  // osx-sign discovers every binary resource, including PNG, PAK and WASM.
+  // Sign actual Mach-O code and bundles; ordinary resources are sealed by
+  // their containing bundle, rather than receiving detached code signatures.
+  const magic = new Set(['feedface', 'cefaedfe', 'feedfacf', 'cffaedfe', 'cafebabe', 'bebafeca', 'cafebabf', 'bfbafeca']);
+  const resources = new Set();
+  for (const file of await walk(path.join(app, 'Contents'))) {
+    if (file.endsWith('.app') || file.endsWith('.framework')) continue;
+    const handle = await fs.open(file, 'r');
+    try { const header = Buffer.alloc(4); await handle.read(header, 0, 4, 0); if (!magic.has(header.toString('hex'))) resources.add(file); }
+    finally { await handle.close(); }
+  }
+  // All nested Mach-O files include ADB, scrcpy and Electron helpers.
   // Entitlements are needed by Electron/V8 and the opt-in camera only.
   await sign({ app, identity, platform: 'darwin', version: APP_INFO.devDependencies.electron,
+    ignore: file => resources.has(file),
     preAutoEntitlements: false, preEmbedProvisioningProfile: false,
     optionsForFile: file => ({ hardenedRuntime: true, entitlements: path.join(ROOT, 'electron/entitlements.mac.plist'), ...(file.includes('/vendor/') ? { entitlements: [] } : {}) }),
   });
