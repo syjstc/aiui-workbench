@@ -1,7 +1,7 @@
 {
   "name": "aiui-workbench",
   "productName": "AIUI 工坊",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "main": "electron/main.cjs",
   "description": "Local AIUI desktop workbench, official runtime simulator and MCP tools",
@@ -60,7 +60,9 @@
     "licenses": "node scripts/third-party-licenses.mjs",
     "package:mac:release": "npm run build && node scripts/package.mjs --platform darwin --arch arm64 --sign --out output/release",
     "notarize:mac": "node scripts/notarize-mac.mjs",
-    "qa:screenshots": "npm run build && node scripts/capture-docs.mjs"
+    "qa:screenshots": "npm run build && node scripts/capture-docs.mjs",
+    "qa:project-removal": "npm run build && node scripts/qa-project-removal.mjs",
+    "qa:github-upgrade": "node scripts/qa-github-upgrade.mjs"
   },
   "engines": {
     "node": ">=22.22.0"

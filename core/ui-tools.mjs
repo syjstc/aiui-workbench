@@ -1,5 +1,6 @@
 // The desktop preload and authenticated Web gateway expose the same local tools.
 export const UI_TOOLS = new Set([
+  'ui_project_removal_begin', 'ui_project_removal_commit', 'ui_project_removal_cancel',
   'aiui_record_start','aiui_record_stop','aiui_record_status','aiui_record_clip',
   'aiui_tools_list', 'aiui_capabilities_get', 'aiui_cli_info', 'aiui_preview_test', 'aiui_project_build', 'aiui_job_wait',
   'aiui_status', 'aiui_projects_list', 'aiui_project_import', 'aiui_project_create', 'aiui_project_refresh',

@@ -33,6 +33,19 @@ app.whenReady().then(async()=>{
   mainWindow.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('file://'))event.preventDefault();});
   require('./media-permissions.cjs').installMediaPermissions(session.defaultSession, { getWebContents:()=>mainWindow?.webContents, origin:client.connection.origin });
   ipcMain.handle('workbench:call',async(event,tool,args)=>{trusted(event);if(!allowed.has(tool))throw new Error('未知操作');return client.call(tool,args,'desktop');});
+  ipcMain.handle('workbench:project-remove',async(event,args)=>{
+    trusted(event);
+    const intent=await client.call('ui_project_removal_begin',args,'desktop');
+    let trashed=false;
+    try {
+      if(intent.operation==='delete'){await shell.trashItem(intent.path);trashed=true;}
+      return await client.call('ui_project_removal_commit',{intentId:intent.id},'desktop');
+    } catch(error) {
+      await client.call('ui_project_removal_cancel',{intentId:intent.id},'desktop').catch(()=>{});
+      if(trashed)throw new Error('项目文件已移到系统废纸篓或回收站，但列表未能更新，请再次解绑此项目');
+      throw error;
+    }
+  });
   ipcMain.handle('workbench:locale',async(event,locale)=>{trusted(event);if(!['zh-CN','en'].includes(locale))throw new Error('Unsupported language');desktopLocale=locale;studio?.setTitle(locale==='en'?'Rokid Official Platform':'Rokid 官方平台');return true;});
   ipcMain.handle('workbench:updates',async(event,method,args)=>{
     trusted(event);

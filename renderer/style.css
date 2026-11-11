@@ -530,6 +530,24 @@ input::placeholder{color:var(--muted)}
 .project-card-main:focus-visible{outline-offset:-3px}
 .project-card-bottom button{padding:3px;border-radius:4px}
 .project-card-bottom button:hover{background:var(--hover);color:var(--ink)}
+.project-card{overflow:visible}
+.project-actions{position:relative;display:flex;align-items:center;gap:6px}
+.project-action-menu{position:absolute;right:0;bottom:32px;z-index:12;min-width:188px;padding:5px;background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 8px 28px var(--shadow)}
+.project-action-menu button{display:flex;width:100%;align-items:center;gap:9px;padding:10px!important;text-align:left;font-size:12px}
+.project-action-menu button.danger{color:var(--danger)}
+.project-action-menu button:disabled{opacity:.45;cursor:not-allowed}
+.project-removal-dialog .eyebrow{margin:12px 0 8px;color:var(--danger)}
+.removal-symbol{display:inline-flex;padding:12px;background:var(--danger-soft);color:var(--danger);border-radius:12px}
+.removal-target{display:flex;flex-direction:column;gap:10px;padding:15px;margin:18px 0;background:var(--soft);border:1px solid var(--border);border-radius:8px}
+.removal-target code{font-size:12px;line-height:1.7;overflow-wrap:anywhere;user-select:text}
+.removal-warning{padding:14px;border:1px solid var(--danger-border);background:var(--danger-soft);color:var(--danger);border-radius:8px;font-size:13px;line-height:1.8;margin-bottom:18px}
+.removal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.button.removal-continue{border-color:var(--danger-border);color:var(--danger)}
+.button.removal-confirm{background:var(--danger);border-color:var(--danger);color:white}
+.button.removal-confirm:disabled{opacity:.4}
+.removal-ack{display:flex;align-items:flex-start;gap:9px;margin-top:15px;font-size:12px;line-height:1.8;color:var(--secondary)}
+.removal-ack input{margin-top:4px;accent-color:var(--danger)}
+.removal-error{margin-top:12px;color:var(--danger);font-size:12px;line-height:1.7}
 .overview>div:first-child{padding-left:0}
 .overview>div:last-child{padding-right:0}
 .overview-connect button:hover{background:var(--hover)}

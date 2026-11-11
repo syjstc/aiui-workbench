@@ -31,6 +31,12 @@ export function createWebBridge() {
   let picker = null;
   return {
     kind: 'web', platform: /Win/i.test(navigator.userAgentData?.platform || navigator.platform) ? 'win32' : /Mac/i.test(navigator.userAgentData?.platform || navigator.platform) ? 'darwin' : 'linux', call: (tool, args = {}) => invoke('call', { tool, args }),
+    removeProject: async args => {
+      if (args.operation !== 'detach') throw new Error(t('请在桌面客户端删除项目，文件将移到系统废纸篓或回收站'));
+      const intent = await invoke('call', { tool: 'ui_project_removal_begin', args });
+      try { return await invoke('call', { tool: 'ui_project_removal_commit', args: { intentId: intent.id } }); }
+      catch (error) { await invoke('call', { tool: 'ui_project_removal_cancel', args: { intentId: intent.id } }).catch(() => {}); throw error; }
+    },
     copy: text => navigator.clipboard.writeText(String(text)),
     reveal: file => invoke('reveal', { path: file }),
     openOfficial: url => invoke('official', { url }),

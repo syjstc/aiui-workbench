@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { TOOL_DEFINITIONS } from './tool-definitions.mjs';
 import { toolCatalog } from './tool-catalog.mjs';
 import { installMcpLauncher } from './mcp-launcher.mjs';
+import { ProjectRemoval } from './project-removal.mjs';
 
 export class Workbench {
   constructor(home) { this.home = home; this.origin = ''; this.events = []; this.sequence = 0; this.clients = new Map(); this.emit = this.emit.bind(this); this.projects = new Projects(home, this.emit); this.knowledge = new Knowledge(home); this.previews = new Previews(this.projects, home, this.emit); this.jobs = new Jobs(this.emit, home); this.adb = new AdbTools(home); this.glasses = new GlassesTools(home, this.adb); this.devices = new DeviceDiscovery((args, options) => this.cli(args, options), (_command, args, options) => this.adb.execute(args, options)); }
@@ -39,6 +40,7 @@ export class Workbench {
     this.previews.getToolchain = project => this.sdk.forProject(project);
     this.automation = new Automation(this);
     this.recordings = await new Recordings(this).init();
+    this.projectRemoval = new ProjectRemoval(this);
     return this;
   }
   async cli(args, options, releaseId) { return run(process.execPath, [this.sdk.cliPath(releaseId), ...args], { ...options, env: { ...process.env, ...options?.env, ...await this.adb.environment() } }); }
@@ -46,10 +48,14 @@ export class Workbench {
   config() { return this.mcpConfig; }
   status() { return { version: APP_VERSION, ...this.runtimeInfo(), sdk: this.sdk.status(), home: this.home, projects: this.projects.list(), knowledge: this.knowledge.status(), previews: this.previews.list(), jobs: this.jobs.list(), recordings:this.recordings?.status().recordings||[], clients: [...this.clients.values()].filter(c => Date.now()-c.lastSeen < 60000), sequence: this.sequence }; }
   async call(tool, args = {}, actor = 'desktop') {
+    if (args.projectId && !tool.startsWith('ui_project_removal_') && this.projectRemoval?.locked(args.projectId)) throw new Error('此项目正在移除，请等待操作完成');
     this.clients.set(actor, { name: actor, lastSeen: Date.now() });
     const definition = TOOL_DEFINITIONS.find(([name]) => name === tool);
     if (definition) args = z.object(definition[2]).parse(args);
     switch (tool) {
+      case 'ui_project_removal_begin': return this.projectRemoval.begin(args);
+      case 'ui_project_removal_commit': return this.projectRemoval.commit(z.string().min(1).parse(args.intentId));
+      case 'ui_project_removal_cancel': return this.projectRemoval.cancel(z.string().min(1).parse(args.intentId));
       case 'aiui_tools_list': return toolCatalog();
       case 'aiui_status': return this.status();
       case 'aiui_capabilities_get': return capabilities();

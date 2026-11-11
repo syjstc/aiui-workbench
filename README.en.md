@@ -10,7 +10,7 @@ A local workbench for Rokid AIUI development. Manage projects, read official doc
 
 ## Download
 
-Current version: **0.3.1**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest).
+Current version: **0.3.2**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest).
 
 | Platform | Install | Signing |
 | --- | --- | --- |
@@ -21,6 +21,7 @@ The app includes Electron/Node, npm, official CLI, Ink WASM, documentation, ADB 
 
 ## Features
 
+- **Project removal:** two-stage confirmation with the full project name and path. Unbinding preserves local files; deletion moves the entire project folder to the system Trash/Recycle Bin. See [the illustrated guide](docs/project-removal.md).
 - **Shared projects:** import an AIUI directory or create a Page. External source changes refresh the preview automatically.
 - **Official runtime:** run real `.ink` source, replay temple keys and repeated swipe events, inject orientation with the mouse, 3D head model, sliders or motion loops. Use local photos or an explicitly enabled computer camera.
 - **Offline knowledge:** 468 official documents and the public `aiui-dev` skill, with search and verified snapshot updates. Prepare SDK/CLI upgrades, check compatibility and migrate projects individually.

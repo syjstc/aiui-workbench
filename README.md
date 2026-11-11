@@ -10,7 +10,7 @@
 
 ## 下载与安装
 
-当前版本 **0.3.1**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
+当前版本 **0.3.2**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
 
 | 平台 | 安装方式 | 签名 |
 | --- | --- | --- |
@@ -21,6 +21,7 @@
 
 ## 可以做什么
 
+- **解绑与删除**：项目卡片“…”菜单提供两步确认、完整名称输入与路径核对。解绑保留文件，删除移到系统废纸篓／回收站。见 [操作说明](docs/project-removal.md)。
 - **项目库与实时预览**：导入 AIUI 目录或新建项目；编辑器与 AI 修改的就是同一份源码，文件变化自动刷新。
 - **真实 Ink 模拟器**：运行 `.ink`，回放镜腿按键、长滑与重复事件；鼠标、头模、三轴滑条和自动动作共享姿态输入。支持本地照片和主动开启的电脑摄像头。
 - **官方资料与 SDK**：内置 468 份资料和公开 `aiui-dev` Skill，可离线阅读、搜索及同步。SDK/CLI 升级先检查项目兼容性，支持逐项目切换与回退。
@@ -94,6 +95,9 @@ aiui_context_get → 创建或导入项目 → AI 编辑本地源码
 - [Windows 与语言维护](docs/windows-and-language.md)
 - [源码结构与验证](docs/development.md)
 - [签名、公证与发布](docs/releasing.md)
+- [解绑与删除项目](docs/project-removal.md)
+- [GitHub 真实升级验收](docs/github-upgrade-testing.md)
+- [模型、联网与 MCP 反向调用方案](docs/model-service-options.md)
 - [镜腿离散输入规范](docs/rokid-discrete-input.md)
 - [更新记录](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md)
 

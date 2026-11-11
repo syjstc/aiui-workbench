@@ -102,5 +102,13 @@ export class Projects {
     await this.save();
     return p;
   }
+  async forget(projectId) {
+    const project = this.get(projectId), index = this.items.indexOf(project), watcher = this.watchers.get(projectId);
+    if (watcher) { await watcher.close(); this.watchers.delete(projectId); }
+    this.items.splice(index, 1);
+    try { await this.save(); }
+    catch (error) { this.items.splice(index, 0, project); if (await fs.access(project.agentPath).then(() => true, () => false)) this.watch(project); throw error; }
+    return project;
+  }
   async close() { await Promise.all([...this.watchers.values()].map(w => w.close())); }
 }

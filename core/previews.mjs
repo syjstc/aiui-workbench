@@ -73,5 +73,6 @@ export class Previews {
     return { path: file, width: result.width, height: result.height, revision, runId: result.runId || null, sha256: sha(bytes), stale: revision !== this.projects.get(s.projectId).revision, simulated: true, data: result.dataUrl.split(',')[1] };
   }
   reload(projectId) { for (const s of this.sessions.values()) if (s.projectId === projectId && s.status !== 'closed') { s.status = 'loading'; if(!s.queue.some(c=>c.action==='reload'))s.queue.push({ id: id(), action: 'reload', args: {} }); } }
+  removeProject(projectId) { for (const session of this.sessions.values()) if (session.projectId === projectId) { for (const pending of [...session.pending.values()]) pending.reject(new Error('项目已解绑')); session.queue = []; this.sessions.delete(session.id); } }
   close() { for (const s of this.sessions.values()) for (const p of s.pending.values()) { clearTimeout(p.timer); p.reject(new Error('预览已关闭')); } this.sessions.clear(); }
 }
