@@ -45,7 +45,7 @@ async function extract(archive, destination) {
 }
 async function launch(executablePath) {
   app = await launchDesktop({ executablePath, args: [], cwd: ROOT, env: { ...process.env, PATH: '', AIUI_WORKBENCH_HOME: home, ELECTRON_RUN_AS_NODE: '' } });
-  page = await app.firstWindow(); page.on('pageerror', error => report.errors.push(error.message));
+  page = await app.firstWindow({ timeout: 45000 }); page.setDefaultTimeout(45000); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
 }
@@ -109,5 +109,5 @@ try {
     await confirmation(true); await assert.rejects(fs.access(directory), { code: 'ENOENT' }); report.upgradedRemovalVerified = true;
   });
   assert.deepEqual(report.errors, []); report.passed = true;
-} catch (error) { report.error = error.stack; throw error; }
+} catch (error) { report.error = error.stack; if (page) { report.pageURL = page.url(); report.pageText = await page.locator('body').innerText({ timeout: 2000 }).catch(() => null); await page.screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 }).catch(() => {}); } await atomicJson(path.join(output, 'verification.json'), report); throw error; }
 finally { await stop(); await manager?.close(); await atomicJson(path.join(output, 'verification.json'), report); }

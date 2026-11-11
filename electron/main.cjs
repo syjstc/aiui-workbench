@@ -69,6 +69,13 @@ app.whenReady().then(async()=>{
   mainWindow.on('closed',()=>{mainWindow=null;});
 }).catch(async error=>{
   let message=error.message;
+  try {
+    const {redact}=await import('../core/util.mjs');
+    const diagnostic=redact(error.stack||message);
+    fs.mkdirSync(home,{recursive:true});
+    fs.appendFileSync(path.join(home,'service.log'),'Desktop startup failure: '+diagnostic+'\n',{mode:0o600});
+    console.error('AIUI desktop startup failure:',diagnostic);
+  } catch {}
   try { const {translateMessage}=await import('../shared/i18n.mjs');message=translateMessage(message,desktopLocale); } catch {}
   dialog.showErrorBox(desktopLocale==='en'?'AIUI Workshop failed to start':'AIUI 工坊启动失败',message+(desktopLocale==='en'?'\n\nLocal service log: ':'\n\n本地服务日志：')+path.join(home,'service.log'));app.quit();
 });
