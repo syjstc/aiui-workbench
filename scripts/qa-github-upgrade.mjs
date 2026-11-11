@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { unzipSync } from 'fflate';
 import semver from 'semver';
 import { launchDesktop, portableEnvironment, closeDesktop } from './desktop-test.mjs';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { AppUpdates, validateManifest } from '../core/updates.mjs';
 import { Workbench } from '../core/service.mjs';
 import { ROOT, atomicJson, readJson, run, sleep } from '../core/util.mjs';
@@ -19,12 +21,13 @@ assert.ok(semver.valid(target) && semver.valid(from) && semver.lt(from, target))
 const base = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-github-upgrade-')), home = path.join(base, 'user-data');
 const output = path.join(ROOT, 'output/qa/github-upgrade', process.platform + '-' + process.arch); await fs.mkdir(output, { recursive: true });
 const report = { repository, fromVersion: from, targetVersion: target, realGitHub: true, responsesMocked: false, isolatedUserData: true, checks: [], errors: [] };
-let app, manager, page;
+let app, manager, page, mcp;
 async function check(name, work) { await work(); report.checks.push({ name, passed: true }); console.log('PASS', name); }
 async function until(work, timeout = 120000) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const value = await work(); if (value) return value; await sleep(300); } throw new Error('GitHub upgrade check timed out'); }
 async function hash(file) { const h = createHash('sha256'); for await (const part of createReadStream(file)) h.update(part); return h.digest('hex'); }
 async function command(command, args) { const r = await run(command, args, { timeout: 300000 }); assert.equal(r.code, 0, r.output); return r.output; }
 async function stop() {
+  await mcp?.close(); mcp = null;
   await closeDesktop(app); app = null;
   const connection = await readJson(path.join(home, 'connection.json'), null);
   if (connection) {
@@ -81,7 +84,7 @@ try {
   });
   await stop();
   const nextExecutable = await extract(downloaded.path, path.join(base, 'updated'));
-  await check('the downloaded macOS bundle retains Developer ID, stapled notarization and Gatekeeper acceptance', async () => {
+  await check('the downloaded package has the documented platform signing status', async () => {
     if (process.platform !== 'darwin') { report.windowsUnsigned = true; return; }
     const bundle = path.resolve(path.dirname(nextExecutable), '../..');
     await command('codesign', ['--verify', '--deep', '--strict', bundle]); await command('xcrun', ['stapler', 'validate', bundle]); await command('spctl', ['--assess', '--type', 'execute', bundle]);
@@ -94,6 +97,14 @@ try {
     const projects = await page.evaluate(() => window.workbench.call('aiui_projects_list'));
     assert.equal(projects.projects.find(p => p.id === project.id)?.agentPath, project.agentPath); assert.equal(await hash(path.join(project.agentPath, 'pages/index/index.ink')), originalHash);
     report.newVersion = status.version; report.projectPreserved = true; await page.screenshot({ path: path.join(output, 'updated-client.png') });
+  });
+  await check('the upgraded installation exports a working MCP launcher without external Node', async () => {
+    const config = (await page.evaluate(() => window.workbench.call('aiui_mcp_config'))).mcpServers['aiui-workbench'];
+    mcp = new Client({ name: 'github-upgrade-test', version: '1.0.0' });
+    await mcp.connect(new StdioClientTransport({ ...config, env: { ...portableEnvironment(home), ...config.env } }), { timeout: 15000 });
+    assert.equal(mcp.getServerVersion().version, target);
+    report.mcpToolCount = (await mcp.listTools()).tools.length; assert.ok(report.mcpToolCount >= 30);
+    await mcp.close(); mcp = null;
   });
   if (semver.gte(target, '0.3.2')) await check('the downloaded upgrade implements two-stage unbind and native Trash deletion', async () => {
     async function confirmation(deleting) {
