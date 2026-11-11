@@ -63,7 +63,11 @@ export async function startDaemon(home = homePath()) {
   };
   return {service,server,connection,close};
 }
-if (process.argv[1] && (await fs.realpath(process.argv[1]).catch(() => null)) === fileURLToPath(import.meta.url)) {
+const canonicalEntry = async file => {
+  const resolved = await fs.realpath(file).catch(() => null);
+  return process.platform === 'win32' ? resolved?.toLowerCase() : resolved;
+};
+if (process.argv[1] && (await canonicalEntry(process.argv[1])) === (await canonicalEntry(fileURLToPath(import.meta.url)))) {
   const daemon = await startDaemon();
   process.stderr.write(`AIUI Workbench service: ${daemon.connection.origin}\n`);
   for (const event of ['SIGTERM','SIGINT']) process.once(event,async () => { await daemon.close(); process.exit(0); });

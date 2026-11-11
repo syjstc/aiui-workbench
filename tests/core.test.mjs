@@ -28,7 +28,6 @@ test('standalone daemon entry starts correctly inside a packaged path containing
   await fs.mkdir(appRoot,{recursive:true});
   await fs.cp(new URL('../core',import.meta.url),path.join(appRoot,'core'),{recursive:true});
   await fs.cp(new URL('../shared',import.meta.url),path.join(appRoot,'shared'),{recursive:true});
-  await fs.cp(new URL('../shared',import.meta.url),path.join(appRoot,'shared'),{recursive:true});
   await fs.copyFile(new URL('../package.json',import.meta.url),path.join(appRoot,'package.json'));
   await fs.symlink(fileURLToPath(new URL('../node_modules',import.meta.url)),path.join(appRoot,'node_modules'),process.platform==='win32'?'junction':'dir');
   const child=spawn(process.execPath,[path.join(appRoot,'core/daemon.mjs')],{env:{...process.env,AIUI_WORKBENCH_HOME:f.home},stdio:['ignore','ignore','pipe']});

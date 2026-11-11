@@ -98,7 +98,9 @@ test('an older retained MCP entry cold-starts the registered current installatio
   f.closers.push(async () => {
     const connection = JSON.parse(await fs.readFile(path.join(f.home, 'connection.json'), 'utf8'));
     process.kill(connection.pid, 'SIGTERM');
-    for (let i = 0; i < 60; i++) { if (!(await fs.access(path.join(f.home, 'connection.json')).then(() => true, () => false))) return; await sleep(50); }
+    // Windows forcibly terminates SIGTERM targets without running JS cleanup;
+    // a stale connection file is valid and will be rejected by discovery.
+    for (let i = 0; i < 60; i++) { try { process.kill(connection.pid, 0); } catch (error) { if (error.code === 'ESRCH') return; throw error; } await sleep(50); }
     throw new Error('Isolated daemon did not stop');
   });
   const client = await mcp(f, retained), resource = await client.readResource({ uri: 'aiui://tools' });
@@ -112,7 +114,7 @@ test('a crashed startup owner does not permanently block MCP cold start', async 
   const client = await connect(f.home, { requireCurrentVersion: false });
   f.closers.push(async () => {
     process.kill(client.connection.pid, 'SIGTERM');
-    for (let i = 0; i < 60; i++) { if (!(await fs.access(path.join(f.home, 'connection.json')).then(() => true, () => false))) return; await sleep(50); }
+    for (let i = 0; i < 60; i++) { try { process.kill(client.connection.pid, 0); } catch (error) { if (error.code === 'ESRCH') return; throw error; } await sleep(50); }
   });
   assert.ok((await client.catalog()).tools.some(tool => tool.name === 'aiui_tools_list'));
 });
