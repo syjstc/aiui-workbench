@@ -42,17 +42,20 @@ async function stop() {
 async function launch() {
   report.stage = 'launching desktop'; await atomicJson(path.join(output, 'verification.json'), report);
   app = await launchDesktop({ executablePath, args: [], cwd: ROOT, env });
-  page = await app.firstWindow(); page.on('pageerror', error => report.errors.push(error.message));
+  page = await app.firstWindow({ timeout: 45000 }); page.setDefaultTimeout(30000);
+  page.on('pageerror', error => report.errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') { (report.rendererErrors ||= []).push(message.text()); console.log('RENDERER', message.text()); } });
+  console.log('STAGE desktop window opened', page.url());
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
-  report.stage = 'desktop UI ready'; await atomicJson(path.join(output, 'verification.json'), report);
+  report.stage = 'desktop UI ready'; console.log('STAGE', report.stage); await atomicJson(path.join(output, 'verification.json'), report);
   const config = (await page.evaluate(() => window.workbench.call('aiui_mcp_config'))).mcpServers['aiui-workbench'];
   const installation = await readJson(path.join(home, 'mcp/installation.json'));
   assert.equal(path.resolve(installation.executable), path.resolve(executablePath));
   assert.notEqual(config.command, executablePath);
   assert.equal(config.env.ELECTRON_RUN_AS_NODE, '1');
   mcp = new Client({ name: 'portable-qa', version: '1.0.0' });
-  report.stage = 'connecting generated MCP launcher'; await atomicJson(path.join(output, 'verification.json'), report);
+  report.stage = 'connecting generated MCP launcher'; console.log('STAGE', report.stage); await atomicJson(path.join(output, 'verification.json'), report);
   await mcp.connect(new StdioClientTransport({ command: config.command, args: config.args, env: { ...env, ...config.env } }));
   return config;
 }
@@ -92,5 +95,12 @@ try {
     assert.equal(await page.locator('html').getAttribute('lang'), 'en');
   });
   assert.deepEqual(report.errors, []); report.passed = true;
-} catch (error) { report.error = error.stack; report.serviceLog = await fs.readFile(path.join(home, 'service.log'), 'utf8').then(text => text.slice(-8000)).catch(() => null); await atomicJson(path.join(output, 'verification.json'), report); throw error; }
-finally { try { await Promise.race([stop(), sleep(15000).then(() => { throw new Error('Portable cleanup timed out'); })]); } finally { await atomicJson(path.join(output, 'verification.json'), report); } }
+} catch (error) {
+  report.error = error.stack; report.serviceLog = await fs.readFile(path.join(home, 'service.log'), 'utf8').then(text => text.slice(-8000)).catch(() => null);
+  if (page) { report.pageURL = page.url(); report.pageText = await page.locator('body').innerText({ timeout: 2000 }).catch(() => null); await page.screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 }).catch(() => {}); }
+  await atomicJson(path.join(output, 'verification.json'), report); throw error;
+} finally {
+  let timer;
+  try { await Promise.race([stop(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Portable cleanup timed out')), 15000); })]); }
+  finally { clearTimeout(timer); await atomicJson(path.join(output, 'verification.json'), report); }
+}
