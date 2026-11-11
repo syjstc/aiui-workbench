@@ -173,15 +173,25 @@ test('Windows launcher uses a fixed system runtime and discovers the current ins
   assert.equal(config.env.ELECTRON_RUN_AS_NODE, '1');
 });
 
-test('Windows saved launcher exchanges UTF-8 MCP messages and follows an upgraded installation', async t => {
+for (const runtime of ['Node', 'Electron']) test(`Windows saved launcher exchanges UTF-8 MCP and follows relocation using ${runtime}`, async t => {
   if (process.platform !== 'win32') return t.skip('Windows native stdio transport');
   const f = await fixture(t);
   f.home = path.join(f.home, '用户数据 中文 & spaces'); await fs.mkdir(f.home);
   await service(f, '99.0.0', { tools: [futureTool] });
-  const saved = (await installMcpLauncher(f.home)).mcpServers['aiui-workbench'];
+  const executable = runtime === 'Electron' ? (await import('electron')).default : process.execPath;
+  if (runtime === 'Electron') {
+    const direct = new Client({ name: 'direct-electron-transport', version: '1.0.0' }); f.clients.push(direct);
+    const transport = new StdioClientTransport({ command: executable, args: [path.join(ROOT, 'mcp/server.mjs')], env: { ...process.env, AIUI_WORKBENCH_HOME: f.home, ELECTRON_RUN_AS_NODE: '1' }, stderr: 'pipe' });
+    transport.stderr.on('data', chunk => console.error('DIRECT ELECTRON STDERR', chunk.toString()));
+    await direct.connect(transport, { timeout: 10000 }); assert.deepEqual((await direct.listTools()).tools, [futureTool]); await direct.close();
+    console.log('Direct Electron MCP transport passed');
+  }
+  const saved = (await installMcpLauncher(f.home, { executable })).mcpServers['aiui-workbench'];
   async function invoke() {
     const client = new Client({ name: 'windows-stable-launcher-test', version: '1.0.0' }); f.clients.push(client);
-    await client.connect(new StdioClientTransport({ ...saved, env: { ...process.env, ...saved.env, PATH: '' }, stderr: 'pipe' }), { timeout: 15000 });
+    const transport = new StdioClientTransport({ ...saved, env: { ...process.env, ...saved.env, PATH: '' }, stderr: 'pipe' });
+    transport.stderr.on('data', chunk => console.error('LAUNCHER STDERR', chunk.toString()));
+    await client.connect(transport, { timeout: 15000 });
     assert.deepEqual((await client.listTools()).tools, [futureTool]);
     const text = '中文照片问题 & literal $ text 🌱';
     const result = await client.callTool({ name: futureTool.name, arguments: { text, futureParameter: 27 } });
@@ -190,7 +200,7 @@ test('Windows saved launcher exchanges UTF-8 MCP messages and follows an upgrade
   }
   assert.notEqual(await invoke(), '0.0.1');
   const relocated = await retainedEntry(f);
-  await installMcpLauncher(f.home, { root: path.dirname(path.dirname(relocated)) });
+  await installMcpLauncher(f.home, { root: path.dirname(path.dirname(relocated)), executable });
   assert.equal(await invoke(), '0.0.1');
 });
 
