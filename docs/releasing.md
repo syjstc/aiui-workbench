@@ -49,7 +49,7 @@ npm run build
 node scripts/package.mjs --platform win32 --arch x64 --out output/release
 ```
 
-产物是完整 ZIP，无需另装 Node、ADB 或 npm。当前不配置 Windows 代码签名，发行说明必须写明未签名。macOS 上的结构检查不能代替 Windows 原生启动验证；CI 的 Windows job 会执行打包和空 PATH 验收。
+产物是完整 ZIP，无需另装 Node、ADB 或 npm。当前不配置 Windows 代码签名，发行说明必须写明未签名。macOS 上的结构检查不能代替 Windows 原生启动验证；CI 的 Windows job 会执行打包和原生验收，PATH 只保留 Windows 系统目录，不含 Node、npm、Android SDK 或 ADB。
 
 ## 本机独立包验收
 

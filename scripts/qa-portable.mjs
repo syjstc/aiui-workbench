@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { launchDesktop } from './desktop-test.mjs';
+import { launchDesktop, portableEnvironment, bounded, closeDesktop } from './desktop-test.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { ROOT, atomicJson, readJson, run, sha, sleep } from '../core/util.mjs';
@@ -11,9 +11,8 @@ const { executablePath } = packagedPaths();
 const output = path.join(ROOT, 'output/qa/portable', process.platform + '-' + process.arch);
 const home = path.join(ROOT, '.local', 'portable qa 中文 & spaces', String(Date.now()));
 await fs.mkdir(output, { recursive: true });
-const env = { ...process.env, PATH: '', AIUI_WORKBENCH_HOME: home, ELECTRON_RUN_AS_NODE: '' };
-delete env.Path; delete env.ANDROID_HOME; delete env.ANDROID_SDK_ROOT;
-const report = { home, executablePath, platform: process.platform, arch: process.arch, checks: [], errors: [], systemPathEmpty: true, deviceInstallPerformed: false };
+const env = portableEnvironment(home);
+const report = { home, executablePath, platform: process.platform, arch: process.arch, checks: [], errors: [], systemPathEmpty: env.PATH === '', onlySystemUtilitiesOnPath: process.platform === 'win32', deviceInstallPerformed: false };
 let app, page, mcp;
 async function check(name, work) { await work(); report.checks.push({ name, passed: true }); console.log('PASS', name); }
 async function until(work, timeout = 30000) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const value = await work(); if (value) return value; await sleep(150); } throw new Error('Portable check timed out'); }
@@ -29,7 +28,7 @@ async function job(name, args) {
 }
 async function stop() {
   await mcp?.close(); mcp = null;
-  await app?.close(); app = null;
+  await closeDesktop(app); app = null;
   const connection = await readJson(path.join(home, 'connection.json'), null);
   if (connection) {
     const response = await fetch(connection.origin + '/health', { headers: { Authorization: 'Bearer ' + connection.token }, signal: AbortSignal.timeout(1000) }).catch(() => null);
@@ -97,10 +96,11 @@ try {
   assert.deepEqual(report.errors, []); report.passed = true;
 } catch (error) {
   report.error = error.stack; report.serviceLog = await fs.readFile(path.join(home, 'service.log'), 'utf8').then(text => text.slice(-8000)).catch(() => null);
+  if (app) report.desktopState = await bounded(app.evaluate(({ app, BrowserWindow }) => ({ ready: app.isReady(), windows: BrowserWindow.getAllWindows().map(window => ({ visible: window.isVisible(), url: window.webContents.getURL(), loading: window.webContents.isLoading() })) })), 3000).catch(error => ({ error: error.message }));
   if (page) { report.pageURL = page.url(); report.pageText = await page.locator('body').innerText({ timeout: 2000 }).catch(() => null); await page.screenshot({ path: path.join(output, 'failure.png'), timeout: 3000 }).catch(() => {}); }
-  await atomicJson(path.join(output, 'verification.json'), report); throw error;
+  console.error(error); await atomicJson(path.join(output, 'verification.json'), report);
 } finally {
-  let timer;
-  try { await Promise.race([stop(), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Portable cleanup timed out')), 15000); })]); }
-  finally { clearTimeout(timer); await atomicJson(path.join(output, 'verification.json'), report); }
+  try { await bounded(stop(), 25000); } catch (error) { report.cleanupError = error.message; }
+  await atomicJson(path.join(output, 'verification.json'), report);
+  if (!report.passed) process.exit(1);
 }

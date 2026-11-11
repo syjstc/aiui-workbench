@@ -6,7 +6,7 @@ import { createReadStream } from 'node:fs';
 import assert from 'node:assert/strict';
 import { unzipSync } from 'fflate';
 import semver from 'semver';
-import { launchDesktop } from './desktop-test.mjs';
+import { launchDesktop, portableEnvironment, closeDesktop } from './desktop-test.mjs';
 import { AppUpdates, validateManifest } from '../core/updates.mjs';
 import { Workbench } from '../core/service.mjs';
 import { ROOT, atomicJson, readJson, run, sleep } from '../core/util.mjs';
@@ -25,7 +25,7 @@ async function until(work, timeout = 120000) { const deadline = Date.now() + tim
 async function hash(file) { const h = createHash('sha256'); for await (const part of createReadStream(file)) h.update(part); return h.digest('hex'); }
 async function command(command, args) { const r = await run(command, args, { timeout: 300000 }); assert.equal(r.code, 0, r.output); return r.output; }
 async function stop() {
-  await app?.close(); app = null;
+  await closeDesktop(app); app = null;
   const connection = await readJson(path.join(home, 'connection.json'), null);
   if (connection) {
     const healthy = await fetch(connection.origin + '/health', { headers: { Authorization: 'Bearer ' + connection.token }, signal: AbortSignal.timeout(1500) }).catch(() => null);
@@ -44,7 +44,7 @@ async function extract(archive, destination) {
   return process.platform === 'darwin' ? path.join(destination, 'AIUI Workshop.app/Contents/MacOS/AIUI Workshop') : path.join(destination, 'AIUI Workshop-win32-x64/AIUI Workshop.exe');
 }
 async function launch(executablePath) {
-  app = await launchDesktop({ executablePath, args: [], cwd: ROOT, env: { ...process.env, PATH: '', AIUI_WORKBENCH_HOME: home, ELECTRON_RUN_AS_NODE: '' } });
+  app = await launchDesktop({ executablePath, args: [], cwd: ROOT, env: portableEnvironment(home) });
   page = await app.firstWindow({ timeout: 45000 }); page.setDefaultTimeout(45000); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
