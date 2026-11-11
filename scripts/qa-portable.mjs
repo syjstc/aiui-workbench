@@ -40,16 +40,19 @@ async function stop() {
   }
 }
 async function launch() {
+  report.stage = 'launching desktop'; await atomicJson(path.join(output, 'verification.json'), report);
   app = await launchDesktop({ executablePath, args: [], cwd: ROOT, env });
   page = await app.firstWindow(); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
+  report.stage = 'desktop UI ready'; await atomicJson(path.join(output, 'verification.json'), report);
   const config = (await page.evaluate(() => window.workbench.call('aiui_mcp_config'))).mcpServers['aiui-workbench'];
   const installation = await readJson(path.join(home, 'mcp/installation.json'));
   assert.equal(path.resolve(installation.executable), path.resolve(executablePath));
   assert.notEqual(config.command, executablePath);
   assert.equal(config.env.ELECTRON_RUN_AS_NODE, '1');
   mcp = new Client({ name: 'portable-qa', version: '1.0.0' });
+  report.stage = 'connecting generated MCP launcher'; await atomicJson(path.join(output, 'verification.json'), report);
   await mcp.connect(new StdioClientTransport({ command: config.command, args: config.args, env: { ...env, ...config.env } }));
   return config;
 }
@@ -89,5 +92,5 @@ try {
     assert.equal(await page.locator('html').getAttribute('lang'), 'en');
   });
   assert.deepEqual(report.errors, []); report.passed = true;
-} catch (error) { report.error = error.stack; throw error; }
-finally { await stop(); await atomicJson(path.join(output, 'verification.json'), report); }
+} catch (error) { report.error = error.stack; report.serviceLog = await fs.readFile(path.join(home, 'service.log'), 'utf8').then(text => text.slice(-8000)).catch(() => null); await atomicJson(path.join(output, 'verification.json'), report); throw error; }
+finally { try { await Promise.race([stop(), sleep(15000).then(() => { throw new Error('Portable cleanup timed out'); })]); } finally { await atomicJson(path.join(output, 'verification.json'), report); } }
