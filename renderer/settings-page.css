@@ -1,5 +1,8 @@
 .app-update-panel{max-width:860px;margin-bottom:22px}
 .app-update-panel>.field{margin:20px 0}
+.field-title-row{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:9px}
+.field-title-row .text-button{font-size:12px;min-height:24px;padding:2px 0}
+.field-help{display:block;font-size:11px;color:var(--muted);line-height:1.7;margin-top:9px}
 .app-update-panel .muted-copy{margin:16px 0;line-height:1.9}
 .app-update-panel>.subtle{margin:13px 0}
 .app-update-panel>.button-row{margin-top:20px}

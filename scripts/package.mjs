@@ -32,7 +32,7 @@ try {
     electronZipDir: process.env.AIUI_ELECTRON_ZIP_DIR,
     platform, arch, icon, overwrite: true, asar: false, prune: true,
     win32metadata: { ProductName: 'AIUI Workshop', FileDescription: 'AIUI Workshop', CompanyName: 'AIUI Workbench' },
-    ignore: [/^\/(?:\.local|output|tests|scripts|renderer|preview|examples|\.git|\.github|\.agents|\.codex)(?:\/|$)/, /(?:^|\/)\.env(?:\.|$)/, /\.(?:p8|p12|pfx|keychain-db)$/, /(?:^|\/)\.DS_Store$/, /\.log$/, /package-lock\.json$/, /vite\.config\.mjs$/, /^\/docs\/screenshots(?:\/|$)/, /^\/assets\/branding\/previous-icon\.png$/, ...['darwin', 'linux', 'win32'].filter(p => p !== platform).map(p => new RegExp(`^/vendor/adb/${p}(?:/|$)`)), ...['darwin-arm64','darwin-x64','linux-x64','win32-x64'].filter(key => key !== `${platform}-${arch}`).map(key => new RegExp(`^/vendor/scrcpy/${key}(?:/|$)`))],
+    ignore: [/^\/(?:\.local|output|tests|scripts|renderer|preview|mirror|examples|\.git|\.github|\.agents|\.codex)(?:\/|$)/, /(?:^|\/)\.env(?:\.|$)/, /\.(?:p8|p12|pfx|keychain-db)$/, /(?:^|\/)\.DS_Store$/, /\.log$/, /package-lock\.json$/, /vite\.config\.mjs$/, /^\/docs\/screenshots(?:\/|$)/, /^\/assets\/branding\/previous-icon\.png$/, ...['darwin', 'linux', 'win32'].filter(p => p !== platform).map(p => new RegExp(`^/vendor/adb/${p}(?:/|$)`)), ...['darwin-arm64','darwin-x64','linux-x64','win32-x64'].filter(key => key !== `${platform}-${arch}`).map(key => new RegExp(`^/vendor/scrcpy/${key}(?:/|$)`))],
     extendInfo: { CFBundleDisplayName: 'AIUI 工坊', NSCameraUsageDescription: '在模拟器中使用电脑摄像头，测试 AIUI 应用的实时取景与拍照。', NSHumanReadableCopyright: 'AIUI Workbench. Includes official AIUI and Ink components with their original notices.' },
   });
   for (const directory of paths) {

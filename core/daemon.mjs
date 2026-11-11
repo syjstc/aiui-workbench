@@ -29,6 +29,15 @@ export async function startDaemon(home = homePath()) {
         return res.end(await fs.readFile(file));
       }
       const recording=url.pathname.match(/^\/session\/([a-f0-9-]+)\/recording\/([a-f0-9-]+)$/);
+      const mirror=url.pathname.match(/^\/mirror\/([a-f0-9-]+)\/(stream|state|input)$/);
+      if(mirror){
+        if(req.headers.origin&&req.headers.origin!==service.origin)return send(res,{error:'Invalid origin'},403);
+        const session=service.mirroring.embedded.authorize(mirror[1],req.headers['x-mirror-key']);
+        if(mirror[2]==='stream'&&req.method==='GET')return service.mirroring.embedded.attach(session,req,res);
+        if(mirror[2]==='state'&&req.method==='GET')return send(res,service.mirroring.embedded.public(session));
+        if(mirror[2]==='input'&&req.method==='POST')return send(res,service.mirroring.embedded.input(session,await body(req)));
+        return send(res,{error:'Method not allowed'},405);
+      }
       if(recording){if(req.method!=='POST')return send(res,{error:'Method not allowed'},405);const session=service.previews.authorize(recording[1],req.headers['x-preview-key']);return send(res,{result:await service.recordings.receive(session,recording[2],req)});}
       const match = url.pathname.match(/^\/session\/([a-f0-9-]+)\/(bundle|poll|ack|state|log)$/);
       if (match) {
@@ -53,6 +62,7 @@ export async function startDaemon(home = homePath()) {
   try { await new Promise((resolve,reject) => { server.once('error',reject); server.listen(0,'127.0.0.1',resolve); }); }
   catch(error) { await service.close(); throw error; }
   service.origin = `http://127.0.0.1:${server.address().port}`;
+  service.mirroring.origin=service.origin;
   const connection = { origin:service.origin,token,pid:process.pid,version:APP_VERSION,startedAt:new Date().toISOString() };
   await atomicJson(path.join(home,'connection.json'),connection);
   service.sdk.start();

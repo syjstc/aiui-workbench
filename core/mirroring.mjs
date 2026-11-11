@@ -3,10 +3,12 @@ import { constants } from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { ROOT, readJson, redact, normalizeEnvironment, id } from './util.mjs';
+import { EmbeddedMirroring } from './embedded-mirroring.mjs';
 
 export class Mirroring {
   constructor(adb, glasses, emit = () => {}, { root = ROOT, platform = process.platform, arch = process.arch, env = process.env, spawnProcess = spawn } = {}) {
     Object.assign(this, { adb, glasses, emit, root, platform, arch, env, spawnProcess }); this.sessions = new Map(); this.starts = new Map();
+    this.embedded=new EmbeddedMirroring(adb,glasses,()=>this.bundled(),()=>this.origin||'',emit);
   }
   async bundled() {
     const manifest = await readJson(path.join(this.root, 'vendor/scrcpy/manifest.json'), null), key = `${this.platform}-${this.arch}`;
@@ -82,5 +84,5 @@ export class Mirroring {
     try { await session.completion; } finally { clearTimeout(timer); }
     return this.public(session);
   }
-  async close() { await Promise.all([...this.sessions.keys()].map(serial => this.stop({ serial }))); }
+  async close() { await Promise.all([...this.sessions.keys()].map(serial => this.stop({ serial }))); await this.embedded.close(); }
 }

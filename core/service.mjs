@@ -8,6 +8,7 @@ import { serviceLogStatus, clearServiceLog } from './logs.mjs';
 import { DeviceDiscovery } from './devices.mjs';
 import { AdbTools } from './adb.mjs';
 import { GlassesTools } from './glasses.mjs';
+import { AiuiApps } from './aiui-apps.mjs';
 import { Mirroring } from './mirroring.mjs';
 import { SdkManager } from './sdk.mjs';
 import { ROOT, atomicJson, readJson, run, sha, redact } from './util.mjs';
@@ -31,6 +32,7 @@ export class Workbench {
     this.events.push({ sequence: ++this.sequence, type, value, at: new Date().toISOString() }); this.events = this.events.slice(-300); if (type === 'source-changed') this.previews.reload(value.projectId);
   }
   async init() {
+    this.aiuiApps = new AiuiApps(this.glasses, (args, options) => this.cli(args, options), this.projects);
     this.mirroring = new Mirroring(this.adb, this.glasses, this.emit);
     await fs.mkdir(this.home, { recursive: true, mode: 0o700 });
     this.mcpConfig = await installMcpLauncher(this.home);
@@ -130,6 +132,8 @@ export class Workbench {
       case 'aiui_glasses_pull': return this.jobs.start('glasses-pull', null, context => this.glasses.pull(args, context), { serial: args.serial });
       case 'aiui_glasses_push': return this.jobs.start('glasses-push', null, context => this.glasses.push(args, context), { serial: args.serial });
       case 'aiui_glasses_apps': return this.glasses.apps(args);
+      case 'aiui_glasses_aiui_apps': return this.aiuiApps.list(args);
+      case 'aiui_glasses_aiui_uninstall': return this.jobs.start('glasses-aiui-uninstall', null, context => this.aiuiApps.uninstall(args, context), { serial: args.serial });
       case 'aiui_glasses_app_details': return this.glasses.appDetails(args);
       case 'aiui_glasses_app_action': return this.jobs.start('glasses-app', null, async ({ signal, progress }) => { progress(`${args.action} · ${args.packageName}`); return this.glasses.appAction(args, { signal }); }, { serial: args.serial });
       case 'aiui_glasses_install': return this.jobs.start('glasses-install', null, context => this.glasses.install(args, context), { serial: args.serial });
@@ -139,6 +143,9 @@ export class Workbench {
       case 'aiui_glasses_mirror_status': return this.mirroring.status(args);
       case 'aiui_glasses_mirror_start': return this.mirroring.start(args);
       case 'aiui_glasses_mirror_stop': return this.mirroring.stop(args);
+      case 'aiui_glasses_mirror_embed_status': return {...await this.mirroring.status(args),...this.mirroring.embedded.status(args)};
+      case 'aiui_glasses_mirror_embed_start': return this.mirroring.embedded.start(args);
+      case 'aiui_glasses_mirror_embed_stop': return this.mirroring.embedded.stop(args);
       case 'aiui_device_enable_developer': {
         if (!args.serial) throw new Error('请选择明确的目标眼镜');
         return this.jobs.start('device-setup', null, async ({ signal, progress }) => {
@@ -188,7 +195,7 @@ export class Workbench {
     return p.lastCheck;
   }
   async platformReceipt(p, result) {
-    const receipt = { stage: 'prepared-locally', projectId: p.id, applicationName: p.name, version: p.version, artifact: result.path, sha256: result.sha256, sourceRevision: result.revision, studioUrl: 'https://aiui.rokid.com/space', uploaded: false, submittedForReview: false, message: '本地包已就绪。通过桌面客户端打开官方平台，完成登录和导入。自动平台上传接口尚未验证，未宣称已上传。' };
+    const receipt = { stage: 'prepared-locally', projectId: p.id, applicationName: p.name, version: p.version, artifact: result.path, sha256: result.sha256, sourceRevision: result.revision, studioUrl: 'https://aiui.rokid.com/space', uploaded: false, submittedForReview: false, message: 'AIX 已保存在本机。下一步：到官方平台登录并上传，完善资料后提交审核。上传与审核进度请以官方平台页面为准。' };
     await atomicJson(path.join(path.dirname(result.path), 'platform-preflight.json'), receipt); p.platform = receipt; await this.projects.save(); return receipt;
   }
   pack(projectId) { return this.jobs.start('pack', projectId, context => this.packNow(projectId, context)); }

@@ -10,6 +10,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsInlineLimit: 0,
-    rollupOptions: { input: { workbench: path.join(root, 'renderer/index.html'), preview: path.join(root, 'preview/index.html') } },
+    rollupOptions: { input: { workbench: path.join(root, 'renderer/index.html'), preview: path.join(root, 'preview/index.html'), mirror:path.join(root,'mirror/index.html') } },
   },
 });

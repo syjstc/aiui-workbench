@@ -21,6 +21,8 @@ import {Simulator} from './simulator.jsx';
 import {ProjectIcon} from './project-icon.jsx';
 import {McpCapabilities} from './mcp-capabilities.jsx';
 import {ProjectRemovalDialog} from './project-removal-dialog.jsx';
+import {PublishPage} from './publish-page.jsx';
+import {UpdateNotice} from './update-notice.jsx';
 import appIcon from '../assets/branding/icon-64.png';
 
 const api=window.workbench;
@@ -28,7 +30,12 @@ const call=(tool,args={})=>api.call(tool,args);
 const short=s=>s?s.slice(0,8):'—';
 const time=s=>s?new Date(s).toLocaleString(getLocale(),{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):t("尚未运行");
 const formatSize=n=>n>1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.round((n||0)/1024)+' KB';
-const navigation=[['projects',PanelsTopLeft,'项目库'],['simulator',Monitor,'模拟器'],['knowledge',BookOpen,'官方资料'],['devices',Glasses,'连接眼镜'],['glasses',SlidersHorizontal,'眼镜工具'],['publish',CloudUpload,'构建与上传']];
+const navigationGroups=[
+ ['应用开发',[['projects',PanelsTopLeft,'项目库'],['simulator',Monitor,'模拟器'],['publish',CloudUpload,'构建与上传']]],
+ ['眼镜管理',[['devices',Glasses,'连接眼镜'],['glasses',SlidersHorizontal,'眼镜工具']]],
+ ['资源与工具',[['knowledge',BookOpen,'官方资料'],['connect',Plug,'连接 AI 工具'],['sdk',Package,'SDK 更新'],['logs',Terminal,'日志与记录']]],
+];
+const navigation=navigationGroups.flatMap(([,items])=>items);
 function Pill({children,tone=''}){return <span className={'pill '+tone}>{children}</span>}
 function Empty({icon:Icon=Box,title,children,action}){return <div className="empty"><span className="empty-icon"><Icon size={30}/></span><h3>{title}</h3><p>{children}</p>{action}</div>}
 function Button({children,icon:Icon,className='',busy,...props}){return <button className={'button '+className} {...props}>{busy?<LoaderCircle size={15} className="spin"/>:Icon&&<Icon size={15}/>} {children}</button>}
@@ -38,8 +45,7 @@ function App(){
  const[state,setState]=useState(null),[view,setView]=useState('projects'),[selected,setSelected]=useState(null),[preview,setPreview]=useState(null),[toast,setToast]=useState(null),[modal,setModal]=useState(null),[busy,setBusy]=useState(''),[logs,setLogs]=useState([]);
  const[appUpdates,setAppUpdates]=useState(null),[projectMenu,setProjectMenu]=useState(null);
  useEffect(()=>{const close=event=>{if(!event.target.closest('.project-actions'))setProjectMenu(null);};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close);},[]);
- const updateNotice=useRef(null);
- useEffect(()=>{if(api.kind==='web'||!api.updates)return;let mounted=true;const poll=()=>api.updates('status').then(value=>{if(!mounted)return;setAppUpdates(value);if(value.updateAvailable&&updateNotice.current!==value.latest.version){updateNotice.current=value.latest.version;notify(t("发现工坊新版本 ")+value.latest.version+t("，可在「设置」中下载"));}}).catch(e=>{if(mounted)notify(e.message,true);});poll();const timer=setInterval(poll,2000);return()=>{mounted=false;clearInterval(timer);};},[]);
+ useEffect(()=>{if(api.kind==='web'||!api.updates)return;let mounted=true;const poll=()=>api.updates('status').then(value=>{if(mounted)setAppUpdates(value);}).catch(()=>{});poll();const timer=setInterval(poll,2000);return()=>{mounted=false;clearInterval(timer);};},[]);
  const[deletingJobs,setDeletingJobs]=useState(false),[clearingPreview,setClearingPreview]=useState(null);
  const discovery=useDeviceDiscovery(api,view==='devices'||view==='guide'||view==='glasses'),environment=discovery.environment;
  const contentRef=useRef();
@@ -79,16 +85,9 @@ function App(){
    <div className="brand"><div className="brand-mark"><img src={appIcon} alt=""/></div><div><strong>{t("AIUI 工坊")}</strong><small>{t("应用开发工作台")}</small></div></div>
    <div className="workspace-tag"><FolderOpen size={15}/><span>{t("本地工作空间")}</span><span className="workspace-badge">{t("本机")}</span></div>
    <div className="sidebar-navigation">
-   <p className="nav-label">{t("工作台")}</p>
-   <nav aria-label={t("工作台")}>{navigation.map(([key,Icon,label])=><button key={key} aria-label={t(label)} aria-current={view===key?'page':undefined} className={'nav-item '+(view===key?'active':'')} onClick={()=>chooseView(key)}><Icon size={17}/><span>{t(label)}</span>{key==='projects'&&<em>{projects.length}</em>}</button>)}</nav>
-   <div className="sidebar-divider"/>
-   <p className="nav-label">{t("开发工具")}</p>
-   <nav aria-label={t("开发工具")}>
-   <button aria-label={t("连接 AI 工具")} aria-current={view==='connect'?'page':undefined} className={'nav-item '+(view==='connect'?'active':'')} onClick={()=>chooseView('connect')}><Plug size={17}/><span>{t("连接 AI 工具")}</span>{state?.clients?.some(c=>c.name==='MCP')&&<span className="dot"/>}</button>
-   <button aria-label={t("SDK 更新")} aria-current={view==='sdk'?'page':undefined} className={'nav-item sdk-update-link '+(view==='sdk'?'active':'')} onClick={()=>chooseView('sdk')}><Package size={17}/><span>{t("SDK 更新")}</span>{state?.sdk?.updateAvailable&&<em>{t("新版")}</em>}</button>
-   <button aria-label={t("日志与记录")} aria-current={view==='logs'?'page':undefined} className={'nav-item '+(view==='logs'?'active':'')} onClick={()=>chooseView('logs')}><Terminal size={17}/><span>{t("日志与记录")}</span></button>
-   </nav></div>
+   {navigationGroups.map(([label,items])=><div className="navigation-group" key={label}><p className="nav-label">{t(label)}</p><nav aria-label={t(label)}>{items.map(([key,Icon,title])=><button key={key} aria-label={t(title)} aria-current={view===key?'page':undefined} className={'nav-item '+(view===key?'active':'')} onClick={()=>chooseView(key)}><Icon size={17}/><span>{t(title)}</span>{key==='projects'&&<em>{projects.length}</em>}{key==='connect'&&state?.clients?.some(c=>c.name==='MCP')&&<span className="dot"/>}{key==='sdk'&&state?.sdk?.updateAvailable&&<em>{t('新版')}</em>}</button>)}</nav></div>)}</div>
    <div className="sidebar-bottom">
+   <UpdateNotice api={api} updates={appUpdates} onUpdate={setAppUpdates}/>
    <button aria-label={t("新手指南")} aria-current={view==='guide'?'page':undefined} className={'nav-item '+(view==='guide'?'active':'')} onClick={()=>chooseView('guide')}><HelpCircle size={17}/><span>{t("新手指南")}</span></button>
    <button aria-label={t("设置")} aria-current={view==='settings'?'page':undefined} className={'nav-item '+(view==='settings'?'active':'')} onClick={()=>chooseView('settings')}><Settings2 size={17}/><span>{t("设置")}</span>{appUpdates?.updateAvailable&&<em>{t("新版")}</em>}</button>
    <div className="knowledge-status"><BookOpen size={14}/><div><strong>{state?.knowledge?.revision?t("{0} 份资料可离线阅读", {0: state.knowledge.documents}):t("官方资料待同步")}</strong></div><button aria-label={t("同步官方资料")} title={t("同步官方资料")} onClick={()=>startJob('aiui_docs_sync')}><RefreshCw size={13} className={running.some(j=>j.type==='knowledge')?'spin':''}/></button></div></div>
@@ -104,8 +103,8 @@ function App(){
     <div className="library-lower"><section className="get-started panel"><div className="section-heading"><h2>{t("让开发连起来")}</h2><Pill>{t("快速开始")}</Pill></div><p>{t("熟悉的 AI 工具，顺手的本地工作流。")}</p><div className="journey">{[['01',t("连接 AI 工具"),t("配置一次 MCP")],['02',t("运行模拟预览"),t("同一份 AIUI 源码")],['03',t("连接你的眼镜"),t("USB 部署与调试")]].map(([n,t,d])=><button key={n} onClick={()=>chooseView(n==='01'?'connect':n==='02'?'simulator':'devices')}><span>{n}</span><strong>{t}</strong><small>{d}</small><ChevronRight size={15}/></button>)}</div></section><section className="panel activity-panel"><div className="section-heading"><h2>{t("最近任务")}</h2><button className="text-button" onClick={()=>chooseView('logs')}>{t("查看全部")}</button></div><JobList jobs={jobs.slice(0,3)} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs}/></section></div>
    </>}
    {view==='simulator'&&<>
-    <div className="simulator-heading"><div><h1>{preview&&project?project.name:t("模拟器桌面")}{preview&&project&&<Pill>{project.version}</Pill>}</h1><p className="project-path">{preview&&project?project.agentPath:t("选择本地 AIUI 应用，运行后可随时回到桌面。")}</p></div><div className="heading-actions">{preview&&project?<><Button icon={FileCheck2} onClick={()=>startJob('aiui_project_check',{projectId:project.id})}>{t("检查源码")}</Button><Button icon={RefreshCw} onClick={()=>act('reload')}>{t("重新加载")}</Button><Button className="primary" icon={Camera} busy={busy==='capture'} onClick={capture}>{t("保存截图")}</Button></>:<Button icon={FolderOpen} onClick={importProject}>{t("导入项目")}</Button>}</div></div>
-    <Simulator projects={projects} project={project} preview={preview} session={session} onOpen={openPreview} onHome={id=>{setPreview(current=>current?.id===id?null:current);setLogs([]);}} onImport={importProject} act={act} choosePhoto={async()=>{const file=await api.choosePhoto();if(file)await act('camera_fixture',{path:file});}}/>
+    <div className="simulator-heading"><div><h1>{preview&&project?project.name:t("模拟器桌面")}{preview&&project&&<Pill>{project.version}</Pill>}</h1><p className="project-path">{preview&&project?project.agentPath:t("选择本地 AIUI 应用，运行后可随时回到桌面。")}</p></div><div className="heading-actions">{preview&&project?<><Button icon={FileCheck2} onClick={()=>startJob('aiui_project_check',{projectId:project.id})}>{t("检查源码")}</Button><Button icon={RefreshCw} onClick={()=>act('reload')}>{t("重新加载")}</Button></>:<Button icon={FolderOpen} onClick={importProject}>{t("导入项目")}</Button>}</div></div>
+    <Simulator projects={projects} project={project} preview={preview} session={session} onCapture={capture} capturing={busy==='capture'} onOpen={openPreview} onHome={id=>{setPreview(current=>current?.id===id?null:current);setLogs([]);}} onImport={importProject} act={act} choosePhoto={async()=>{const file=await api.choosePhoto();if(file)await act('camera_fixture',{path:file});}}/>
     {preview&&<section className="console panel"><div className="section-heading"><h2><Terminal size={15}/>{t(" 运行日志 ")}<span>{session?.logCount||0}</span></h2><div className="button-row"><span className="subtle">{t("来自当前预览会话")}</span><Button icon={Trash2} disabled={!!clearingPreview} onClick={()=>clearPreviewLogs(preview.id)}>{clearingPreview===preview.id?t("正在清空…"):t("清空运行日志")}</Button></div></div><div className="console-entries">{logs.length?logs.map((l,i)=><div className={'log-line '+l.level} key={i}><time>{new Date(l.at).toLocaleTimeString(getLocale())}</time><span>{l.message}</span></div>):<p className="subtle">{t("正在等待应用日志…")}</p>}</div></section>}
    </>}
    {view==='knowledge'&&<KnowledgePage knowledge={state?.knowledge} running={running} startJob={startJob} notify={notify}/>}
@@ -116,7 +115,7 @@ function App(){
    {view==='guide'&&<BeginnerGuide environment={environment} importProject={importProject} go={chooseView} notify={notify}/>}
    {view==='devices'&&<><div className="page-heading"><div><h1>{t("连接眼镜")}</h1><p>{t("插上数据线，自动检查连接。准备好后，把应用安装到眼镜。")}</p></div></div><DevicePanel discovery={discovery} project={activeProject} projects={projects} setSelected={setSelected} startJob={startJob} jobs={jobs} goToProjects={()=>setView('projects')} goToGuide={()=>setView('guide')}/><JobHistory title={t("安装与打开记录")} jobs={jobs.filter(j=>['deploy','launch','device-setup'].includes(j.type))} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs}/></>}
    {view==='glasses'&&<GlassesToolsPage discovery={discovery} jobs={jobs} refresh={refresh} notify={notify} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs} goToGuide={()=>setView('guide')}/>}
-   {view==='publish'&&<><div className="page-heading"><div><h1>{t("构建与上传")}</h1><p>{t("官方打包、版本核对与平台导入，保留每一步的实际结果。")}</p></div><Button icon={ExternalLink} onClick={()=>api.openStudio()}>{t("打开官方平台")}</Button></div><div className="publish-layout"><section className="panel publish-card"><div className="section-heading"><h2>{t("准备当前项目")}</h2><Package size={20}/></div>{activeProject?<><select aria-label={t("选择构建项目")} value={activeProject.id} onChange={e=>setSelected(e.target.value)}>{projects.map(p=><option key={p.id} value={p.id}>{p.name} · {p.version}</option>)}</select><div className="build-info"><span>{t("源代码版本 ")}<code>{short(activeProject.revision)}</code></span><span>{t("运行时要求 ")}<code>{activeProject.engine}</code></span><span>{t("构建结果 ")}<code>{activeProject.lastBuild?formatSize(activeProject.lastBuild.bytes):t("尚未构建")}</code></span></div><div className="button-row"><Button icon={FileCheck2} onClick={()=>startJob('aiui_project_check',{projectId:activeProject.id})}>{t("静态检查")}</Button><Button icon={Package} onClick={()=>startJob('aiui_project_pack',{projectId:activeProject.id})}>{t("打包 AIX")}</Button><Button icon={CloudUpload} className="primary" onClick={()=>startJob('aiui_platform_prepare',{projectId:activeProject.id})}>{t("准备平台导入")}</Button></div>{activeProject.lastBuild&&<button className="artifact-link" onClick={()=>api.reveal(activeProject.lastBuild.path)}><Package size={16}/><span>application.aix<small>SHA256 {short(activeProject.lastBuild.sha256)}</small></span><FolderOpen size={16}/></button>}</>:<Empty title={t("先导入一个项目")}/>}</section><section className="panel delivery-boundary"><h2>{t("清楚记录交付状态")}</h2>{[[t("本地打包"),t("生成 AIX 与文件摘要")],[t("平台上传"),t("在官方登录会话中导入")],[t("提交审核"),t("根据平台回执确认")],[t("审核与上架"),t("独立读取平台结果")]].map(([t,d],i)=><div key={t}><span>{i+1}</span><p><strong>{t}</strong><small>{d}</small></p></div>)}<p className="subtle">{t("首版已接通本地打包与资料准备。平台自动上传尚未验证，需在官方窗口完成登录与导入。")}</p></section></div><JobHistory title={t("构建与检查记录")} jobs={jobs.filter(j=>['pack','check','platform-prepare'].includes(j.type))} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs}/></>}
+   {view==='publish'&&<PublishPage api={api} projects={projects} project={activeProject} onSelect={setSelected} onImport={importProject} jobs={jobs} busy={busy} startJob={startJob} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs} notify={notify}/>}
    </main>
    <footer className="statusbar"><span><ShieldCheck size={11}/>{t(" 项目保存在本机 ")}<span className="statusbar-divider">·</span> v{__APP_VERSION__}</span><span>{running.length?<><LoaderCircle size={11} className="spin"/> {translateMessage(running[0].message).slice(0,90)}</>:<>Ink SDK {state?.webSdkVersion||'—'}</>}</span></footer>
   </div>

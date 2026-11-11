@@ -13,7 +13,7 @@ function Button({ children, icon: Icon, className = '', ...props }) {
   return <button className={'button ' + className} {...props}>{Icon && <Icon size={15}/>} {children}</button>;
 }
 
-export function Simulator({ projects, project, preview, session, onOpen, onHome, onImport, act, choosePhoto }) {
+export function Simulator({ projects, project, preview, session, onOpen, onHome, onImport, onCapture, capturing, act, choosePhoto }) {
   const frame = useRef(null), home = useRef(onHome);
   const [live, setLive] = useState(null);
   home.current = onHome;
@@ -47,7 +47,6 @@ export function Simulator({ projects, project, preview, session, onOpen, onHome,
   const status = { ready:t("预览运行中"), failed:t("加载失败"), closed:t("应用已退出"), detached:t("预览连接中断") }[current.status] || t("正在加载");
   return <div className="simulation-layout">
     <section className="simulation-stage">
-      {preview&&<RecordingControls source="simulator" sessionId={preview.id} disabled={!ready}/>}
       <div className="stage-toolbar">
         <span><span className={'dot ' + (current.status === 'failed' ? 'error' : '')}/>{preview ? status : t("模拟器桌面")}</span>
         <span>Rokid Glasses <span className="stage-divider">/</span> {preview?.width || 480} × {preview?.height || 352}</span>
@@ -71,7 +70,7 @@ export function Simulator({ projects, project, preview, session, onOpen, onHome,
       </div>}
       <div className="stage-foot"><span><ShieldCheck size={13}/>{preview ? t("原项目源码 · ") + (project?.revision?.slice(0,8) || '—') : t("{0} 个本地项目", {0: projects.length})}</span><span>{t("桌面与硬件输入均为模拟")}</span></div>
     </section>
-    {preview ? <SimulationControls act={act} direct={direct} session={current} ready={ready} choosePhoto={choosePhoto}/> : <section className="simulation-controls desktop-help">
+    {preview ? <aside className="simulation-sidebar" aria-label={t('模拟器工具')}><RecordingControls source="simulator" sessionId={preview.id} disabled={!ready} onCapture={onCapture} capturing={capturing}/><SimulationControls act={act} direct={direct} session={current} ready={ready} choosePhoto={choosePhoto}/></aside> : <section className="simulation-controls desktop-help">
       <div className="control-heading"><Glasses size={17}/><strong>{t("从桌面开始")}</strong></div>
       <div className="control-body"><h2>{t("选择应用，即刻运行")}</h2><p>{t("项目库中的 AIUI 应用会自动出现在桌面。点击图标即可启动。")}</p>
         <div className="desktop-help-item"><MousePointer2 size={19}/><span>{t("鼠标选择")}<small>{t("点击图标运行，滚动查看更多")}</small></span></div>

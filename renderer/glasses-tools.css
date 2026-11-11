@@ -14,6 +14,26 @@
 .glasses-tabs>button:hover{color:var(--ink)}
 .glasses-tabs>button[aria-selected=true]{color:var(--ink);font-weight:500;border-color:var(--accent)}
 .glasses-workspace{margin-bottom:24px}
+.app-type-switch{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--border);border-radius:9px;background:var(--soft);margin-bottom:18px}
+.app-type-switch>button{display:flex;align-items:center;gap:7px;font-size:12px;padding:9px 18px;border-radius:6px;color:var(--secondary);min-height:36px}
+.app-type-switch>button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 4px var(--shadow);font-weight:500}
+.app-scope-note{display:flex;align-items:flex-start;gap:8px;padding:12px 14px;background:var(--soft);border:1px solid var(--border);border-radius:7px;font-size:11px;color:var(--secondary);line-height:1.8;margin:0 0 18px}
+.app-scope-note>svg{flex-shrink:0;margin-top:2px}
+.app-version-note{font-size:12px;line-height:1.8;color:var(--secondary);padding:12px;background:var(--soft);border-radius:6px;margin-top:20px}
+.glasses-dialog.app-install-dialog{position:relative;width:760px;max-width:calc(100% - 60px);max-height:85vh;overflow:auto}
+.app-install-dialog>.panel{border:0;padding:0;margin:0;box-shadow:none}
+.app-install-dialog .glasses-section-title{padding-right:32px}
+.install-dialog-close{position:absolute;top:18px;right:18px;padding:6px!important;min-height:28px!important}
+.glasses-dialog>div>code{white-space:pre-wrap}
+.glasses-mirror-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:start}
+.glasses-mirror-sidebar{display:flex;flex-direction:column;gap:14px;min-width:0}
+.mirror-settings{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.mirror-settings .control-heading{font-size:13px}
+.mirror-settings .glasses-mirror-options{display:flex;flex-direction:column;align-items:stretch;gap:18px;padding:16px;margin:0;border:0}
+.mirror-settings .glasses-mirror-options>label:not(.glasses-checkbox){justify-content:space-between}
+.mirror-settings .glasses-checkbox{align-items:flex-start;line-height:1.8}
+@media(max-width:1150px){.glasses-mirror-layout{grid-template-columns:minmax(0,1fr)}.glasses-mirror-sidebar{display:grid;grid-template-columns:1fr 1fr;align-items:start}}
+@media(max-width:760px){.glasses-mirror-sidebar{grid-template-columns:1fr}.app-type-switch>button{padding:8px 12px}}
 .glasses-section-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
 .glasses-section-title h2{display:flex;align-items:center;gap:8px}
 .glasses-section-title p{color:var(--muted);font-size:12px;margin-top:6px;line-height:1.7}
@@ -88,22 +108,47 @@
 .glasses-app-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:20px}
 .glasses-app-toolbar .glasses-search{flex:1;max-width:420px}
 .glasses-app-toolbar>.subtle{margin-left:auto;white-space:nowrap}
-.glasses-app-layout{display:grid;grid-template-columns:minmax(220px,.9fr) minmax(0,1.25fr);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-height:380px}
-.glasses-app-list{border-right:1px solid var(--border);max-height:590px;overflow:auto;padding:7px}
-.glasses-app-list>button{width:100%;padding:13px 10px;display:flex;align-items:center;gap:10px;text-align:left;border-radius:6px}
+.glasses-app-layout{display:grid;grid-template-columns:minmax(260px,.75fr) minmax(0,1.25fr);border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:420px}
+.glasses-app-list{border-right:1px solid var(--border);max-height:480px;overflow:auto;padding:7px}
+.glasses-app-list>button{width:100%;min-height:78px;padding:12px;display:flex;align-items:center;gap:12px;text-align:left;border-radius:8px}
 .glasses-app-list>button:hover{background:var(--soft)}
 .glasses-app-list>button.selected{background:var(--selected)}
 .glasses-app-list>button>span:nth-child(2){flex:1;min-width:0}
 .glasses-app-list strong{display:block;font-size:12px;font-weight:500;margin-bottom:5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.glasses-app-list code{display:block;font-size:9px;color:var(--secondary);overflow-wrap:anywhere}
+.glasses-app-list code{display:block;font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .glasses-app-list small{display:block;font-size:10px;color:var(--muted);margin-top:5px}
 .glasses-app-list>button>svg{color:var(--muted);flex-shrink:0}
 .glasses-package-icon{width:34px;height:38px;background:var(--surface);border:1px solid var(--border);border-radius:7px;display:grid;place-items:center;color:var(--secondary);flex-shrink:0}
-.glasses-app-detail{padding:25px;min-width:0}
+.glasses-app-detail{padding:28px;min-width:0}
+.installed-app-icon{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;flex:0 0 44px;overflow:hidden;background:var(--soft);color:var(--secondary);font-size:20px;font-weight:600}
+.installed-app-icon img{display:block;width:100%;height:100%;object-fit:contain}
+.installed-app-icon.large{width:68px;height:68px;flex-basis:68px;border-radius:16px;font-size:28px}
+.installed-app-heading{display:flex;gap:18px;align-items:flex-start;margin-bottom:24px}
+.installed-app-title{min-width:0;flex:1}
+.glasses-app-detail .installed-app-heading h3{font-size:22px;line-height:1.35;margin:0 0 9px;font-weight:600}
+.installed-app-title>.pill{font-size:10px;margin-bottom:10px}
+.installed-app-identity{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.installed-app-identity code{color:var(--muted);font-size:11px;line-height:1.6;overflow-wrap:anywhere;min-width:0}
+.installed-app-identity button{display:grid;place-items:center;padding:3px;border-radius:4px;color:var(--muted);flex-shrink:0}
+.installed-app-identity button:hover{background:var(--hover);color:var(--ink)}
+.installed-app-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 26px}
+.installed-app-actions .button{min-height:36px;padding:7px 16px}
+.installed-app-metadata{margin:0;padding:20px 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:16px;font-size:12px;line-height:1.7}
+.installed-app-metadata>div{display:grid;grid-template-columns:92px minmax(0,1fr);gap:20px}
+.installed-app-metadata dt{color:var(--muted)}
+.installed-app-metadata dd{margin:0;color:var(--ink);overflow-wrap:anywhere}
+.metadata-secondary{color:var(--muted);font-size:11px}
+.installed-app-technical{margin-top:0;padding:16px 0 0;border-top:1px solid var(--border)}
+.installed-app-paths{display:flex;flex-direction:column;gap:8px;margin-top:16px;font-size:11px;overflow-wrap:anywhere}.installed-app-paths strong{font-weight:500;color:var(--muted)}
+.app-management-label{display:block;flex-basis:100%;font-size:11px;color:var(--muted);margin-bottom:2px}
+.mirror-settings .glasses-checkbox{display:grid;grid-template-columns:15px minmax(0,1fr);gap:10px;align-items:start}
+.mirror-settings .glasses-checkbox input{margin-top:3px}
 .glasses-app-detail h3{font-size:20px;margin:15px 0 8px;overflow-wrap:anywhere}
 .glasses-package-name{display:block;font-size:11px;color:var(--secondary);overflow-wrap:anywhere}
 .glasses-copy-package{margin:12px 0 23px;font-size:10px;min-height:26px;padding:3px 8px}
-.glasses-app-detail .glasses-info-list{margin-top:25px}
+.glasses-app-detail .glasses-info-list{margin-top:18px}
+.glasses-app-detail .glasses-copy-package{margin:12px 0 0}
+.glasses-app-detail .glasses-info-list>div{margin:10px 0}
 .glasses-app-detail .glasses-info-list>div{grid-template-columns:72px minmax(0,1fr);gap:12px}
 .glasses-app-placeholder{min-height:280px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;color:var(--muted);font-size:12px;text-align:center;line-height:1.8}
 .glasses-raw{margin-top:20px;font-size:11px;color:var(--secondary)}
@@ -174,6 +219,14 @@
 .glasses-file-preview pre{font-size:12px;line-height:1.8;max-height:55vh;overflow:auto;padding:16px;background:var(--soft);border:1px solid var(--border);border-radius:7px;white-space:pre-wrap}
 .glasses-file-preview .glasses-section-title{align-items:flex-start}
 .glasses-mirror{margin-bottom:0}
+.embedded-mirror-panel{padding:20px}
+.embedded-mirror-stage{position:relative;width:100%;height:clamp(280px,calc(100vh - 450px),560px);border-radius:10px;overflow:hidden;background:#0b0d0c}
+.embedded-mirror-stage iframe{display:block;width:100%;height:100%;border:0}
+.embedded-mirror-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;color:#a7b3ac;font-size:13px}
+.embedded-mirror-empty strong{font-weight:400}
+.embedded-mirror-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;font-size:11px;color:var(--muted)}
+.embedded-mirror-footer>span{display:flex;align-items:center;gap:7px}
+.embedded-mirror-footer .button{font-size:11px;min-height:29px;padding:4px 10px}
 .glasses-mirror-hero{text-align:center;border:1px solid var(--border);border-radius:9px;padding:40px 25px;background:var(--soft)}
 .glasses-mirror-illustration{position:relative;display:inline-flex;color:var(--secondary);margin:0 auto 20px}
 .glasses-mirror-illustration>svg:last-child{position:absolute;bottom:-5px;right:-12px;fill:var(--soft);stroke-width:1.8}
@@ -190,3 +243,17 @@
 .job-open-result{color:var(--secondary);font-size:11px;display:inline-flex;gap:5px;align-items:center;padding:5px;white-space:nowrap}
 @media(max-width:1230px){.glasses-metrics>div{padding:0 16px}.glasses-metrics strong{font-size:22px}.glasses-metrics>div:last-child strong{font-size:17px}.glasses-tabs{gap:22px}.glasses-app-detail{padding:20px}.glasses-utilities-grid{gap:16px}.glasses-reboot{flex-wrap:wrap}.glasses-section-title>.button-row{gap:6px}}
 @media(max-width:1100px){.glasses-overview-grid{grid-template-columns:1fr 1fr}.glasses-info-list>div{grid-template-columns:80px minmax(0,1fr);gap:10px}.glasses-file-table th:nth-child(2){width:82px}.glasses-file-table th:nth-child(3){width:110px}.glasses-section-title{align-items:flex-start}.glasses-file-filter{gap:12px}.glasses-file-filter .glasses-search{width:200px}.glasses-app-toolbar{flex-wrap:wrap}}
+
+.mirror-screenshot{margin-top:20px;display:flex;align-items:center;flex-direction:column;gap:12px}.mirror-screenshot img{max-width:100%;max-height:300px;background:#111;border-radius:7px}
+.aiui-source-filters{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 16px}
+.aiui-source-filters>button{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:7px;padding:8px 12px;font-size:12px;color:var(--secondary)}
+.aiui-source-filters>button[aria-pressed=true]{background:var(--soft);border-color:var(--border-strong);color:var(--ink)}
+.aiui-source-filters>button>span{font-size:10px;color:var(--muted)}
+.aiui-read-only-note{line-height:1.8;align-items:flex-start}
+.aiui-read-only-note>svg{flex-shrink:0;margin-top:3px}
+.aiui-catalog-unavailable{padding:16px 18px;border:1px solid var(--border);border-radius:8px;margin:16px 0 20px;background:var(--soft)}
+.aiui-catalog-unavailable strong{font-size:13px;font-weight:500}.aiui-catalog-unavailable p{font-size:12px;line-height:1.8;margin:8px 0;color:var(--secondary)}.aiui-catalog-unavailable small{font-size:11px;color:var(--muted)}
+.aiui-detail-read-only{display:flex;gap:10px;padding:13px 15px;background:var(--soft);border:1px solid var(--border);border-radius:8px;margin:0 0 24px;color:var(--secondary)}
+.aiui-detail-read-only>svg{flex-shrink:0;margin-top:2px}.aiui-detail-read-only strong{display:block;font-size:12px;font-weight:500}.aiui-detail-read-only small{display:block;font-size:11px;margin-top:6px;line-height:1.7}
+.aiui-app-description{margin-bottom:24px}.aiui-app-description h4{font-size:12px;margin:0 0 10px;font-weight:500}.aiui-app-description p{font-size:12px;line-height:1.9;color:var(--secondary);margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.installed-app-technical .installed-app-metadata dd{overflow-wrap:anywhere}

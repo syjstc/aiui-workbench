@@ -10,14 +10,16 @@
 
 ## 下载与安装
 
-当前版本 **0.3.2**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
+当前版本 **0.4.0**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
 
 | 平台 | 安装方式 | 签名 |
 | --- | --- | --- |
-| macOS · Apple Silicon | 解压 `darwin-arm64.zip`，将 `AIUI Workshop.app` 拖入“应用程序” | Developer ID；公证核验结果见发行说明 |
+| macOS · Apple Silicon | 打开 `darwin-arm64.dmg`，将 `AIUI Workshop.app` 拖入“应用程序”；也保留 ZIP | Developer ID；公证核验结果见发行说明 |
 | Windows 10 / 11 · x64 | 完整解压 `win32-x64.zip`，双击 `AIUI Workshop.exe` | 未签名 |
 
 客户端自带运行时、npm、官方 CLI、ADB 和 scrcpy，无需安装 Node.js、Android Studio 或另配 PATH。Windows 未签名包可能显示系统信誉提示，请先核对下载来源和 SHA256。当前没有 Intel Mac、Windows ARM64 或 Linux 的正式下载包。
+
+**维护者目前没有 Windows 实体机器，尚未完成完整的 Windows 实机体验验证。** 自动检查与结构验收不能代表每个环境都能完美运行，欢迎协助测试并反馈问题。
 
 ## 可以做什么
 
@@ -26,7 +28,9 @@
 - **真实 Ink 模拟器**：运行 `.ink`，回放镜腿按键、长滑与重复事件；鼠标、头模、三轴滑条和自动动作共享姿态输入。支持本地照片和主动开启的电脑摄像头。
 - **官方资料与 SDK**：内置 468 份资料和公开 `aiui-dev` Skill，可离线阅读、搜索及同步。SDK/CLI 升级先检查项目兼容性，支持逐项目切换与回退。
 - **MCP / CLI 协作**：AI 可读取规范、操作预览、执行断言、截图、录制短片及检查打包；桌面、Web、CLI 和 MCP 共享项目、日志与任务。
-- **眼镜工具**：设备诊断、文件与 APK 管理、截图、日志和 scrcpy 实时投屏。安装、清空数据等操作始终指向明确设备。
+- **眼镜工具**：设备诊断、文件与 APK 管理、真实名称与图标、截图、日志和默认内嵌的实时投屏。小窗口可单独打开或召回，结束投屏时同步关闭。
+- **AIUI 分类查看**：开发版、商店正式版与系统内置信息分开显示。正式版和内置版仅供查看，工坊不提供删除、卸载或清空数据。部分固件未开放商店清单权限，会明确显示不可读取，不会把未知数量显示成零。
+- **升级提醒**：启动与回到应用时自动检查，左下角提示新版本；macOS 支持下载、校验并重启升级，Windows 提供下载和手动安装入口。更新源可修改、可恢复默认。
 - **中英文与外观**：右上角随时切换中文 / EN，支持浅色、深色和跟随系统。
 
 ![Hello AIUI 在官方 Ink 运行时中的模拟画面与姿态控制](docs/screenshots/simulator-zh.png)
@@ -85,7 +89,7 @@ aiui_context_get → 创建或导入项目 → AI 编辑本地源码
 - 相机支持照片素材、电脑摄像头、连续取景和抓帧；不模拟眼镜原始分辨率、光学效果或音视频采集。
 - 蓝牙、定位轨迹、语音/模型服务、应用任意外网请求尚未完整模拟。工坊不内置 AI 模型。
 - 模拟验证、真机安装、佩戴体验和平台上架分别验收。自动上传、提审及平台状态回读尚未验证；本地 AIX 打包不表示已上架。
-- 版本更新支持检测、下载和校验，安装由用户完成。
+- macOS 的应用内升级需要安装目录可写；从只读磁盘映像运行时，请用 DMG 拖入“应用程序”。Windows 自动覆盖安装尚未提供，下载后手动替换便携目录。
 
 ## 文档与开发
 

@@ -10,23 +10,27 @@ A local workbench for Rokid AIUI development. Manage projects, read official doc
 
 ## Download
 
-Current version: **0.3.2**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest).
+Current version: **0.4.0**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest).
 
 | Platform | Install | Signing |
 | --- | --- | --- |
-| macOS, Apple Silicon | Extract the `darwin-arm64.zip`, move `AIUI Workshop.app` to Applications | Developer ID; see release notes for notarization verification |
+| macOS, Apple Silicon | Open the `darwin-arm64.dmg` and drag `AIUI Workshop.app` to Applications; ZIP is also available | Developer ID; see release notes for notarization verification |
 | Windows 10 / 11, x64 | Extract the entire `win32-x64.zip`, launch `AIUI Workshop.exe` | Unsigned |
 
 The app includes Electron/Node, npm, official CLI, Ink WASM, documentation, ADB and scrcpy. No separate Node.js, Android Studio or PATH setup is needed. Windows may show a reputation warning for the unsigned app; verify the source and checksum before running it. Intel Mac, Windows ARM64 and Linux release downloads are not currently provided.
 
 ## Features
 
+The maintainer has no physical Windows machine and has not completed full Windows hardware acceptance. Automated checks do not guarantee that every Windows environment will run perfectly. Testing and issue reports are welcome.
+
 - **Project removal:** two-stage confirmation with the full project name and path. Unbinding preserves local files; deletion moves the entire project folder to the system Trash/Recycle Bin. See [the illustrated guide](docs/project-removal.md).
 - **Shared projects:** import an AIUI directory or create a Page. External source changes refresh the preview automatically.
 - **Official runtime:** run real `.ink` source, replay temple keys and repeated swipe events, inject orientation with the mouse, 3D head model, sliders or motion loops. Use local photos or an explicitly enabled computer camera.
 - **Offline knowledge:** 468 official documents and the public `aiui-dev` skill, with search and verified snapshot updates. Prepare SDK/CLI upgrades, check compatibility and migrate projects individually.
 - **AI integration:** MCP and the Workshop CLI share previews, assertions, screenshots, silent recordings, build results and logs with desktop/Web.
-- **Glasses tools:** device information, files, APKs, screenshots, logs and bundled scrcpy mirroring.
+- **Glasses tools:** device information, files, real APK names/icons, screenshots, logs, and embedded mirroring with an optional separate window that closes when mirroring ends.
+- **Read-only AIUI catalogs:** separate development, store, and system-provided apps. Store and system-provided apps have no delete, uninstall, or clear-data controls. Restricted store inventories are reported as unavailable, with an unknown count.
+- **Update notice:** a persistent bottom-left notice offers download and restart on macOS. Windows offers package download and manual installation.
 - **Language and appearance:** persistent 中文 / EN buttons, light/dark/system themes.
 
 All documentation screenshots use only this repository's public examples in a fresh profile. They show simulation, not optical capture.
@@ -78,7 +82,7 @@ Projects, camera fixtures, platform sessions and task records stay on your compu
 
 The bundled Ink Web SDK is **0.19.1**, its WASM engine is **0.19.0**, and the CLI is **0.12.0**. Photo fixtures, computer camera streams and frame snapshots are supported. Original glasses capture resolution/optics, audio/video capture, Bluetooth, location tracks, speech/model services and arbitrary outbound app networking are not fully simulated. No AI model is bundled.
 
-Simulation, physical installation, worn-device acceptance and store publishing are separate. Automatic platform upload/review is unverified. App updates detect, download and verify packages; users complete installation themselves.
+Simulation, physical installation, worn-device acceptance and store publishing are separate. Automatic platform upload/review is unverified. macOS updates verify and stage a signed application, restart, and restore the previous app if replacement fails. Windows packages are installed manually.
 
 ## Development and licensing
 

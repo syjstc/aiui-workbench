@@ -17,6 +17,15 @@ async function manager(t, fetcher, options = {}) {
 }
 const custom = updates => updates.settings({ source: 'custom', sources: { custom: { manifestUrl: 'https://release.example/workbench-update.json' } } });
 
+test('packaged repository defaults remain editable, survive restart and can be restored without resetting other preferences',async t=>{
+  const updates=await manager(t,()=>assert.fail('settings do not fetch'));
+  const defaults=updates.status().defaults;assert.equal(defaults.sources.github.repository,'syjstc/aiui-workbench');
+  await updates.settings({sources:{github:{repository:'example/custom'}},autoCheck:false,intervalHours:168});
+  const reopened=await new AppUpdates(updates.home).init();t.after(()=>reopened.close());assert.equal(reopened.status().sources.github.repository,'example/custom');
+  await reopened.settings({sources:{github:{repository:reopened.status().defaults.sources.github.repository}}});
+  assert.equal(reopened.status().sources.github.repository,'syjstc/aiui-workbench');assert.equal(reopened.status().autoCheck,false);assert.equal(reopened.status().intervalHours,168);
+});
+
 test('an explicitly unconfigured update source makes no network request or latest-version claim', async t => {
   let requests = 0; const updates = await manager(t, () => { requests++; throw new Error('unexpected request'); });
   await updates.settings({ sources: { github: { repository: '' } } });

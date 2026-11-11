@@ -1,6 +1,6 @@
 import {RecordingControls} from './recording-controls.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, AlertCircle, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Battery, Camera, Check, ChevronRight, Clock, Copy, Download, File, FileText, Folder, FolderOpen, FolderPlus, Glasses, HardDrive, Home, Info, LayoutGrid, LoaderCircle, Monitor, MousePointer2, Package, Play, Plus, Power, RefreshCw, Search, Settings2, Smartphone, Square, Terminal, Trash2, Upload, Volume1, Volume2, Wrench, X } from 'lucide-react';
+import { Activity, AlertCircle, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Battery, Camera, Check, ChevronRight, ExternalLink, Clock, Copy, Download, File, FileText, Folder, FolderOpen, FolderPlus, Glasses, HardDrive, Home, Info, LayoutGrid, LoaderCircle, Monitor, MousePointer2, Package, Play, Plus, Power, RefreshCw, Search, Settings2, Smartphone, Square, Terminal, Trash2, Upload, Volume1, Volume2, Wrench, X } from 'lucide-react';
 import { getLocale, t, translateMessage } from './i18n.jsx';
 import { JobHistory } from './job-history.jsx';
 import { useFileDrop } from './file-drop.jsx';
@@ -11,7 +11,7 @@ const basename = file => file.split(/[\\/]/).at(-1);
 const size = bytes => bytes == null ? '—' : bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KiB` : bytes < 1024 ** 3 ? `${(bytes / 1024 ** 2).toFixed(1)} MiB` : `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 const date = value => value ? new Date(value).toLocaleString(getLocale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 const toolJob = job => job.type.startsWith('glasses-');
-const tabs = [['overview', Info, '概览'], ['mirror', Monitor, '真机投屏'], ['files', FolderOpen, '文件'], ['apps', LayoutGrid, '应用'], ['install', Download, '安装 APK'], ['utilities', Wrench, '常用工具']];
+const tabs = [['overview', Info, '概览'], ['mirror', Monitor, '真机投屏'], ['files', FolderOpen, '文件'], ['apps', LayoutGrid, '应用'], ['utilities', Wrench, '常用工具']];
 
 function Button({ icon: Icon, children, busy, className = '', ...props }) {
   return <button className={`button ${className}`} {...props}>{busy ? <LoaderCircle size={15} className="spin"/> : Icon && <Icon size={15}/>} {children}</button>;
@@ -36,10 +36,10 @@ function useTool(tool, args, revision = '', enabled = true) {
   return { data, loading, error, reload };
 }
 function ConfirmDialog({ title, description, target, confirmLabel, onClose, onConfirm }) {
-  const ref = useRef(null), [busy, setBusy] = useState(false);
+  const ref = useRef(null), [busy, setBusy] = useState(false), [error,setError] = useState('');
   useEffect(() => { ref.current.showModal(); }, []);
   return <dialog ref={ref} className="glasses-dialog" aria-labelledby="glasses-dialog-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === ref.current && !busy) onClose(); }}>
-    <div><span className="glasses-dialog-icon"><AlertCircle size={24}/></span><h2 id="glasses-dialog-title">{title}</h2><p>{description}</p><code>{target}</code><div className="button-row"><Button autoFocus disabled={busy} onClick={onClose}>{t('取消')}</Button><Button className="danger" busy={busy} disabled={busy} onClick={async () => { setBusy(true); try { await onConfirm(); onClose(); } finally { setBusy(false); } }}>{confirmLabel}</Button></div></div>
+    <div><span className="glasses-dialog-icon"><AlertCircle size={24}/></span><h2 id="glasses-dialog-title">{title}</h2><p>{description}</p><code>{target}</code><ErrorMessage error={error}/><div className="button-row"><Button autoFocus disabled={busy} onClick={onClose}>{t('取消')}</Button><Button className="danger" busy={busy} disabled={busy} onClick={async () => { setBusy(true); setError(''); try { const result=await onConfirm(); if(result===null)throw new Error(t('操作未提交，请重试')); onClose(); } catch(failure){setError(failure.message);} finally { setBusy(false); } }}>{confirmLabel}</Button></div></div>
   </dialog>;
 }
 
@@ -92,35 +92,37 @@ function ToolWorkspace({ serial, device, jobs, startJob, notify }) {
       {tab === 'mirror' && <MirrorPane serial={serial} notify={notify}/>}
       {tab === 'files' && <FilesPane {...common}/>}
       {tab === 'apps' && <AppsPane {...common}/>}
-      {tab === 'install' && <InstallPane {...common}/>}
       {tab === 'utilities' && <UtilitiesPane {...common} device={device}/>}
     </div>
   </div>;
 }
 
 function Meter({ value }) { return <div className="glasses-meter"><span style={{ width: `${Math.min(100, Math.max(0, value || 0))}%` }}/></div>; }
-function MirrorPane({ serial, notify }) {
-  const [status, setStatus] = useState(null), [error, setError] = useState(''), [pending, setPending] = useState(''), [maxFps, setMaxFps] = useState(30), [rotation, setRotation] = useState(0), [readOnly, setReadOnly] = useState(false);
-  const active = ['starting', 'running'].includes(status?.session?.status);
-  useEffect(() => {
-    let disposed = false, fetching = false;
-    async function poll() { if (fetching) return; fetching = true; try { const value = await api.call('aiui_glasses_mirror_status', { serial }); if (!disposed) { setStatus(value); setError(''); } } catch (failure) { if (!disposed) setError(failure.message); } finally { fetching = false; } }
-    poll(); const timer = setInterval(poll, 1500); return () => { disposed = true; clearInterval(timer); };
-  }, [serial]);
-  async function perform(action) {
-    setPending(action); setError('');
-    try {
-      const session = await api.call(`aiui_glasses_mirror_${action}`, { serial, ...(action === 'start' ? { maxFps, rotation, readOnly } : {}) });
-      setStatus(current => ({ ...current, session })); if (action === 'start') notify(t('投屏窗口已打开，可用鼠标操作眼镜'));
-    } catch (failure) { setError(failure.message); } finally { setPending(''); }
-  }
-  return <section className="panel glasses-mirror"><RecordingControls source="glasses" serial={serial}/><div className="glasses-section-title"><div><h2>{t('真机投屏与鼠标控制')}</h2><p>{t('打开实时投屏窗口，直接用电脑鼠标和键盘操作眼镜。')}</p></div><span className="pill">{t('客户端内置')} · scrcpy {status?.version || '—'}</span></div>
-    <div className="glasses-mirror-hero"><div className="glasses-mirror-illustration"><Monitor size={62}/><MousePointer2 size={27}/></div><h3>{active ? t('眼镜正在投屏') : t('把眼镜画面带到电脑上')}</h3><p>{t('独立窗口显示真实屏幕，可与工作台并排使用。全部组件随客户端提供，无需另装工具。')}</p><div className="button-row"><Button icon={Play} className="primary" disabled={!status?.available || active || !!pending} busy={pending === 'start'} onClick={() => perform('start')}>{pending === 'start' ? t('正在打开投屏…') : t('打开真机投屏')}</Button><Button icon={Square} disabled={!active || !!pending} busy={pending === 'stop'} onClick={() => perform('stop')}>{t('停止投屏')}</Button></div>{active && <span className="glasses-mirror-running"><span className="dot"/>{status.session.readOnly ? t('只看画面') : t('鼠标与键盘控制已启用')}</span>}</div>
-    <ErrorMessage error={error || status?.error || (status?.session?.status === 'failed' ? status.session.error : '')}/>
-    <div className="glasses-mirror-options"><label>{t('帧率上限')}<select aria-label={t('投屏帧率')} value={maxFps} disabled={active || !!pending} onChange={event => setMaxFps(Number(event.target.value))}>{[15, 30, 60].map(value => <option key={value} value={value}>{value} fps</option>)}</select></label><label>{t('画面旋转')}<select aria-label={t('投屏画面旋转')} value={rotation} disabled={active || !!pending} onChange={event => setRotation(Number(event.target.value))}>{[0, 90, 180, 270].map(value => <option key={value} value={value}>{value}°</option>)}</select></label><label className="glasses-checkbox"><input type="checkbox" checked={readOnly} disabled={active || !!pending} onChange={event => setReadOnly(event.target.checked)}/>{t('只看画面，关闭鼠标与键盘控制')}</label></div>
-    <div className="glasses-mirror-help"><div><strong>{t('左键点击与拖动')}</strong><span>{t('点击、长按和滑动眼镜界面')}</span></div><div><strong>{t('右键 / 鼠标中键')}</strong><span>{t('返回上一页 / 回到桌面')}</span></div><div><strong>{t('关闭投屏窗口')}</strong><span>{t('结束投屏，眼镜应用继续运行')}</span></div></div><p className="glasses-pane-note">{t('若画面方向与佩戴视角不同，停止投屏后调整旋转角度再打开。')}</p>
-    {status?.session?.output && <details className="glasses-raw"><summary>{t('投屏连接详情')}</summary><pre>{status.session.output}</pre></details>}
-  </section>;
+function MirrorPane({serial,notify}) {
+  const [status,setStatus]=useState(null),[error,setError]=useState(''),[pending,setPending]=useState('');
+  const [maxFps,setMaxFps]=useState(30),[rotation,setRotation]=useState(0),[readOnly,setReadOnly]=useState(false),[live,setLive]=useState(null);
+  const [screenshot,setScreenshot]=useState(null),[capturing,setCapturing]=useState(false),frame=useRef(null);
+  const active=status?.session?.status==='running'&&pending!=='restart'&&pending!=='stop';
+  const changed=active&&(status.session.maxFps!==maxFps||status.session.rotation!==rotation||status.session.readOnly!==readOnly);
+  useEffect(()=>{
+    let disposed=false,fetching=false;
+    async function initialize(){setPending('start');setError('');try{const info=await api.call('aiui_glasses_mirror_embed_status',{serial});if(disposed)return;setStatus(info);if(!info.available)throw new Error(info.error);const session=await api.call('aiui_glasses_mirror_embed_start',{serial,maxFps:30,rotation:0,readOnly:false});if(!disposed){setStatus({...info,session});setMaxFps(session.maxFps);setRotation(session.rotation);setReadOnly(session.readOnly);}}catch(failure){if(!disposed)setError(failure.message);}finally{if(!disposed)setPending('');}}
+    async function poll(){if(fetching)return;fetching=true;try{const value=await api.call('aiui_glasses_mirror_embed_status',{serial});if(!disposed)setStatus(value);}catch(failure){if(!disposed)setError(failure.message);}finally{fetching=false;}}
+    initialize();const timer=setInterval(poll,1500);return()=>{disposed=true;clearInterval(timer);};
+  },[serial]);
+  useEffect(()=>{setLive(null);if(!status?.session?.url)return;const origin=new URL(status.session.url).origin;function receive(event){if(event.source!==frame.current?.contentWindow||event.origin!==origin||event.data?.channel!=='aiui-mirror-state'||event.data.sessionId!==status.session.id)return;setLive(event.data);}window.addEventListener('message',receive);return()=>window.removeEventListener('message',receive);},[status?.session?.id,status?.session?.url]);
+  async function perform(action){setPending(action);setError('');try{if(action!=='start')await api.call('aiui_glasses_mirror_embed_stop',{serial});if(action!=='stop'){const session=await api.call('aiui_glasses_mirror_embed_start',{serial,maxFps,rotation,readOnly});setStatus(current=>({...current,session}));}else setStatus(current=>({...current,session:{...current?.session,status:'stopped'}}));}catch(failure){setError(failure.message);}finally{setPending('');}}
+  async function popout(){try{if(api.openMirror)await api.openMirror(serial);else if(!window.open(status.session.url,'aiui-mirror-'+serial,'width=760,height=650'))throw new Error(t('请允许打开独立投屏窗口'));}catch(failure){notify(failure.message,true);}}
+  return <div className="glasses-mirror-layout"><section className="panel glasses-mirror embedded-mirror-panel">
+    <div className="glasses-section-title"><div><h2>{t('真机画面')}</h2><p>{t('连接后直接在这里显示，也可以打开独立窗口。')}</p></div><Button icon={ExternalLink} disabled={!active||!!pending} title={t('打开或召回独立投屏窗口')} onClick={popout}>{t('独立窗口')}</Button></div>
+    <div className="embedded-mirror-stage">{active?<iframe ref={frame} key={status.session.id} src={status.session.url} title={t('内嵌真机投屏')}/>:<div className="embedded-mirror-empty"><Monitor size={38}/><strong>{pending?t('正在连接眼镜画面…'):t('真机投屏已暂停')}</strong>{!pending&&<Button className="primary" icon={Play} onClick={()=>perform('start')}>{t('开始投屏')}</Button>}</div>}</div>
+    <div className="embedded-mirror-footer"><span><span className={'dot '+(!active?'muted':'')}/>{active?(live?.ready?t('画面已连接'):t('正在解码画面…')):t('未在投屏')}{active&&` · ${status.session.width} × ${status.session.height}`}</span><Button busy={!!pending} disabled={!!pending||!active} onClick={()=>perform('stop')}>{t('暂停投屏')}</Button></div>
+    <ErrorMessage error={error||(!pending&&active&&live?.error)||status?.session?.error}/>
+    <p className="glasses-pane-note">{active&&status.session.readOnly?t('只看画面已开启。点击“独立窗口”可打开或召回窗口。'):t('点击画面操作眼镜，右键返回。点击“独立窗口”可打开或召回窗口。')}</p>
+    {screenshot&&<div className="mirror-screenshot"><img alt={t('真实眼镜截图')} src={`data:image/png;base64,${screenshot.data}`}/><Button icon={FolderOpen} onClick={()=>api.reveal(screenshot.path).catch(failure=>notify(failure.message,true))}>{t('打开文件位置')}</Button></div>}
+  </section><aside className="glasses-mirror-sidebar" aria-label={t('投屏工具')}><RecordingControls source="glasses" serial={serial} disabled={!status?.available} capturing={capturing} onCapture={async()=>{setCapturing(true);try{setScreenshot(await api.call('aiui_glasses_screenshot',{serial}));notify(t('眼镜截图已保存到电脑'));}catch(failure){notify(failure.message,true);}finally{setCapturing(false);}}}/>
+    <section className="mirror-settings"><div className="control-heading"><Settings2 size={16}/><strong>{t('投屏设置')}</strong></div><div className="glasses-mirror-options"><label>{t('帧率上限')}<select aria-label={t('投屏帧率')} value={maxFps} disabled={!!pending} onChange={event=>setMaxFps(Number(event.target.value))}>{[15,30,60].map(value=><option key={value} value={value}>{value} fps</option>)}</select></label><label>{t('画面旋转')}<select aria-label={t('投屏画面旋转')} value={rotation} disabled={!!pending} onChange={event=>setRotation(Number(event.target.value))}>{[0,90,180,270].map(value=><option key={value} value={value}>{value}°</option>)}</select></label><label className="glasses-checkbox"><input type="checkbox" checked={readOnly} disabled={!!pending} onChange={event=>setReadOnly(event.target.checked)}/><span>{t('只看画面，关闭鼠标与键盘控制')}</span></label>{changed&&<Button className="full" disabled={!!pending} onClick={()=>perform('restart')}>{t('应用投屏设置')}</Button>}</div></section>
+  </aside></div>;
 }
 function Overview({ serial, revision }) {
   const { data, loading, error, reload } = useTool('aiui_glasses_info', { serial }, revision);
@@ -177,18 +179,80 @@ function FilesPane({ serial, revision, busy, startJob, notify }) {
   </section>;
 }
 
-function AppsPane({ serial, revision, busy, startJob, notify }) {
+function AppsPane(props) {
+  const [kind,setKind]=useState('apk'),[installing,setInstalling]=useState(false);
+  return <div className="installed-apps-workspace">
+    <div className="app-type-switch" role="tablist" aria-label={t('应用类型分类')}>{[['apk',Package,'APK 应用'],['aiui',LayoutGrid,'AIUI 应用']].map(([key,Icon,label])=><button key={key} id={`app-kind-${key}`} role="tab" aria-selected={kind===key} aria-controls="installed-apps-content" onClick={()=>setKind(key)}><Icon size={16}/>{t(label)}</button>)}</div>
+    <div id="installed-apps-content" role="tabpanel" aria-labelledby={`app-kind-${kind}`}>{kind==='apk'?<ApkAppsPane {...props} onInstall={()=>setInstalling(true)}/>:<AiuiAppsPane {...props}/>}</div>
+    {installing&&<InstallDialog {...props} onClose={()=>setInstalling(false)}/>}
+  </div>;
+}
+
+function InstallDialog({onClose,...props}) {
+  const ref=useRef(null);
+  useEffect(()=>{ref.current.showModal();},[]);
+  return <dialog ref={ref} className="glasses-dialog app-install-dialog" aria-label={t('安装 APK')} onCancel={event=>{event.preventDefault();onClose();}}><Button className="install-dialog-close" icon={X} aria-label={t('关闭安装窗口')} onClick={onClose}/><InstallPane {...props} startJob={async(...args)=>{const job=await props.startJob(...args);if(job)onClose();return job;}}/></dialog>;
+}
+
+function InstalledAppIcon({app,large=false}) {
+  const [failed,setFailed]=useState(null);
+  const name=app.label||app.name||app.packageName?.split('.').at(-1)||'A';
+  return <span className={'installed-app-icon '+(large?'large':'')} title={app.iconSource==='local-project'?t('图标来自关联的本地项目'):undefined}>{app.icon&&failed!==app.icon?<img alt="" referrerPolicy="no-referrer" src={app.icon} onError={()=>setFailed(app.icon)}/>:<span aria-hidden="true">{Array.from(name)[0].toLocaleUpperCase()}</span>}</span>;
+}
+function InstalledAppHeading({app,name,identity,badge,copyLabel,notify}) {
+  return <header className="installed-app-heading"><InstalledAppIcon app={app} large/><div className="installed-app-title"><h3>{name}</h3><span className="pill">{badge}</span><div className="installed-app-identity"><code>{identity}</code><button aria-label={copyLabel} title={copyLabel} onClick={()=>api.copy(identity).then(()=>notify(t('已复制应用身份'))).catch(failure=>notify(failure.message,true))}><Copy size={14}/></button></div></div></header>;
+}
+
+function AiuiAppsPane({serial,revision,busy,startJob,notify}) {
+  const {data,loading,error,reload}=useTool('aiui_glasses_aiui_apps',{serial},revision);
+  const [query,setQuery]=useState(''),[selected,setSelected]=useState(''),[confirm,setConfirm]=useState(null),[source,setSource]=useState('all');
+  const sources={store:t('商店正式版'),developer:t('开发版'),builtin:t('系统内置'),unverified:t('身份待核实')};
+  const apps=(data?.apps||[]).filter(app=>(source==='all'||app.source===source)&&`${app.name} ${app.agentId||''} ${app.version} ${app.description||''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  const app=data?.apps.find(item=>item.fileName===selected);
+  useEffect(()=>{if(data&&!data.apps.some(item=>item.fileName===selected))setSelected('');},[data,selected]);
+  const store=data?.sources?.find(item=>item.source==='store');
+  const readOnly=app&&(app.source!=='developer'||!app.removable);
+  const permissionNames={CAMERA:t('相机'),GEOLOCATION:t('位置信息'),RECORD_AUDIO:t('麦克风'),INTERNET:t('网络'),STORAGE:t('存储'),BLUETOOTH:t('蓝牙')};
+  return <section className="panel glasses-apps"><div className="glasses-section-title"><div><h2>{t('AIUI 应用')}</h2><p>{t('按来源查看可读取的应用信息，正式版与系统内置应用仅供查看。')}</p></div><Button icon={RefreshCw} disabled={loading} busy={loading} onClick={reload}>{t('刷新')}</Button></div>
+    <div className="aiui-source-filters" role="group" aria-label={t('AIUI 应用来源')}>{['all','store','developer','builtin'].map(key=><button key={key} aria-pressed={source===key} onClick={()=>{setSource(key);setSelected('');}}>{key==='all'?t('全部'):sources[key]}{key==='store'&&<span>{t('只读')}</span>}{key==='builtin'&&<span>{t('只读')}</span>}</button>)}</div>
+    <p className="app-scope-note aiui-read-only-note"><Info size={16}/>{t('商店正式版与系统内置应用只读：工坊不提供删除、卸载或清空数据。开发版可单独卸载。')}</p>
+    {store?.status==='unavailable'&&(source==='all'||source==='store')&&<div className="aiui-catalog-unavailable"><strong>{t('商店正式版清单暂不可读取')}</strong><p>{store.reason==='permission-denied'?t('当前眼镜系统未开放正式版清单的读取权限，无法确认数量；这不代表没有安装正式版。'):t('当前眼镜未提供工坊可用的正式版清单接口，无法确认已安装数量。')}</p><small>{t('请在 Rokid App 中查看和管理商店正式版。')}</small></div>}
+    {data?.sources?.filter(item=>item.source!=='store'&&item.status==='unavailable'&&(source==='all'||source===item.source)).map(item=><div className="aiui-catalog-unavailable" key={item.source}><strong>{sources[item.source]} · {t('清单暂不可读取')}</strong><p>{translateMessage(item.error)}</p></div>)}
+    <div className="glasses-app-toolbar"><label className="glasses-search"><Search size={15}/><input aria-label={t('搜索 AIUI 应用')} placeholder={t('搜索名称、版本或 Agent ID')} value={query} onChange={event=>setQuery(event.target.value)}/></label>{data&&source!=='store'&&<span className="subtle">{t('已读取 {0} 个应用',{0:apps.length})}</span>}</div>
+    <ErrorMessage error={error} retry={reload}/>{loading?<Loading/>:data&&<div className="glasses-app-layout"><div className="glasses-app-list" aria-label={t('已安装 AIUI 应用')}>{apps.map(item=><button key={item.fileName} className={selected===item.fileName?'selected':''} aria-pressed={selected===item.fileName} onClick={()=>setSelected(item.fileName)}><InstalledAppIcon app={item}/><span><strong>{item.name}</strong><code>{item.agentId||item.fileName}</code><small>{item.version||t('版本未知')} · {sources[item.source]}{item.source!=='developer'&&' · '+t('只读')}</small></span><ChevronRight size={14}/></button>)}{!apps.length&&<p className="glasses-table-empty">{source==='store'?t('正式版清单不可读取，未显示应用数量'):query?t('没有匹配的应用'):t('此来源没有可展示的应用信息')}</p>}</div>
+      <div className="glasses-app-detail">{app?<><InstalledAppHeading app={app} name={app.name} identity={app.agentId||app.fileName} badge={'AIUI · '+sources[app.source]+(readOnly?' · '+t('只读'):'')} copyLabel={t('复制 Agent ID')} notify={notify}/>
+        {readOnly&&<div className="aiui-detail-read-only"><Info size={16}/><span><strong>{t('仅供查看，不支持删除')}</strong><small>{t('此处不会卸载应用，也不会清空应用数据。')}</small></span></div>}
+        {app.description&&<div className="aiui-app-description"><h4>{t('应用说明')}</h4><p>{app.description}</p></div>}
+        <dl className="installed-app-metadata"><div><dt>{t('应用来源')}</dt><dd>{sources[app.source]}</dd></div><div><dt>{t('眼镜版本')}</dt><dd>{app.version||t('版本未知')}</dd></div><div><dt>{t('安装包大小')}</dt><dd>{size(app.bytes)}</dd></div><div><dt>{t('运行时要求')}</dt><dd>Ink {app.engine||'—'}</dd></div>{app.source==='builtin'?<><div><dt>{t('可用状态')}</dt><dd>{t('随系统提供，当前启用状态未核实')}</dd></div><div><dt>{t('系统宿主版本')}</dt><dd>{app.hostVersion||'—'}</dd></div><div><dt>{t('宿主更新时间')}</dt><dd>{app.hostUpdatedAt||'—'}</dd></div></>:<><div><dt>{t('更新时间')}</dt><dd>{date(app.modifiedAt)}</dd></div><div><dt>{t('本地项目')}</dt><dd>{app.localProject?`${app.localProject.name} · ${app.localProject.version}`:t('未关联本地项目')}</dd></div></>}{!!app.permissions?.length&&<div><dt>{t('声明权限')}</dt><dd>{app.permissions.map(value=>permissionNames[value]||value).join(' · ')}</dd></div>}</dl>
+        {app.localProject&&app.version!==app.localProject.version&&<p className="app-version-note">{t('眼镜与本地项目版本不同，可在“连接眼镜”中重新安装。')}</p>}
+        <details className="glasses-raw installed-app-technical"><summary>{t('技术信息')}</summary><dl className="installed-app-metadata"><div><dt>{t('安装包文件')}</dt><dd>{app.fileName}</dd></div>{app.hostPackage&&<div><dt>{t('宿主包名')}</dt><dd>{app.hostPackage}</dd></div>}{app.checksum&&<div><dt>MD5</dt><dd>{app.checksum}</dd></div>}{app.definitionSha256&&<div><dt>SHA256</dt><dd>{app.definitionSha256}</dd></div>}</dl></details>
+        {app.source==='developer'&&app.removable&&<div className="glasses-app-danger"><Button icon={Trash2} disabled={busy} onClick={()=>setConfirm(app)}>{t('卸载开发版本')}</Button></div>}
+      </>:<div className="glasses-app-placeholder"><LayoutGrid size={32}/><p>{t('选择 AIUI 应用，查看详细信息')}</p></div>}</div>
+    </div>}
+    {confirm&&<ConfirmDialog title={t('卸载这个 AIUI 开发版本？')} description={t('将移除这台眼镜上的开发安装包及其本地注册。电脑中的项目文件会保留；云端移除状态需另行确认。')} target={`${confirm.name} · ${confirm.version}\n${confirm.agentId}\n${serial}`} confirmLabel={t('确认卸载开发版本')} onClose={()=>setConfirm(null)} onConfirm={()=>startJob('aiui_glasses_aiui_uninstall',{serial,agentId:confirm.agentId,confirmAgentId:confirm.agentId})}/>}
+  </section>;
+}
+
+function ApkAppsPane({ serial, revision, busy, startJob, notify, onInstall }) {
   const { data, loading, error, reload } = useTool('aiui_glasses_apps', { serial }, revision);
   const [filter, setFilter] = useState('user'), [query, setQuery] = useState(''), [selected, setSelected] = useState(''), [confirm, setConfirm] = useState(null);
   const details = useTool('aiui_glasses_app_details', { serial, packageName: selected }, revision, !!selected && !!data?.packages.some(item => item.packageName === selected));
-  const packages = (data?.packages || []).filter(item => (filter === 'all' || (filter === 'user' ? !item.system : item.system)) && item.packageName.toLowerCase().includes(query.toLowerCase()));
+  const packages = (data?.packages || []).filter(item => (filter === 'all' || (filter === 'user' ? !item.system : item.system)) && `${item.label||''} ${item.packageName}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const app = data?.packages.find(item => item.packageName === selected);
   async function action(value) { return startJob('aiui_glasses_app_action', { serial, packageName: selected, action: value, ...(['clear', 'uninstall'].includes(value) ? { confirmPackage: selected } : {}) }); }
-  return <section className="panel glasses-apps"><div className="glasses-section-title"><div><h2>{t('Android 应用')}</h2><p>{t('查看已安装的 APK 应用，打开、停止或管理第三方应用。')}</p></div><Button icon={RefreshCw} disabled={loading} busy={loading} onClick={reload}>{t('刷新')}</Button></div>
-    <div className="glasses-app-toolbar"><label className="glasses-search"><Search size={15}/><input aria-label={t('搜索应用包名')} placeholder={t('搜索应用包名')} value={query} onChange={event => setQuery(event.target.value)}/></label><select aria-label={t('应用类型')} value={filter} onChange={event => setFilter(event.target.value)}><option value="user">{t('第三方应用')}</option><option value="system">{t('系统应用')}</option><option value="all">{t('全部应用')}</option></select><span className="subtle">{t('{0} 个应用', { 0: packages.length })}</span></div>
-    <ErrorMessage error={error} retry={reload}/>{loading ? <Loading/> : data && <div className="glasses-app-layout"><div className="glasses-app-list" aria-label={t('已安装应用')}>{packages.map(item => <button key={item.packageName} className={selected === item.packageName ? 'selected' : ''} aria-pressed={selected === item.packageName} onClick={() => setSelected(item.packageName)}><span className="glasses-package-icon"><Package size={20}/></span><span><strong>{item.packageName.split('.').at(-1)}</strong><code>{item.packageName}</code><small>versionCode {item.versionCode || '—'}{item.disabled ? ' · ' + t('已停用') : ''}</small></span><ChevronRight size={14}/></button>)}{!packages.length && <p className="glasses-table-empty">{t('没有匹配的应用')}</p>}</div>
-      <div className="glasses-app-detail">{app ? <><span className="pill">{app.system ? t('系统应用') : t('第三方应用')}</span><h3>{app.packageName.split('.').at(-1)}</h3><code className="glasses-package-name">{app.packageName}</code><Button icon={Copy} className="glasses-copy-package" onClick={() => api.copy(app.packageName).then(() => notify(t('包名已复制'))).catch(failure => notify(failure.message, true))}>{t('复制包名')}</Button><div className="button-row"><Button icon={Play} className="primary" disabled={busy || app.disabled} onClick={() => action('launch')}>{t('打开应用')}</Button>{!app.system && <Button icon={Square} disabled={busy} onClick={() => action('stop')}>{t('强行停止')}</Button>}</div><ErrorMessage error={details.error}/>{details.loading && <Loading/>}{details.data && <><dl className="glasses-info-list"><div><dt>{t('版本')}</dt><dd>{details.data.versionName || '—'} ({details.data.versionCode || app.versionCode})</dd></div><div><dt>{t('安装时间')}</dt><dd>{details.data.firstInstallTime || '—'}</dd></div><div><dt>{t('更新时间')}</dt><dd>{details.data.lastUpdateTime || '—'}</dd></div><div><dt>{t('APK 路径')}</dt><dd>{details.data.apkPaths.map(file => <code key={file}>{file}</code>)}</dd></div></dl><details className="glasses-raw"><summary>{t('查看系统原始详情')}</summary><pre>{details.data.output}</pre></details></>}{!app.system && <div className="glasses-app-danger"><Button icon={Trash2} disabled={busy} onClick={() => setConfirm('clear')}>{t('清空应用数据')}</Button><Button icon={Trash2} disabled={busy} onClick={() => setConfirm('uninstall')}>{t('卸载应用')}</Button></div>}</> : <div className="glasses-app-placeholder"><Package size={32}/><p>{t('选择应用查看版本和管理操作')}</p></div>}</div>
-    </div>}<p className="glasses-pane-note">{t('此处列出 Android APK；AIUI 小组件请在“连接眼镜”中安装和打开。')}</p>
+  return <section className="panel glasses-apps"><div className="glasses-section-title"><div><h2>{t('APK 应用')}</h2><p>{t('查看已安装的 APK 应用，打开、停止或管理第三方应用。')}</p></div><div className="button-row"><Button icon={RefreshCw} disabled={loading} busy={loading} onClick={reload}>{t('刷新')}</Button><Button icon={Plus} className="primary" disabled={busy} onClick={onInstall}>{t('安装 APK')}</Button></div></div>
+    <div className="glasses-app-toolbar"><label className="glasses-search"><Search size={15}/><input aria-label={t('搜索应用包名')} placeholder={t('搜索名称或包名')} value={query} onChange={event => setQuery(event.target.value)}/></label><select aria-label={t('应用类型')} value={filter} onChange={event => setFilter(event.target.value)}><option value="user">{t('第三方应用')}</option><option value="system">{t('系统应用')}</option><option value="all">{t('全部应用')}</option></select><span className="subtle">{t('{0} 个应用', { 0: packages.length })}</span></div>
+    <ErrorMessage error={error} retry={reload}/>{loading ? <Loading/> : data && <div className="glasses-app-layout"><div className="glasses-app-list" aria-label={t('已安装应用')}>{packages.map(item => <button key={item.packageName} className={selected === item.packageName ? 'selected' : ''} aria-pressed={selected === item.packageName} onClick={() => setSelected(item.packageName)}><InstalledAppIcon app={item}/><span><strong>{item.label||item.packageName.split('.').at(-1)}</strong><code>{item.packageName}</code><small>versionCode {item.versionCode || '—'}{item.disabled ? ' · ' + t('已停用') : ''}</small></span><ChevronRight size={14}/></button>)}{!packages.length && <p className="glasses-table-empty">{t('没有匹配的应用')}</p>}</div>
+      <div className="glasses-app-detail">{app ? <>
+        <InstalledAppHeading app={app} name={app.label||app.packageName.split('.').at(-1)} identity={app.packageName} badge={'APK · '+(app.system?t('系统应用'):t('第三方应用'))} copyLabel={t('复制包名')} notify={notify}/>
+        <div className="installed-app-actions"><Button icon={Play} className="primary" disabled={busy||app.disabled} onClick={()=>action('launch')}>{t('打开应用')}</Button>{!app.system&&<Button icon={Square} disabled={busy} onClick={()=>action('stop')}>{t('强行停止')}</Button>}</div>
+        <ErrorMessage error={details.error}/>{details.loading&&<Loading/>}{details.data&&<>
+          <dl className="installed-app-metadata"><div><dt>{t('版本')}</dt><dd>{details.data.versionName||'—'} <span className="metadata-secondary">({details.data.versionCode||app.versionCode})</span></dd></div><div><dt>{t('安装时间')}</dt><dd>{details.data.firstInstallTime||'—'}</dd></div><div><dt>{t('更新时间')}</dt><dd>{details.data.lastUpdateTime||'—'}</dd></div></dl>
+          <details className="glasses-raw installed-app-technical"><summary>{t('技术信息')}</summary><div className="installed-app-paths"><strong>{t('APK 路径')}</strong>{details.data.apkPaths.map(file=><code key={file}>{file}</code>)}</div><pre>{details.data.output}</pre></details>
+        </>}
+        {!app.system&&<div className="glasses-app-danger"><span className="app-management-label">{t('应用管理')}</span><Button icon={Trash2} disabled={busy} onClick={()=>setConfirm('clear')}>{t('清空应用数据')}</Button><Button icon={Trash2} disabled={busy} onClick={()=>setConfirm('uninstall')}>{t('卸载应用')}</Button></div>}
+      </> : <div className="glasses-app-placeholder"><Package size={32}/><p>{t('选择应用查看版本和管理操作')}</p></div>}</div>
+    </div>}
     {confirm && <ConfirmDialog title={confirm === 'clear' ? t('清空这个应用的数据？') : t('卸载这个应用？')} description={confirm === 'clear' ? t('这会删除应用的登录状态、设置和本地数据，应用本身会保留。') : t('这会从当前眼镜移除应用，并删除它的本地数据。')} target={`${selected} · ${serial.slice(-6)}`} confirmLabel={confirm === 'clear' ? t('确认清空数据') : t('确认卸载')} onClose={() => setConfirm(null)} onConfirm={() => action(confirm)}/>}
   </section>;
 }

@@ -1,13 +1,16 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, session } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const {spawn}=require('node:child_process');
 const ROOT = path.resolve(__dirname,'..');
 const home = process.env.AIUI_WORKBENCH_HOME || path.join(app.getPath('appData'),'AIUI Workbench');
 process.env.AIUI_WORKBENCH_HOME = home;
 app.setName('AIUI 工坊');
 app.setPath('userData',path.join(home,'desktop-profile'));
 let mainWindow, client, studio;
-let allowed, updates;
+const mirrorWindows=new Map();
+const mirrorWindowLifecycle=require('./mirror-window-lifecycle.cjs').createMirrorWindowLifecycle({windows:mirrorWindows,getSession:async serial=>(await client.call('aiui_glasses_mirror_embed_status',{serial},'desktop')).session});
+let allowed, updates, upgradeTask, quittingForUpgrade=false;
 let desktopLocale = 'zh-CN';
 function trusted(event) { if(event.sender!==mainWindow?.webContents || event.senderFrame!==mainWindow?.webContents.mainFrame)throw new Error('无效的桌面调用来源'); }
 async function connectService(){
@@ -31,7 +34,7 @@ app.whenReady().then(async()=>{
   mainWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   mainWindow.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('file://'))event.preventDefault();});
   require('./media-permissions.cjs').installMediaPermissions(session.defaultSession, { getWebContents:()=>mainWindow?.webContents, origin:client.connection.origin });
-  ipcMain.handle('workbench:call',async(event,tool,args)=>{trusted(event);if(!allowed.has(tool))throw new Error('未知操作');return client.call(tool,args,'desktop');});
+  ipcMain.handle('workbench:call',async(event,tool,args)=>{trusted(event);if(!allowed.has(tool))throw new Error('未知操作');const result=await client.call(tool,args,'desktop');if(tool==='aiui_glasses_mirror_embed_stop')mirrorWindowLifecycle.close(args.serial,result?.id);return result;});
   ipcMain.handle('workbench:project-remove',async(event,args)=>{
     trusted(event);
     const intent=await client.call('ui_project_removal_begin',args,'desktop');
@@ -48,7 +51,27 @@ app.whenReady().then(async()=>{
   ipcMain.handle('workbench:locale',async(event,locale)=>{trusted(event);if(!['zh-CN','en'].includes(locale))throw new Error('Unsupported language');desktopLocale=locale;studio?.setTitle(locale==='en'?'Rokid Official Platform':'Rokid 官方平台');return true;});
   ipcMain.handle('workbench:updates',async(event,method,args)=>{
     trusted(event);
-    if(method==='status')return updates.status();
+    if(method==='status')return {...updates.status(),canInstall:process.platform==='darwin'&&app.isPackaged,installing:!!upgradeTask};
+    if(upgradeTask)throw new Error('正在准备升级，请稍候');
+    if(method==='upgrade'){
+      upgradeTask=(async()=>{
+        let prepared;
+        try {
+        const ensureIdle=async()=>{const status=await client.call('aiui_status',{},'desktop');if(status.jobs?.some(job=>job.status==='running')||status.recordings?.some(record=>['starting','recording','finalizing'].includes(record.status)))throw new Error('请先结束正在运行的任务或录制，再升级工坊');};
+        await ensureIdle();
+        const downloaded=updates.downloaded?.version===updates.latest?.version?updates.downloaded:await updates.download();
+        if(process.platform!=='darwin'||!app.isPackaged){shell.showItemInFolder(downloaded.path);return {manualInstall:true};}
+        const {prepareMacUpdate}=await import('../core/update-install.mjs');
+        const target=path.resolve(path.dirname(app.getPath('exe')),'../..');
+        prepared=await prepareMacUpdate({home,downloaded,target,pid:process.pid});
+        await ensureIdle();
+        const installer=spawn('/bin/sh',[prepared.script,...prepared.args],{detached:true,stdio:'ignore',windowsHide:true});
+        await new Promise((resolve,reject)=>{installer.once('spawn',resolve);installer.once('error',reject);});installer.unref();
+        quittingForUpgrade=true;setTimeout(()=>app.quit(),200);return {restarting:true,version:prepared.version};
+        } catch(error) {await prepared?.cancel().catch(()=>{});throw error;}
+      })().finally(()=>{if(!quittingForUpgrade)upgradeTask=null;});
+      return upgradeTask;
+    }
     if(method==='settings')return updates.settings(args);
     if(method==='check')return updates.check();
     if(method==='download')return updates.download();
@@ -62,7 +85,25 @@ app.whenReady().then(async()=>{
   ipcMain.handle('workbench:reveal',async(event,file)=>{trusted(event);if(typeof file!=='string'||!path.isAbsolute(file))throw new Error('无效路径');shell.showItemInFolder(file);return true;});
   ipcMain.handle('workbench:external',async(event,url)=>{trusted(event);if(!/^https:\/\/(?:github\.com|js\.rokid\.com|yodaos-project\.github\.io|jsar-project\.github\.io|modelcontextprotocol\.io|developer\.android\.com|global\.rokid\.com|x-docs\.rokid\.com)\//.test(url))throw new Error('仅支持打开已知官方资料来源');await shell.openExternal(url);});
   ipcMain.handle('workbench:studio',event=>{trusted(event);studioWindow();return true;});
+  ipcMain.handle('workbench:mirror-window',async(event,serial)=>{
+    trusted(event);
+    const {session}=await client.call('aiui_glasses_mirror_embed_status',{serial},'desktop');
+    if(session?.status!=='running')throw new Error('请先连接内嵌真机投屏');
+    const existing=mirrorWindows.get(serial);
+    if(existing&&!existing.window.isDestroyed()){
+      if(existing.sessionId!==session.id){existing.sessionId=session.id;await existing.window.loadURL(session.url);}
+      if(existing.window.isMinimized())existing.window.restore();existing.window.show();existing.window.focus();return {focused:true};
+    }
+    const window=new BrowserWindow({width:760,height:650,minWidth:360,minHeight:300,title:`AIUI · ${serial.slice(-6)}`,backgroundColor:'#0b0d0c',webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}});
+    const entry={window,sessionId:session.id};mirrorWindows.set(serial,entry);mirrorWindowLifecycle.changed();
+    window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+    window.webContents.on('will-navigate',(event,url)=>{if(new URL(url).origin!==client.connection.origin)event.preventDefault();});
+    window.on('closed',()=>{if(mirrorWindows.get(serial)===entry)mirrorWindows.delete(serial);mirrorWindowLifecycle.changed();});
+    await window.loadURL(session.url);return {opened:true};
+  });
   await mainWindow.loadFile(path.join(ROOT,'dist/renderer/index.html'));
+  if(process.platform==='darwin'&&app.isPackaged){const {finishMacUpdate}=await import('../core/update-install.mjs');await finishMacUpdate(home,{target:path.resolve(path.dirname(app.getPath('exe')),'../..'),version:updates.version}).catch(()=>{});}
+  mainWindow.on('focus',()=>{if(updates.data.autoCheck&&Date.now()-Date.parse(updates.data.attemptedAt||0)>5*60000)updates.check().catch(()=>{});});
   updates.start();
   client.call('aiui_docs_sync',{},'desktop').catch(()=>{});
   mainWindow.on('closed',()=>{mainWindow=null;});
@@ -81,4 +122,4 @@ app.whenReady().then(async()=>{
 app.on('window-all-closed',()=>app.quit());
 app.on('activate',()=>mainWindow?.show());
 
-app.on('before-quit',()=>{updates?.close();});
+app.on('before-quit',()=>{mirrorWindowLifecycle.dispose();updates?.close();});

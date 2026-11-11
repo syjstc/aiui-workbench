@@ -1,5 +1,7 @@
 {
   "source": "github",
+  "autoCheck": true,
+  "intervalHours": 24,
   "sources": {
     "github": {
       "repository": "syjstc/aiui-workbench"

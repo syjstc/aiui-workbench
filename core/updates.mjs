@@ -38,6 +38,7 @@ export class AppUpdates {
   }
   async init() {
     const defaults = await readJson(path.join(ROOT, 'assets/updates.json'));
+    this.defaults = { autoCheck:true, intervalHours:24, ...defaults };
     const saved = await readJson(this.file, {});
     this.data = { autoCheck: true, intervalHours: 24, ...defaults, ...saved, sources: Object.fromEntries(UPDATE_SOURCES.map(key => [key, { ...defaults.sources[key], ...saved.sources?.[key] }])) };
     if (!UPDATE_SOURCES.includes(this.data.source)) this.data.source = 'github';
@@ -47,7 +48,7 @@ export class AppUpdates {
   }
   configured() { const source = this.data.sources[this.data.source]; return !!(this.data.source === 'github' ? source.repository : source.manifestUrl); }
   status() {
-    return { version: this.version, platform: this.platform, arch: this.arch, ...structuredClone(this.data), configured: this.configured(), checking: !!this.checking, downloading: !!this.downloading, progress: this.progress || null, latest: this.latest, updateAvailable: !!this.latest && semver.gt(this.latest.version, this.version), downloaded: this.downloaded };
+    return { version: this.version, platform: this.platform, arch: this.arch, ...structuredClone(this.data), defaults:structuredClone(this.defaults), configured: this.configured(), checking: !!this.checking, downloading: !!this.downloading, progress: this.progress || null, latest: this.latest, updateAvailable: !!this.latest && semver.gt(this.latest.version, this.version), downloaded: this.downloaded };
   }
   async save() { await atomicJson(this.file, this.data); }
   async settings({ source, sources, autoCheck, intervalHours } = {}) {

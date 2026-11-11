@@ -101,7 +101,7 @@ public class QaActivity extends Activity {
   });
   await check('通过 APK 选择器在真机安装独立测试应用', async () => {
     await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, apk);
-    await page.getByRole('tab', { name: '安装 APK', exact: true }).click();
+    await page.getByRole('button', { name: '安装 APK', exact: true }).click();
     await dropFile(page, '.glasses-apk-picker', apk);
     await page.getByText('workbench QA.apk', { exact: true }).waitFor();
     await dropFile(page, '.glasses-apk-picker', apk);
@@ -204,7 +204,7 @@ public class QaActivity extends Activity {
     await webPage.getByRole('button', { name: '切换到中文', exact: true }).click();
     await webPage.getByRole('button', { name: '眼镜工具', exact: true }).click();
     await webPage.getByRole('heading', { name: '存储空间', exact: true }).waitFor();
-    await webPage.getByRole('tab', { name: '安装 APK', exact: true }).click();
+    await webPage.getByRole('button', { name: '安装 APK', exact: true }).click();
     const fileChooser = webPage.waitForEvent('filechooser');
     await webPage.getByRole('button', { name: '选择 APK 文件', exact: true }).click();
     await (await fileChooser).setFiles(apk);

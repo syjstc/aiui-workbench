@@ -1,5 +1,7 @@
 .view-simulator .simulation-layout{display:grid;grid-template-columns:minmax(530px,1fr) 310px;gap:18px;align-items:start}
 .view-simulator .simulation-stage{min-height:560px;min-width:0}
+.simulation-sidebar{display:flex;flex-direction:column;gap:14px;min-width:0;position:sticky;top:0;max-height:calc(100vh - 210px);overflow-y:auto;scrollbar-gutter:stable}
+.simulation-sidebar>*{flex-shrink:0}
 .mouse-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--soft);font-size:11px;color:var(--muted)}
 .mouse-mode{display:flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid var(--border-strong);border-radius:6px;background:white;color:var(--secondary);font-size:11px}
 .mouse-mode.active{background:var(--selected);border-color:var(--border-strong);color:var(--ink)}
@@ -23,5 +25,6 @@
 .simulation-controls .control-body .control-divider{margin:18px 0}.simulation-controls .control-body .axis-control{margin-bottom:19px}.simulation-controls .control-body .switch-row{margin:14px 0}.simulation-controls .control-body .mouse-switch{margin-top:0}
 @media(max-width:1230px){.view-simulator .simulation-layout{grid-template-columns:minmax(530px,1fr) 270px;gap:12px}.head-model canvas{height:190px}.simulation-controls .control-tabs button{padding-left:5px;padding-right:5px;gap:3px}.pose-readout{gap:10px}.content.view-simulator{padding:24px 16px}.mouse-toolbar{gap:7px}.mouse-toolbar>span{font-size:9px}}
 
-@media(max-width:1150px){.view-simulator .simulation-layout{grid-template-columns:minmax(0,1fr)}.view-simulator .simulation-controls{max-width:none}.simulation-controls .control-body{max-width:620px}.head-model canvas{height:210px}}
+@media(max-width:1150px){.view-simulator .simulation-layout{grid-template-columns:minmax(0,1fr)}.simulation-sidebar{position:static;max-height:none;overflow:visible;display:grid;grid-template-columns:minmax(220px,.65fr) minmax(0,1fr);align-items:start}.view-simulator .simulation-controls{max-width:none}.simulation-controls .control-body{max-width:620px}.head-model canvas{height:210px}}
+@media(max-width:760px){.simulation-sidebar{grid-template-columns:minmax(0,1fr)}}
 .camera-error{color:var(--danger,#b42318);font-size:12px;line-height:1.6;overflow-wrap:anywhere}

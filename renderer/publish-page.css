@@ -1,0 +1,56 @@
+.publish-progress{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));list-style:none;padding:18px 0;margin:0 0 24px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);gap:20px}
+.publish-progress li{display:flex;align-items:center;gap:12px;min-width:0}
+.publish-progress li>span{display:grid;place-items:center;width:29px;height:29px;border:1px solid var(--border-strong);border-radius:50%;font-size:12px;color:var(--secondary);flex-shrink:0}
+.publish-progress li>span.complete{color:var(--success);border-color:var(--success-border);background:var(--success-soft)}
+.publish-progress strong{display:block;font-weight:500;font-size:13px;line-height:1.6}
+.publish-progress small{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+.publish-progress li>svg{margin-left:auto;color:var(--muted);flex-shrink:0}
+.publish-workflow{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1.2fr);gap:22px;align-items:start;margin-bottom:24px}
+.publish-workflow>.panel{padding:24px;min-width:0;margin-bottom:0}
+.publish-step-heading{display:flex;gap:9px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.publish-step-number{display:grid;place-items:center;width:24px;height:24px;border-radius:6px;background:var(--soft);border:1px solid var(--border);color:var(--secondary);font-size:12px;flex-shrink:0}
+.publish-step-heading h2{font-size:14px;flex:1;line-height:1.6}
+.publish-step-heading .pill{font-size:10px;font-weight:400}
+.publish-project-label{display:block;font-size:12px;color:var(--secondary);margin-bottom:9px}
+.publish-local select{width:100%;margin-bottom:20px;min-width:0}
+.publish-build-actions{gap:8px}
+.publish-local-note{font-size:11px;color:var(--muted);line-height:1.85;margin-top:11px}
+.publish-build-status{display:flex;align-items:flex-start;gap:10px;padding:15px;border:1px solid var(--border);border-radius:8px;background:var(--soft);margin-top:22px;color:var(--secondary)}
+.publish-build-status>svg{flex-shrink:0;margin-top:1px}
+.publish-build-status strong{font-size:12px;font-weight:500;line-height:1.7;display:block}
+.publish-build-status p{font-size:11px;line-height:1.85;margin-top:4px;color:var(--secondary)}
+.publish-build-status.ready{background:var(--success-soft);border-color:var(--success-border);color:var(--success)}
+.publish-build-status.attention{background:var(--warning-soft);border-color:var(--warning-border);color:var(--warning)}
+.publish-artifact{border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:14px}
+.publish-artifact-heading{display:flex;align-items:center;gap:11px;margin-bottom:15px}
+.publish-artifact-heading>svg{color:var(--secondary)}
+.publish-artifact-heading strong{font-size:13px;font-weight:500}
+.publish-artifact-heading small{display:block;color:var(--muted);font-size:11px;margin-top:5px;line-height:1.6}
+.publish-artifact .button{font-size:11px;padding:6px 9px;min-height:31px}
+.publish-artifact .button-row{gap:7px}
+.publish-build-details{margin-top:20px;border-top:1px solid var(--border);padding-top:16px}
+.publish-build-details summary{cursor:pointer;color:var(--secondary);font-size:12px;width:fit-content}
+.publish-build-details dl{margin:16px 0 0;font-size:11px;color:var(--secondary)}
+.publish-build-details dl>div{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.publish-build-details dt{flex-shrink:0;line-height:1.7}
+.publish-build-details dd{margin:0;min-width:0;text-align:right;line-height:1.7}
+.publish-build-details code{font-size:11px}
+.publish-checksum{overflow-wrap:anywhere}
+.publish-build-details>p{font-size:11px;color:var(--muted);line-height:1.85;margin-top:14px}
+.publish-empty{padding:26px 0 12px;text-align:center;color:var(--secondary)}
+.publish-empty>svg{margin-bottom:16px;color:var(--muted)}
+.publish-empty h3{font-size:13px}
+.publish-empty p{font-size:12px;line-height:1.85;margin:10px 0 20px;color:var(--muted)}
+.publish-instructions{padding-left:20px;margin:0;color:var(--secondary);font-size:12px;line-height:1.9}
+.publish-instructions li{padding-left:3px;margin-bottom:11px}
+.publish-instructions li:last-child{margin-bottom:0}
+.publish-instructions li::marker{color:var(--muted);font-size:11px}
+.publish-version-note{font-size:11px;color:var(--muted);line-height:1.8;margin:12px 0 18px}
+.publish-upload-step>.button-row{gap:16px}
+.publish-workflow .text-button{display:inline-flex;align-items:center;gap:6px;font-size:11px;line-height:1.7}
+.publish-review-step{border-top:1px solid var(--border);padding-top:24px;margin-top:24px}
+.publish-review-step>.text-button{margin-top:16px}
+.publish-platform-note{border-top:1px solid var(--border);padding-top:17px;margin-top:22px;display:flex;align-items:flex-start;gap:8px;color:var(--muted);font-size:11px;line-height:1.85}
+.publish-platform-note>svg{flex-shrink:0;margin-top:2px}
+@media(max-width:1230px){.publish-workflow{grid-template-columns:1fr;gap:20px}.publish-progress{gap:14px}.publish-progress li{gap:9px}.publish-progress strong{font-size:12px}.publish-local .publish-artifact .button{font-size:12px}.publish-step-heading .pill{margin-left:auto}}
+@media(max-width:760px){.publish-progress{gap:9px}.publish-progress li{align-items:flex-start;gap:7px}.publish-progress li>svg{display:none}.publish-progress strong{font-size:11px}.publish-progress small{font-size:10px}.publish-progress li>span{width:23px;height:23px}.publish-workflow>.panel{padding:19px}.publish-step-heading .pill{margin-left:33px}.publish-step-heading h2{min-width:calc(100% - 35px)}}

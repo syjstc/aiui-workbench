@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { id } from './util.mjs';
 import { parseDevices } from './devices.mjs';
+import { AndroidAppInfo } from './android-app-info.mjs';
 
 const MiB = 1024 * 1024;
 export const KEY_CODES = { home: 3, back: 4, up: 19, down: 20, left: 21, right: 22, enter: 23, volumeUp: 24, volumeDown: 25, wake: 224, sleep: 223 };
@@ -47,7 +48,7 @@ export function parseFileList(output, directory) {
 }
 
 export class GlassesTools {
-  constructor(home, adb) { this.home = home; this.adb = adb; this.mutations = new Set(); }
+  constructor(home, adb) { this.home = home; this.adb = adb; this.mutations = new Set(); this.appInfo = new AndroidAppInfo(this); }
   async adbCommand(serial, args, options) {
     const result = await this.adb.capture(['-s', serial, ...args], options);
     if (result.code !== 0) throw new Error((result.stderr || result.stdout.toString('utf8')).trim() || '眼镜操作失败，请检查连接与授权');
@@ -168,14 +169,17 @@ export class GlassesTools {
       await this.shell(serial, ['mkdir', '--', target]); return { serial, path: target };
     });
   }
-  async apps({ serial }) {
-    await this.ready(serial);
+  async apps({ serial, appearance = true }) {
+    const device = await this.ready(serial);
     const [all, user, disabled] = await Promise.all([
       this.shell(serial, ['pm', 'list', 'packages', '--user', '0', '--show-versioncode']),
       this.shell(serial, ['pm', 'list', 'packages', '--user', '0', '-3']),
       this.shell(serial, ['pm', 'list', 'packages', '--user', '0', '-d']),
     ]);
-    return { serial, packages: parsePackages(all, user, disabled) };
+    const packages=parsePackages(all,user,disabled);
+    let info=new Map(),appearanceError=null;
+    if(appearance)try{info=await this.appInfo.read(serial,device.transport,packages);}catch(error){appearanceError=error.message;}
+    return { serial, packages:packages.map(item=>({...item,...info.get(item.packageName)})), appearanceError };
   }
   async appDetails({ serial, packageName: name }) {
     packageName(name); await this.ready(serial);
@@ -188,7 +192,7 @@ export class GlassesTools {
     if (!['launch', 'stop', 'uninstall', 'clear'].includes(action)) throw new Error('不支持的应用操作');
     if (['uninstall', 'clear'].includes(action) && confirmPackage !== name) throw new Error('请确认目标应用及数据删除操作');
     return this.exclusive(serial, async () => {
-      const installed = (await this.apps({ serial })).packages.find(item => item.packageName === name);
+      const installed = (await this.apps({ serial, appearance:false })).packages.find(item => item.packageName === name);
       if (!installed) throw new Error('应用已不在眼镜中，请刷新列表');
       if (installed.system && action !== 'launch') throw new Error('系统应用仅支持查看与打开');
       signal?.throwIfAborted();
@@ -200,6 +204,7 @@ export class GlassesTools {
       } else if (action === 'uninstall') output = (await this.adbCommand(serial, ['uninstall', '--user', '0', name], { signal, timeout: 120000 })).stdout.toString('utf8');
       else output = await this.shell(serial, action === 'clear' ? ['pm', 'clear', '--user', '0', name] : ['am', 'force-stop', '--user', '0', name], { signal });
       if (/Failure|Error:|Exception/i.test(output) || (['clear', 'uninstall'].includes(action) && !/^Success\s*$/m.test(output))) throw new Error(output.trim() || '应用操作未成功');
+      this.appInfo.invalidate(serial);
       return { serial, packageName: name, action, output: output.trim() };
     });
   }
