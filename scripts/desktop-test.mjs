@@ -1,6 +1,6 @@
 import { _electron } from 'playwright';
 import path from 'node:path';
-import { normalizeEnvironment, run } from '../core/util.mjs';
+import { normalizeEnvironment, run, sleep } from '../core/util.mjs';
 
 const nativeProcesses = new WeakMap();
 
@@ -30,7 +30,17 @@ export async function closeDesktop(app) {
     const pid = nativeProcesses.get(app) || child?.pid;
     if (process.platform === 'win32' && pid) await run(path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/taskkill.exe'), ['/PID', String(pid), '/T', '/F'], { timeout: 10000 }).catch(() => {});
     else if (child?.pid && child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
-    await bounded(closing, 5000);
+    // A shell that exited before Playwright attached cannot emit close twice.
+    // Verify the owned native process itself instead of waiting on that shell.
+    if (pid) {
+      let exited = false;
+      for (let i = 0; i < 50; i++) {
+        try { process.kill(pid, 0); }
+        catch (error) { if (error.code === 'ESRCH') { exited = true; break; } throw error; }
+        await sleep(100);
+      }
+      if (!exited) throw new Error('The isolated native desktop process did not exit');
+    }
   }
   nativeProcesses.delete(app);
 }
