@@ -11,10 +11,9 @@ let allowed, updates;
 let desktopLocale = 'zh-CN';
 function trusted(event) { if(event.sender!==mainWindow?.webContents || event.senderFrame!==mainWindow?.webContents.mainFrame)throw new Error('无效的桌面调用来源'); }
 async function connectService(){
-  // Electron's executable can also run the Node-only MCP/service entry points.
-  const previous = process.env.ELECTRON_RUN_AS_NODE;process.env.ELECTRON_RUN_AS_NODE='1';
-  try { const {connect}=await import('../core/client.mjs');client=await connect(home); }
-  finally { if(previous===undefined)delete process.env.ELECTRON_RUN_AS_NODE;else process.env.ELECTRON_RUN_AS_NODE=previous; }
+  // core/client sets Node-only mode on its service child. Setting it on the
+  // desktop can race Chromium utility startup, especially on Windows.
+  const {connect}=await import('../core/client.mjs');client=await connect(home);
 }
 function studioWindow(){
   if(studio&&!studio.isDestroyed()){studio.focus();return;}
