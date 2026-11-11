@@ -13,14 +13,16 @@ import { AppUpdates, validateManifest } from '../core/updates.mjs';
 import { Workbench } from '../core/service.mjs';
 import { ROOT, atomicJson, readJson, run, sleep } from '../core/util.mjs';
 import { APP_VERSION } from '../core/version.mjs';
+import { githubTestFetcher, installDesktopGithubTestAuth } from './github-test-auth.mjs';
 
 const repository = process.env.AIUI_UPDATE_REPOSITORY || 'syjstc/aiui-workbench';
 const target = process.env.AIUI_UPDATE_TARGET_VERSION || APP_VERSION;
+const githubToken = process.env.CI ? process.env.AIUI_QA_GITHUB_TOKEN : '';
 const from = process.env.AIUI_UPDATE_FROM_VERSION || (semver.patch(target) > 0 ? `${semver.major(target)}.${semver.minor(target)}.${semver.patch(target) - 1}` : '0.3.1');
 assert.ok(semver.valid(target) && semver.valid(from) && semver.lt(from, target));
 const base = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-github-upgrade-')), home = path.join(base, 'user-data');
 const output = path.join(ROOT, 'output/qa/github-upgrade', process.platform + '-' + process.arch); await fs.mkdir(output, { recursive: true });
-const report = { repository, fromVersion: from, targetVersion: target, realGitHub: true, responsesMocked: false, isolatedUserData: true, checks: [], errors: [] };
+const report = { repository, fromVersion: from, targetVersion: target, realGitHub: true, responsesMocked: false, isolatedUserData: true, authenticatedGitHubApi: !!githubToken, checks: [], errors: [] };
 let app, manager, page, mcp;
 async function check(name, work) { await work(); report.checks.push({ name, passed: true }); console.log('PASS', name); }
 async function until(work, timeout = 120000) { const deadline = Date.now() + timeout; while (Date.now() < deadline) { const value = await work(); if (value) return value; await sleep(300); } throw new Error('GitHub upgrade check timed out'); }
@@ -48,12 +50,17 @@ async function extract(archive, destination) {
 }
 async function launch(executablePath) {
   app = await launchDesktop({ executablePath, args: [], cwd: ROOT, env: portableEnvironment(home) });
+  if (githubToken) await app.evaluate(installDesktopGithubTestAuth, { repository, token: githubToken });
   page = await app.firstWindow({ timeout: 45000 }); page.setDefaultTimeout(45000); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
 }
 try {
-  manager = await new AppUpdates(home, { version: from }).init();
+  if (githubToken) {
+    const probe = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, { signal: AbortSignal.timeout(15000) }).catch(() => null);
+    if (probe) { report.anonymousApiProbe = { status: probe.status, remaining: probe.headers.get('x-ratelimit-remaining') }; await probe.body?.cancel(); }
+  }
+  manager = await new AppUpdates(home, { version: from, fetcher: githubTestFetcher(repository, githubToken) }).init();
   await manager.settings({ source: 'github', sources: { github: { repository } }, autoCheck: true });
   const baselineRelease = (await manager.json(`https://api.github.com/repos/${repository}/releases/tags/v${from}`, manager.controller.signal)).value;
   const manifestUrl = baselineRelease.assets.find(asset => asset.name === 'workbench-update.json')?.browser_download_url; assert.ok(manifestUrl, 'Previous release manifest missing');
@@ -74,6 +81,7 @@ try {
     const status = await until(async () => { const s = await page.evaluate(() => window.workbench.updates('status')); if (s.error && !s.checking) throw new Error(s.error); return !s.checking && s.latest && s; });
     assert.equal(status.version, from); assert.equal(status.latest.version, target); assert.equal(status.updateAvailable, true); assert.equal(status.autoCheck, true);
     report.automaticCheck = { currentVersion: status.version, foundVersion: status.latest.version, source: status.source };
+    if (githubToken) { report.oldClientAuthenticatedApiRequests = await app.evaluate(() => globalThis.__aiuiQaGithubAuth.authenticatedRequests); assert.ok(report.oldClientAuthenticatedApiRequests > 0); }
     await page.getByRole('button', { name: 'Settings', exact: true }).click(); await sleep(500); await page.screenshot({ path: path.join(output, 'old-client-found-update.png') });
   });
   let downloaded;

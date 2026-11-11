@@ -6,7 +6,7 @@ const nativeProcesses = new WeakMap();
 
 export function portableEnvironment(home) {
   const env = normalizeEnvironment({ ...process.env, AIUI_WORKBENCH_HOME: home });
-  for (const key of Object.keys(env)) if (/^(path|android_home|android_sdk_root|electron_run_as_node)$/i.test(key)) delete env[key];
+  for (const key of Object.keys(env)) if (/^(path|android_home|android_sdk_root|electron_run_as_node|aiui_qa_github_token)$/i.test(key)) delete env[key];
   // Keep Windows' own utilities available, without Node, npm, SDK or ADB.
   const system = env.SystemRoot || env.SYSTEMROOT || 'C:\\Windows';
   env.PATH = process.platform === 'win32' ? [system, path.join(system, 'System32'), path.join(system, 'System32/Wbem'), path.join(system, 'System32/WindowsPowerShell/v1.0')].join(';') : '';

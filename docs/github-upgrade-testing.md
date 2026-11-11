@@ -2,6 +2,8 @@
 
 `release-update.yml` 在 GitHub Release 发布后自动触发 macOS 与 Windows 验收，也可从 Actions 手动触发。此检查使用真实公开 GitHub API 和附件，不模拟发行源。
 
+GitHub 托管 runner 的匿名 API 配额可能耗尽。CI 使用只读工作流 token：测试宿主和桌面主进程通过传输层仅为本仓库的 GitHub Release API 添加认证头，安装包及 CDN 请求不携带凭据；不修改客户端文件、不替换响应、不关闭 TLS 校验。报告明确记录认证模式及匿名接口探测结果。本机运行默认继续使用匿名 GitHub 源，验证普通用户的实际网络路径。token 只保留在测试进程内存中，不写入报告或安装包。
+
 ```sh
 npm run qa:github-upgrade
 ```
