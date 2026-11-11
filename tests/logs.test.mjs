@@ -10,17 +10,18 @@ import { atomicJson } from '../core/util.mjs';
 
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-log-test-'));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const closers = [];
+  t.after(async () => { for (const close of closers.reverse()) await close(); await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
   const project = path.join(root, 'project');
   await fs.mkdir(project);
   await atomicJson(path.join(project, 'app.json'), { name: 'Log fixture', version: '1.0.0', pages: ['index'], permissions: [] });
   await fs.writeFile(path.join(project, 'index.ink'), '<page><text>Logs</text></page>');
-  return { root, project, home: path.join(root, 'home') };
+  return { root, project, home: path.join(root, 'home'), cleanup: close => closers.push(close) };
 }
 
 test('task deletion is scoped, durable, and preserves a running task and its progress', async t => {
-  const { home } = await fixture(t), jobs = await new Jobs(() => {}, home).init();
-  t.after(() => jobs.close());
+  const { home, cleanup } = await fixture(t), jobs = await new Jobs(() => {}, home).init();
+  cleanup(() => jobs.close());
   const finished = [];
   for (const type of ['check', 'pack', 'deploy', 'launch', 'sdk-prepare', 'knowledge', 'platform-prepare', 'device-setup']) {
     const job = jobs.start(type, 'project', async ({ progress }) => { progress(type + ' output'); if (type === 'check') throw new Error('diagnostic'); return type; });
@@ -29,7 +30,7 @@ test('task deletion is scoped, durable, and preserves a running task and its pro
   }
   let complete, progress;
   const running = jobs.start('pack', 'project', context => { progress = context.progress; return new Promise(resolve => { complete = resolve; }); });
-  t.after(() => complete());
+  cleanup(() => complete());
   const activePromise = jobs.items.find(item => item.id === running.id).promise;
   const result = await jobs.delete([finished[0], finished[0], running.id]);
   assert.deepEqual(result, { deletedIds: [finished[0]], skippedRunningIds: [running.id] });
@@ -55,8 +56,8 @@ test('task deletion requires an explicit bounded selection', async () => {
 });
 
 test('deleted task output is also removed from retained service events', async t => {
-  const { home } = await fixture(t), service = await new Workbench(home).init();
-  t.after(() => service.close());
+  const { home, cleanup } = await fixture(t), service = await new Workbench(home).init();
+  cleanup(() => service.close());
   const job = service.jobs.start('knowledge', null, async ({ progress }) => progress('old task output'));
   await service.jobs.items[0].promise;
   assert.ok(service.events.some(event => event.type === 'job' && event.value.id === job.id));
@@ -66,8 +67,8 @@ test('deleted task output is also removed from retained service events', async t
 });
 
 test('preview clearing drops buffered old logs, keeps other sessions, and accepts new SDK logs', async t => {
-  const { home, project } = await fixture(t), daemon = await startDaemon(home);
-  t.after(() => daemon.close());
+  const { home, project, cleanup } = await fixture(t), daemon = await startDaemon(home);
+  cleanup(() => daemon.close());
   const { service } = daemon, imported = await service.projects.import(project);
   const first = service.previews.open(imported.id, service.origin), second = service.previews.open(imported.id, service.origin, { target: '_current' });
   const session = service.previews.get(first.id);
@@ -96,11 +97,11 @@ test('preview clearing drops buffered old logs, keeps other sessions, and accept
 });
 
 test('service log clearing keeps the active append handle and project records intact', async t => {
-  const { home, project } = await fixture(t), service = await new Workbench(home).init();
-  t.after(() => service.close());
+  const { home, project, cleanup } = await fixture(t), service = await new Workbench(home).init();
+  cleanup(() => service.close());
   const imported = await service.projects.import(project), file = path.join(home, 'service.log');
   const handle = await fs.open(file, 'a');
-  t.after(() => handle.close());
+  cleanup(() => handle.close());
   await handle.writeFile('old service log\n');
   const before = await handle.stat();
   assert.equal((await service.call('aiui_service_log_status')).bytes, before.size);

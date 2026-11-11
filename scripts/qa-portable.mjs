@@ -58,7 +58,7 @@ try {
   let config, project;
   await check('packaged app and bundled MCP start with no system Node, npm or ADB on PATH', async () => { config = await launch(); assert.ok((await mcp.listTools()).tools.length >= 30); });
   await check('bundled npm and ADB run without external tools', async () => {
-    const appRoot = path.dirname(path.dirname(config.args[0]));
+    const appRoot = (await readJson(path.join(home, 'mcp/installation.json'))).root;
     const npm = await run(executablePath, [path.join(appRoot, 'node_modules/npm/bin/npm-cli.js'), '--version'], { env: { ...env, ELECTRON_RUN_AS_NODE: '1' } });
     assert.equal(npm.code, 0, npm.output); assert.match(npm.output, /\d+\.\d+\.\d+/);
     const environment = await tool('aiui_environment_check');
