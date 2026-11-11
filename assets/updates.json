@@ -1,0 +1,17 @@
+{
+  "source": "github",
+  "sources": {
+    "github": {
+      "repository": "syjstc/aiui-workbench"
+    },
+    "cnb": {
+      "manifestUrl": ""
+    },
+    "gitee": {
+      "manifestUrl": ""
+    },
+    "custom": {
+      "manifestUrl": ""
+    }
+  }
+}

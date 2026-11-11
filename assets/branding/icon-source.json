@@ -1,0 +1,6 @@
+{
+  "generator": "built-in image_gen",
+  "master": "aiui-workshop-icon-master.png",
+  "prompt": "Use case: logo-brand. Asset type: production macOS app icon and browser favicon for AIUI 工坊 (AIUI Workshop), a refined local development workbench for AR smart glasses. Create one original, exceptionally polished icon, front-facing, square 1024x1024 composition. A near-black graphite squircle with subtly rounded macOS-style corners and restrained satin depth; a bold ivory geometric glyph centered inside, suggesting a pair of smart-glass lenses joined into one continuous rounded orbital loop, with one small luminous pale-jade node. Strong coherent silhouette, broad consistent strokes, spacious negative space, optically centered. Calm, simple, precise industrial design, sophisticated like a carefully crafted professional creative tool. The glyph must be unmistakably legible when reduced to 16px; only two or three large shapes. Soft restrained studio highlights on the graphite tile, no heavy bevel. Transparent outside the squircle, tile occupies 90% of the canvas, symmetric margins. No typography, no text, no letters, no numbers, no watermarks, no presentation board, no multiple variants, no mockup scene, no extra symbols, no starbursts, no bright rainbow gradient. Deliver a single finished app icon.",
+  "exportCommand": "node scripts/prepare-icons.mjs"
+}

@@ -1,0 +1,16 @@
+const {contextBridge,ipcRenderer,webUtils}=require('electron');
+contextBridge.exposeInMainWorld('workbench',{
+  kind:'desktop',
+  platform:process.platform,
+  setLocale:locale=>ipcRenderer.invoke('workbench:locale',locale),
+  updates:(method,args)=>ipcRenderer.invoke('workbench:updates',method,args),
+  call:(tool,args={})=>ipcRenderer.invoke('workbench:call',tool,args),
+  chooseDirectory:()=>ipcRenderer.invoke('workbench:choose','directory'),
+  choosePhoto:()=>ipcRenderer.invoke('workbench:choose','photo'),
+  chooseFiles:kind=>ipcRenderer.invoke('workbench:choose-files',kind),
+  importFiles:files=>Array.from(files,file=>{const path=webUtils.getPathForFile(file);if(!path)throw new Error('无法读取拖入文件的位置，请重新从文件管理器拖入');return path;}),
+  copy:text=>ipcRenderer.invoke('workbench:clipboard',text),
+  reveal:file=>ipcRenderer.invoke('workbench:reveal',file),
+  openOfficial:url=>ipcRenderer.invoke('workbench:external',url),
+  openStudio:()=>ipcRenderer.invoke('workbench:studio'),
+});

@@ -1,0 +1,15 @@
+.mcp-capabilities{margin-top:30px}
+.mcp-capabilities>.muted-copy{margin:0 0 18px;max-width:850px}
+.mcp-capability-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.mcp-capability{min-width:0;padding:22px}
+.mcp-capability .section-heading{align-items:flex-start;gap:12px;margin-bottom:12px}
+.mcp-capability h3{font-size:15px;line-height:1.6;margin:0}
+.mcp-capability .pill{flex-shrink:0;display:inline-flex;align-items:center;gap:4px}
+.mcp-capability>p{font-size:13px;color:var(--secondary);line-height:1.8;margin:0 0 14px}
+.mcp-capability summary{cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--secondary);flex-wrap:wrap}
+.mcp-capability code{overflow-wrap:anywhere}
+.mcp-capability details[open]>summary{margin-bottom:14px}
+.mcp-capability .code-block{max-width:100%;max-height:340px;overflow:auto}
+.mcp-related{overflow-wrap:anywhere;font-size:11px;line-height:1.8;margin:12px 0 0}
+.mcp-capabilities>.subtle{margin:18px 0;line-height:1.8}
+@media(max-width:900px){.mcp-capability-grid{grid-template-columns:1fr}}

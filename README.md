@@ -1,0 +1,100 @@
+# AIUI 工坊 · AIUI Workshop
+
+[English](README.en.md) · [下载桌面版](https://github.com/syjstc/aiui-workbench/releases/latest) · [使用指南](docs/getting-started.md) · [AI / MCP 工作流](docs/ai-tool-workflows.md)
+
+一个面向 Rokid AIUI 的本地开发工作台：管理项目、阅读官方资料、运行真实 Ink 模拟器、构建 AIX，并通过 MCP 与你常用的 AI 编程工具协作。提供 macOS、Windows 桌面客户端及本地 Web 界面。
+
+**独立社区项目，与 Rokid 官方无隶属关系。** 内置官方运行时和公开资料，第三方组件保留原有许可。
+
+![AIUI 工坊项目库，展示仓库内的 Hello AIUI 和 Motion Lab 示例](docs/screenshots/projects-zh.png)
+
+## 下载与安装
+
+当前版本 **0.3.1**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
+
+| 平台 | 安装方式 | 签名 |
+| --- | --- | --- |
+| macOS · Apple Silicon | 解压 `darwin-arm64.zip`，将 `AIUI Workshop.app` 拖入“应用程序” | Developer ID；公证核验结果见发行说明 |
+| Windows 10 / 11 · x64 | 完整解压 `win32-x64.zip`，双击 `AIUI Workshop.exe` | 未签名 |
+
+客户端自带运行时、npm、官方 CLI、ADB 和 scrcpy，无需安装 Node.js、Android Studio 或另配 PATH。Windows 未签名包可能显示系统信誉提示，请先核对下载来源和 SHA256。当前没有 Intel Mac、Windows ARM64 或 Linux 的正式下载包。
+
+## 可以做什么
+
+- **项目库与实时预览**：导入 AIUI 目录或新建项目；编辑器与 AI 修改的就是同一份源码，文件变化自动刷新。
+- **真实 Ink 模拟器**：运行 `.ink`，回放镜腿按键、长滑与重复事件；鼠标、头模、三轴滑条和自动动作共享姿态输入。支持本地照片和主动开启的电脑摄像头。
+- **官方资料与 SDK**：内置 468 份资料和公开 `aiui-dev` Skill，可离线阅读、搜索及同步。SDK/CLI 升级先检查项目兼容性，支持逐项目切换与回退。
+- **MCP / CLI 协作**：AI 可读取规范、操作预览、执行断言、截图、录制短片及检查打包；桌面、Web、CLI 和 MCP 共享项目、日志与任务。
+- **眼镜工具**：设备诊断、文件与 APK 管理、截图、日志和 scrcpy 实时投屏。安装、清空数据等操作始终指向明确设备。
+- **中英文与外观**：右上角随时切换中文 / EN，支持浅色、深色和跟随系统。
+
+![Hello AIUI 在官方 Ink 运行时中的模拟画面与姿态控制](docs/screenshots/simulator-zh.png)
+
+所有截图均在全新隔离数据目录中使用本仓库的公开示例拍摄，未展示个人业务项目。截图显示电脑模拟画面。
+
+## 第一次使用
+
+1. 打开客户端，导入本仓库的 [`examples/hello-aiui`](examples/hello-aiui) 或新建一个 Page 项目。
+2. 点击项目卡片运行。使用方向键或“交互”面板前后滑动，Enter 确认，Backspace 返回。
+3. 打开“连接 AI 工具”，复制客户端生成的 MCP 配置到你的 AI 工具。无需手动拼接运行时路径。
+4. 在“构建与上传”中检查、打包；连接眼镜时，按“新手指南”准备对应机型的数据调试线，并在手机 Rokid AI App 中开启眼镜 ADB 调试。
+
+完整步骤见 [图文使用指南](docs/getting-started.md)。公开示例包括 [菜单与离散输入](examples/hello-aiui) 和 [姿态传感器](examples/motion-lab)。
+
+## 从源码运行
+
+使用 Node.js **24 LTS**（最低 22.22）：
+
+```sh
+git clone https://github.com/syjstc/aiui-workbench.git
+cd aiui-workbench
+npm ci
+npm run prepare:tools
+npm run dev
+```
+
+`prepare:tools` 从固定的上游地址下载 ADB / scrcpy，并验证 SHA256；生成的二进制不进入 Git。只使用模拟器或资料时可跳过这一步。
+
+本地 Web 界面：
+
+```sh
+npm run web
+# 固定端口，不自动打开浏览器
+npm run web -- --port 3100 --no-open
+```
+
+Web 仅监听 `127.0.0.1`。npm 包暂未发布，请使用源码命令或桌面包。
+
+## 连接 AI 工具
+
+在客户端中复制生成的 stdio MCP 配置，工坊会维护稳定启动入口。推荐工作流：
+
+```text
+aiui_context_get → 创建或导入项目 → AI 编辑本地源码
+→ aiui_preview_test → aiui_project_build
+```
+
+`aiui_preview_test` 一次返回交互回放、行为断言、PNG 和日志；`aiui_project_build` 完成官方静态检查、AIX 和 SHA256。只有返回 `status: running` 时才继续 `aiui_job_wait`。详见 [工具工作流、CLI 和示例参数](docs/ai-tool-workflows.md)。
+
+## 数据与能力边界
+
+项目、照片、账号会话和任务记录保存在本机。默认目录：macOS `~/Library/Application Support/AIUI Workbench`；Windows `%APPDATA%/AIUI Workbench`。可通过 `AIUI_WORKBENCH_HOME` 覆盖。本地控制接口使用随机口令并拒绝跨站来源；不要分享带口令的 Web 启动链接或本地连接文件。
+
+- 模拟器使用官方 **Ink Web SDK 0.19.1**，对应 **WASM 引擎 0.19.0**；CLI 为 **0.12.0**。
+- 相机支持照片素材、电脑摄像头、连续取景和抓帧；不模拟眼镜原始分辨率、光学效果或音视频采集。
+- 蓝牙、定位轨迹、语音/模型服务、应用任意外网请求尚未完整模拟。工坊不内置 AI 模型。
+- 模拟验证、真机安装、佩戴体验和平台上架分别验收。自动上传、提审及平台状态回读尚未验证；本地 AIX 打包不表示已上架。
+- 版本更新支持检测、下载和校验，安装由用户完成。
+
+## 文档与开发
+
+- [图文使用指南](docs/getting-started.md)
+- [AI / MCP / CLI 工作流](docs/ai-tool-workflows.md)
+- [Web 与更新源](docs/web-and-updates.md)
+- [Windows 与语言维护](docs/windows-and-language.md)
+- [源码结构与验证](docs/development.md)
+- [签名、公证与发布](docs/releasing.md)
+- [镜腿离散输入规范](docs/rokid-discrete-input.md)
+- [更新记录](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md)
+
+原始工坊代码和示例使用 [MIT License](LICENSE)。官方资料、Ink、Electron、ADB、scrcpy 及其他依赖保留各自许可，见 [第三方声明](NOTICE.md) 和 [依赖许可清单](THIRD_PARTY_LICENSES.json)。

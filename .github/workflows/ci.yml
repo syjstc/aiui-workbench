@@ -1,0 +1,35 @@
+name: Checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  source:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run prepare:tools
+      - run: npm run check:public
+      - run: npm test
+      - run: npm run build
+      - name: Build Windows portable package
+        if: runner.os == 'Windows'
+        run: npm run package:win
+      - name: Verify Windows app with an empty PATH
+        if: runner.os == 'Windows'
+        run: npm run qa:portable
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && always()
+        with:
+          name: windows-verification
+          path: output/qa/portable/

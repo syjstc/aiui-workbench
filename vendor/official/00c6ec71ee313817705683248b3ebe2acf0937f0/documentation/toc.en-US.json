@@ -1,0 +1,1065 @@
+[
+  {
+    "id": "0-guide",
+    "label": "Guide",
+    "children": [
+      {
+        "id": "quickstart",
+        "label": "Quick Start",
+        "expanded": true,
+        "children": [
+          {
+            "id": "intro",
+            "label": "Introduction"
+          },
+          {
+            "id": "quickstart",
+            "label": "Quick Start"
+          },
+          {
+            "id": "first-chat",
+            "label": "AIUI in Chat"
+          },
+          {
+            "id": "first-immersive",
+            "label": "Immersive AIUI"
+          },
+          {
+            "id": "ai-dev",
+            "label": "Developing with AI"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "overview",
+        "label": "Overview"
+      },
+      {
+        "id": "concepts",
+        "label": "Concepts"
+      },
+      {
+        "id": "structure",
+        "label": "Project Structure"
+      },
+      {
+        "id": "framework",
+        "label": "Agent Framework",
+        "expanded": false,
+        "children": [
+          {
+            "id": "intro",
+            "label": "Introduction"
+          },
+          {
+            "id": "category",
+            "label": "Categories"
+          },
+          {
+            "id": "logic",
+            "label": "Logic Development"
+          },
+          {
+            "id": "ui",
+            "label": "User Interface (UI) Development"
+          },
+          {
+            "id": "full-color",
+            "label": "Full-Color Glasses Adaptation"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "runtime",
+        "label": "Agent Runtime",
+        "expanded": false,
+        "children": [
+          {
+            "id": "env",
+            "label": "Runtime Environment"
+          },
+          {
+            "id": "js",
+            "label": "JavaScript Compatibility"
+          },
+          {
+            "id": "mechanism",
+            "label": "Runtime Mechanism"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "basic",
+        "label": "Core Capabilities",
+        "expanded": false,
+        "children": [
+          {
+            "id": "network",
+            "label": "Networking",
+            "children": [
+              {
+                "id": "usage",
+                "label": "Usage"
+              },
+              {
+                "id": "lan",
+                "label": "LAN",
+                "status": "unsupported"
+              }
+            ]
+          },
+          {
+            "id": "storage",
+            "label": "Storage"
+          },
+          {
+            "id": "module",
+            "label": "Modules"
+          },
+          {
+            "id": "device",
+            "label": "Device",
+            "docId": "basic-device",
+            "children": [
+              {
+                "id": "bluetooth",
+                "label": "Bluetooth"
+              },
+              {
+                "id": "imu",
+                "label": "IMU"
+              }
+            ]
+          },
+          {
+            "id": "ai",
+            "label": "AI Capabilities",
+            "docId": "basic-ai",
+            "children": [
+              {
+                "id": "asr",
+                "label": "Speech Recognition"
+              },
+              {
+                "id": "tts",
+                "label": "Speech Synthesis"
+              },
+              {
+                "id": "llm",
+                "label": "Large Language Model"
+              }
+            ]
+          },
+          {
+            "id": "canvas",
+            "label": "Canvas"
+          },
+          {
+            "id": "prefetch",
+            "label": "Data Prefetch",
+            "status": "unsupported"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "account",
+        "label": "Account & Identity",
+        "expanded": false,
+        "children": [
+          {
+            "id": "authorization",
+            "label": "Account Authorization",
+            "docId": "authorization",
+            "docPath": "0-guide/account/authorization.en-US.md"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "debug",
+        "label": "Debugging",
+        "expanded": false,
+        "children": [
+          {
+            "id": "intro",
+            "label": "Introduction"
+          },
+          {
+            "id": "web_debug",
+            "label": "Web Simulation Debugging"
+          },
+          {
+            "id": "real_device_debug",
+            "label": "Real-Device Debugging (AIUI Studio)"
+          },
+          {
+            "id": "cli_device_debug",
+            "label": "Real-Device Debugging (CLI)"
+          },
+          {
+            "id": "sourcemap",
+            "label": "Source Map",
+            "status": "unsupported"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "bundle",
+        "label": "Packaging & Distribution",
+        "expanded": false,
+        "children": [
+          {
+            "id": "publish",
+            "label": "Submit for Review and Publish to the Hi Rokid Agent Store"
+          },
+          {
+            "id": "aix",
+            "label": "What Is AIX"
+          },
+          {
+            "id": "cli",
+            "label": "CLI"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "performance",
+        "label": "Performance & Experience",
+        "expanded": false,
+        "children": [
+          {
+            "id": "startup",
+            "label": "Startup Performance"
+          },
+          {
+            "id": "runtime",
+            "label": "Runtime Performance"
+          },
+          {
+            "id": "data",
+            "label": "Performance Metrics"
+          },
+          {
+            "id": "tool",
+            "label": "Performance Diagnostics"
+          },
+          {
+            "id": "network",
+            "label": "Poor Network Experience"
+          },
+          {
+            "id": "full-color",
+            "label": "Full-Color Optimization"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "faq",
+        "label": "FAQ"
+      }
+    ],
+    "slug": "guide"
+  },
+  {
+    "id": "1-framework",
+    "label": "Framework",
+    "children": [
+      {
+        "id": "open-agent-format",
+        "label": "Open Agent Format",
+        "expanded": true,
+        "children": [
+          {
+            "id": "agents",
+            "label": "AGENTS.md",
+            "docId": "config-agents",
+            "docPath": "1-framework/open-agent-format/agents.en-US.md"
+          },
+          {
+            "id": "app-json",
+            "label": "app.json",
+            "docId": "open-agent-format-app-json",
+            "docPath": "1-framework/open-agent-format/app-json.en-US.md"
+          },
+          {
+            "id": "page",
+            "label": "Pages",
+            "expanded": true,
+            "children": [
+              {
+                "id": "overview",
+                "label": "Overview",
+                "docId": "open-agent-format-page",
+                "docPath": "1-framework/open-agent-format/page.en-US.md"
+              },
+              {
+                "id": "definition",
+                "label": "Definition",
+                "docId": "open-agent-format-page-definition",
+                "docPath": "1-framework/open-agent-format/page-definition.en-US.md"
+              },
+              {
+                "id": "lifecycle",
+                "label": "Lifecycle",
+                "docId": "open-agent-format-page-lifecycle",
+                "docPath": "1-framework/open-agent-format/page-lifecycle.en-US.md"
+              },
+              {
+                "id": "events",
+                "label": "Events",
+                "docId": "open-agent-format-page-events",
+                "docPath": "1-framework/open-agent-format/page-events.en-US.md"
+              },
+              {
+                "id": "focus",
+                "label": "Focus System",
+                "docId": "open-agent-format-page-focus",
+                "docPath": "1-framework/open-agent-format/focus.en-US.md"
+              },
+              {
+                "id": "target",
+                "label": "Target",
+                "docId": "open-agent-format-page-target",
+                "docPath": "1-framework/open-agent-format/target.en-US.md"
+              }
+            ]
+          },
+          {
+            "id": "widget",
+            "label": "Widgets",
+            "docId": "open-agent-format-widget",
+            "docPath": "1-framework/open-agent-format/widget.en-US.md"
+          },
+          {
+            "id": "agent-worker",
+            "label": "Agent Workers",
+            "docId": "open-agent-format-agent-worker",
+            "docPath": "1-framework/open-agent-format/agent-worker.en-US.md"
+          },
+          {
+            "id": "custom-components",
+            "label": "Components",
+            "docId": "open-agent-format-custom-components",
+            "docPath": "1-framework/open-agent-format/custom-components.en-US.md"
+          },
+          {
+            "id": "module",
+            "label": "Modules",
+            "docId": "open-agent-format-module",
+            "docPath": "1-framework/open-agent-format/module.en-US.md"
+          },
+          {
+            "id": "assets",
+            "label": "Assets",
+            "docId": "open-agent-format-assets",
+            "docPath": "1-framework/open-agent-format/assets.en-US.md"
+          },
+          {
+            "id": "packages",
+            "label": "Packages",
+            "docId": "open-agent-format-packages",
+            "docPath": "1-framework/open-agent-format/package.en-US.md"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "wxml",
+        "label": "WXML Reference",
+        "expanded": false,
+        "children": [
+          {
+            "id": "intro",
+            "label": "Introduction"
+          },
+          {
+            "id": "data-binding",
+            "label": "Data Binding"
+          },
+          {
+            "id": "conditional-rendering",
+            "label": "Conditional Rendering"
+          },
+          {
+            "id": "list-rendering",
+            "label": "List Rendering"
+          },
+          {
+            "id": "template",
+            "label": "Template",
+            "status": "unsupported"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "wxss",
+        "label": "WXSS Reference",
+        "expanded": false,
+        "children": [
+          {
+            "id": "intro",
+            "label": "Introduction"
+          },
+          {
+            "id": "selector",
+            "label": "Selectors"
+          },
+          {
+            "id": "pseudo-class",
+            "label": "Pseudo Classes",
+            "status": "partial"
+          },
+          {
+            "id": "pseudo-element",
+            "label": "Pseudo Elements",
+            "status": "partial"
+          },
+          {
+            "id": "property",
+            "label": "Properties"
+          },
+          {
+            "id": "value-type",
+            "label": "Value Types"
+          },
+          {
+            "id": "function",
+            "label": "Functions"
+          },
+          {
+            "id": "at-rule",
+            "label": "At-rules",
+            "status": "partial"
+          },
+          {
+            "id": "animation",
+            "label": "Animations and Transforms"
+          }
+        ],
+        "hasIndex": true
+      }
+    ],
+    "slug": "framework"
+  },
+  {
+    "id": "2-components",
+    "label": "Components",
+    "children": [
+      {
+        "id": "view-containers",
+        "label": "View Containers",
+        "expanded": true,
+        "children": [
+          { "id": "view", "label": "<view>", "docId": "view", "docPath": "2-components/view.en-US.md" },
+          { "id": "scroll-view", "label": "<scroll-view>", "docId": "scroll-view", "docPath": "2-components/scroll-view.en-US.md" },
+          { "id": "swiper", "label": "<swiper>", "docId": "swiper", "docPath": "2-components/swiper.en-US.md" },
+          { "id": "card", "label": "<card>", "docId": "card", "docPath": "2-components/card.en-US.md" }
+        ]
+      },
+      {
+        "id": "date-components",
+        "label": "Date Components",
+        "expanded": true,
+        "children": [
+          { "id": "calendar", "label": "<calendar>", "docId": "calendar", "docPath": "2-components/calendar.en-US.md" }
+        ]
+      },
+      {
+        "id": "basic-content",
+        "label": "Basic Content",
+        "expanded": true,
+        "children": [
+          { "id": "text", "label": "<text>", "docId": "text", "docPath": "2-components/text.en-US.md" },
+          { "id": "icon", "label": "<icon>", "docId": "icon", "docPath": "2-components/icon.en-US.md" },
+          { "id": "error-state", "label": "<error-state>", "docId": "error-state", "docPath": "2-components/error-state.en-US.md" },
+          { "id": "streamdown", "label": "<streamdown>", "docId": "streamdown", "docPath": "2-components/streamdown.en-US.md" },
+          { "id": "table", "label": "<table>", "docId": "table", "docPath": "2-components/table.en-US.md" },
+          { "id": "timed-text", "label": "<timed-text>", "docId": "timed-text", "docPath": "2-components/timed-text.en-US.md" }
+        ]
+      },
+      {
+        "id": "semantic-content",
+        "label": "Semantic Content",
+        "expanded": true,
+        "children": [
+          { "id": "p", "label": "<p>", "docId": "p", "docPath": "2-components/p.en-US.md" },
+          { "id": "header", "label": "<header>", "docId": "header", "docPath": "2-components/header.en-US.md" },
+          { "id": "blockquote", "label": "<blockquote>", "docId": "blockquote", "docPath": "2-components/blockquote.en-US.md" },
+          { "id": "list", "label": "<list>", "docId": "list", "docPath": "2-components/list.en-US.md" },
+          { "id": "list-item", "label": "<list-item>", "docId": "list-item", "docPath": "2-components/list-item.en-US.md" },
+          { "id": "b", "label": "<b>", "docId": "b", "docPath": "2-components/b.en-US.md" },
+          { "id": "i", "label": "<i>", "docId": "i", "docPath": "2-components/i.en-US.md" },
+          { "id": "snippet", "label": "<snippet>", "docId": "snippet", "docPath": "2-components/snippet.en-US.md" },
+          { "id": "formula", "label": "<formula>", "docId": "formula", "docPath": "2-components/formula.en-US.md" }
+        ]
+      },
+      {
+        "id": "form-components",
+        "label": "Form Components",
+        "expanded": true,
+        "children": [
+          { "id": "button", "label": "<button>", "docId": "button", "docPath": "2-components/button.en-US.md" },
+          { "id": "input", "label": "<input>", "docId": "input", "docPath": "2-components/input.en-US.md" },
+          { "id": "textarea", "label": "<textarea>", "docId": "textarea", "docPath": "2-components/textarea.en-US.md" },
+          { "id": "switch", "label": "<switch>", "docId": "switch", "docPath": "2-components/switch.en-US.md" }
+        ]
+      },
+      {
+        "id": "media-components",
+        "label": "Media Components",
+        "expanded": true,
+        "children": [
+          { "id": "image", "label": "<image>", "docId": "image", "docPath": "2-components/image.en-US.md" },
+          { "id": "video", "label": "<video>", "docId": "video", "docPath": "2-components/video.en-US.md" },
+          { "id": "lottie-view", "label": "<lottie-view>", "docId": "lottie-view", "docPath": "2-components/lottie-view.en-US.md" }
+        ]
+      },
+      {
+        "id": "location-components",
+        "label": "Location Components",
+        "expanded": true,
+        "children": [
+          { "id": "map", "label": "<map>", "docId": "map", "docPath": "2-components/map.en-US.md" }
+        ]
+      },
+      {
+        "id": "canvas-chart",
+        "label": "Canvas & Chart",
+        "expanded": true,
+        "children": [
+          { "id": "canvas", "label": "<canvas>", "docId": "canvas", "docPath": "2-components/canvas.en-US.md" },
+          { "id": "chart", "label": "<chart>", "docId": "chart", "docPath": "2-components/chart.en-US.md" }
+        ]
+      },
+      {
+        "id": "ai-components",
+        "label": "AI Components",
+        "expanded": true,
+        "children": [
+          { "id": "a2ui", "label": "<a2ui>", "docId": "a2ui", "docPath": "2-components/a2ui.en-US.md" }
+        ]
+      }
+    ],
+    "slug": "components"
+  },
+  {
+    "id": "3-api",
+    "label": "API",
+    "children": [
+      {
+        "id": "framework",
+        "label": "Framework",
+        "expanded": true,
+        "children": [
+          {
+            "id": "app",
+            "label": "App",
+            "docId": "framework-app"
+          },
+          {
+            "id": "page",
+            "label": "Page",
+            "docId": "framework-page"
+          },
+          {
+            "id": "widget",
+            "label": "Widget",
+            "docId": "framework-widget",
+            "docPath": "3-api/framework/widget.en-US.md"
+          },
+          {
+            "id": "agent-worker",
+            "label": "AgentWorker",
+            "docId": "framework-agent-worker",
+            "docPath": "3-api/framework/agent-worker.en-US.md"
+          },
+          {
+            "id": "component",
+            "label": "Component",
+            "docId": "framework-component",
+            "docPath": "3-api/framework/component.en-US.md"
+          },
+          {
+            "id": "entity",
+            "label": "Entity",
+            "docId": "framework-entity",
+            "docPath": "3-api/framework/entity.en-US.md"
+          }
+        ]
+      },
+      {
+        "id": "route",
+        "label": "Routing"
+      },
+      {
+        "id": "window",
+        "label": "Window",
+        "docPath": "3-api/window.en-US.md"
+      },
+      {
+        "id": "navigator",
+        "label": "Navigator",
+        "docId": "weixin-compatible-apis-navigator"
+      },
+      {
+        "id": "media",
+        "label": "Media",
+        "expanded": false,
+        "children": [
+          {
+            "id": "sound",
+            "label": "Sound"
+          },
+          {
+            "id": "audio-player",
+            "label": "Audio Player"
+          },
+          {
+            "id": "web-audio",
+            "label": "Web Audio",
+            "docId": "media-web-audio",
+            "docPath": "3-api/media/web-audio.en-US.md"
+          },
+          {
+            "id": "media-capture",
+            "label": "Media Capture",
+            "docId": "media-media-capture",
+            "docPath": "3-api/media/media-capture.en-US.md"
+          },
+          {
+            "id": "video",
+            "label": "Video Playback",
+            "docId": "media-video",
+            "docPath": "3-api/media/video.en-US.md"
+          }
+        ]
+      },
+      {
+        "id": "network",
+        "label": "Network",
+        "expanded": false,
+        "children": [
+          {
+            "id": "https",
+            "label": "HTTPS",
+            "docId": "network-https",
+            "docPath": "3-api/network/https.en-US.md"
+          },
+          {
+            "id": "event-source",
+            "label": "Event Source",
+            "docId": "network-event-source",
+            "docPath": "3-api/network/event-source.en-US.md"
+          },
+          {
+            "id": "websocket",
+            "label": "WebSocket"
+          },
+          {
+            "id": "url",
+            "label": "URL",
+            "docId": "network-url"
+          },
+          {
+            "id": "streams",
+            "label": "Streams",
+            "docId": "network-streams",
+            "docPath": "3-api/network/streams.en-US.md"
+          }
+        ]
+      },
+      {
+        "id": "device",
+        "label": "Device",
+        "expanded": false,
+        "children": [
+          {
+            "id": "bluetooth",
+            "label": "Bluetooth"
+          },
+          {
+            "id": "barcode",
+            "label": "Barcode",
+            "docId": "device-barcode"
+          },
+          {
+            "id": "absolute-orientation-sensor",
+            "label": "Absolute Orientation Sensor"
+          },
+          {
+            "id": "accelerometer",
+            "label": "Accelerometer"
+          },
+          {
+            "id": "gyroscope",
+            "label": "Gyroscope"
+          },
+          {
+            "id": "battery-manager",
+            "label": "Battery Status",
+            "docId": "device-battery-manager",
+            "docPath": "3-api/device/battery-manager.en-US.md"
+          }
+        ]
+      },
+      {
+        "id": "geo-data",
+        "label": "Geography and Location",
+        "expanded": false,
+        "children": [
+          {
+            "id": "geolocation",
+            "label": "Geolocation",
+            "docId": "geo-data-geolocation",
+            "docPath": "3-api/geo-data/geolocation.en-US.md"
+          },
+          {
+            "id": "gpx-document",
+            "label": "GPXDocument",
+            "docId": "geo-data-gpx-document",
+            "docPath": "3-api/geo-data/gpx-document.en-US.md"
+          }
+        ]
+      },
+      {
+        "id": "ai",
+        "label": "AI",
+        "expanded": false,
+        "children": [
+          {
+            "id": "speech-recognition",
+            "label": "Speech Recognition"
+          },
+          {
+            "id": "speech-synthesis",
+            "label": "Speech Synthesis"
+          },
+          {
+            "id": "language-model",
+            "label": "Large Language Model"
+          },
+          {
+            "id": "agent-session",
+            "label": "Agent Sessions",
+            "docId": "ai-agent-session",
+            "docPath": "3-api/ai/agent-session.en-US.md"
+          }
+        ]
+      },
+      {
+        "id": "storage",
+        "label": "Data Storage",
+        "expanded": false,
+        "children": [
+          {
+            "id": "storage-api",
+            "label": "localStorage",
+            "docId": "storage-api"
+          },
+          {
+            "id": "opfs",
+            "label": "OPFS",
+            "docId": "storage-opfs",
+            "docPath": "3-api/storage/opfs.en-US.md"
+          }
+        ]
+      },
+      {
+        "id": "canvas",
+        "label": "Canvas",
+        "hasIndex": true
+      },
+      {
+        "id": "encoding",
+        "label": "Encoding"
+      },
+      {
+        "id": "crypto",
+        "label": "Crypto"
+      },
+      {
+        "id": "permissions",
+        "label": "Permission State",
+        "docPath": "3-api/permissions.en-US.md"
+      },
+      {
+        "id": "webassembly",
+        "label": "WebAssembly",
+        "docPath": "3-api/webassembly.en-US.md"
+      },
+      {
+        "id": "console",
+        "label": "Console"
+      },
+      {
+        "id": "performance",
+        "label": "Performance"
+      },
+      {
+        "id": "open-services",
+        "label": "Open Services"
+      },
+      {
+        "id": "web-apis",
+        "label": "Web API"
+      },
+      {
+        "id": "weixin-compatible-apis",
+        "label": "WeChat Mini Program Compatible APIs"
+      }
+    ],
+    "slug": "api"
+  },
+  {
+    "id": "4-tutorials",
+    "label": "Tutorials",
+    "children": [
+      {
+        "id": "getting-started",
+        "label": "Getting Started",
+        "expanded": true,
+        "children": [
+          {
+            "id": "create-first-agent",
+            "label": "Create Your First AIUI Agent",
+            "sourcePath": "4-tutorials/getting-started/create-first-agent"
+          }
+        ]
+      },
+      {
+        "id": "interface",
+        "label": "UI and Interaction",
+        "expanded": false,
+        "children": [
+          {
+            "id": "build-interactive-counter",
+            "label": "Build an Interactive Counter",
+            "sourcePath": "4-tutorials/interface/build-interactive-counter"
+          },
+          {
+            "id": "conditional-content",
+            "label": "Render Content from State",
+            "sourcePath": "4-tutorials/interface/conditional-content"
+          },
+          {
+            "id": "render-a-list",
+            "label": "Render a Dynamic List",
+            "sourcePath": "4-tutorials/interface/render-a-list"
+          },
+          {
+            "id": "handle-text-input",
+            "label": "Read Text Input",
+            "sourcePath": "4-tutorials/interface/handle-text-input"
+          },
+          {
+            "id": "build-flex-layout",
+            "label": "Lay Out a Page with Flexbox",
+            "sourcePath": "4-tutorials/interface/build-flex-layout"
+          },
+          {
+            "id": "navigate-between-pages",
+            "label": "Navigate Between Pages",
+            "sourcePath": "4-tutorials/interface/navigate-between-pages"
+          },
+          {
+            "id": "use-page-lifecycle",
+            "label": "Use the Page Lifecycle",
+            "sourcePath": "4-tutorials/interface/use-page-lifecycle"
+          },
+          {
+            "id": "draw-on-canvas",
+            "label": "Draw on Canvas",
+            "sourcePath": "4-tutorials/interface/draw-on-canvas"
+          }
+        ]
+      },
+      {
+        "id": "data",
+        "label": "Data and Network",
+        "expanded": false,
+        "children": [
+          {
+            "id": "load-remote-data",
+            "label": "Load and Display Remote Data",
+            "sourcePath": "4-tutorials/data/load-remote-data"
+          },
+          {
+            "id": "persist-settings",
+            "label": "Persist User Settings",
+            "sourcePath": "4-tutorials/data/persist-settings"
+          },
+          {
+            "id": "receive-server-events",
+            "label": "Receive Server-Sent Events",
+            "sourcePath": "4-tutorials/data/receive-server-events"
+          },
+          {
+            "id": "connect-a-websocket",
+            "label": "Connect a WebSocket",
+            "sourcePath": "4-tutorials/data/connect-a-websocket"
+          }
+        ]
+      },
+      {
+        "id": "framework",
+        "label": "Framework Capabilities",
+        "expanded": false,
+        "children": [
+          {
+            "id": "create-a-widget",
+            "label": "Create a Widget",
+            "sourcePath": "4-tutorials/framework/create-a-widget"
+          },
+          {
+            "id": "run-an-agent-worker",
+            "label": "Run an Agent Worker",
+            "sourcePath": "4-tutorials/framework/run-an-agent-worker"
+          },
+          {
+            "id": "reuse-a-component",
+            "label": "Reuse a Custom Component",
+            "sourcePath": "4-tutorials/framework/reuse-a-component"
+          }
+        ]
+      },
+      {
+        "id": "ai",
+        "label": "AI and Speech",
+        "expanded": false,
+        "children": [
+          {
+            "id": "generate-text-with-llm",
+            "label": "Generate Text with a Language Model",
+            "sourcePath": "4-tutorials/ai/generate-text-with-llm"
+          },
+          {
+            "id": "speak-text",
+            "label": "Speak a Text Message",
+            "sourcePath": "4-tutorials/ai/speak-text"
+          },
+          {
+            "id": "recognize-speech",
+            "label": "Recognize a Speech Input",
+            "sourcePath": "4-tutorials/ai/recognize-speech"
+          }
+        ]
+      },
+      {
+        "id": "device",
+        "label": "Device Capabilities",
+        "expanded": false,
+        "children": [
+          {
+            "id": "read-accelerometer",
+            "label": "Read Accelerometer Data",
+            "sourcePath": "4-tutorials/device/read-accelerometer"
+          }
+        ]
+      },
+      {
+        "id": "delivery",
+        "label": "Build and Delivery",
+        "expanded": false,
+        "children": [
+          {
+            "id": "package-an-aix",
+            "label": "Package an AIX File",
+            "sourcePath": "4-tutorials/delivery/package-an-aix"
+          }
+        ]
+      }
+    ],
+    "slug": "tutorials"
+  },
+  {
+    "id": "5-cloud",
+    "label": "Cloud",
+    "children": [
+      {
+        "id": "overview",
+        "label": "Overview"
+      },
+      {
+        "id": "notifications",
+        "label": "Sending Notifications"
+      }
+    ],
+    "slug": "cloud"
+  },
+  {
+    "id": "6-design",
+    "label": "Design",
+    "children": [
+      {
+        "id": "visual",
+        "label": "Visual Design",
+        "children": [
+          {
+            "id": "monochrome",
+            "label": "Monochrome"
+          },
+          {
+            "id": "full-color",
+            "label": "Full Color"
+          }
+        ],
+        "hasIndex": true
+      },
+      {
+        "id": "interaction",
+        "label": "Interaction Design"
+      }
+    ],
+    "slug": "design"
+  },
+  {
+    "id": "7-tools",
+    "label": "Tools",
+    "children": [
+      {
+        "id": "intro",
+        "label": "Introduction"
+      },
+      {
+        "id": "AIUI_Studio",
+        "label": "AIUI Studio Platform"
+      },
+      {
+        "id": "editor",
+        "label": "AIUI Editor"
+      },
+      {
+        "id": "cli",
+        "label": "Command Line Tool"
+      },
+      {
+        "id": "skills",
+        "label": "Skills"
+      }
+    ],
+    "slug": "tools"
+  },
+  {
+    "id": "8-changelog",
+    "label": "Changelog",
+    "children": [
+      {
+        "id": "latest",
+        "label": "AIUI Runtime"
+      },
+      {
+        "id": "studio",
+        "label": "AIUI Studio"
+      }
+    ],
+    "slug": "changelog"
+  }
+]

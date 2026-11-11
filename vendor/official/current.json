@@ -1,0 +1,10 @@
+{
+  "status": "ready",
+  "source": "https://github.com/yodaos-project/AIUI",
+  "revision": "00c6ec71ee313817705683248b3ebe2acf0937f0",
+  "documents": 468,
+  "syncedAt": "2026-11-10T12:27:10.171Z",
+  "checkedAt": "2026-11-10T12:27:10.172Z",
+  "upstreamDate": "2026-11-03T05:42:42Z",
+  "license": "Apache-2.0"
+}

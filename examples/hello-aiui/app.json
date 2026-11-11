@@ -1,0 +1,15 @@
+{
+  "name": "Hello AIUI",
+  "agentName": "Hello AIUI",
+  "agentDesc": "A minimal page with one-action-per-swipe navigation.",
+  "version": "0.1.0",
+  "engine": ">=0.19.0",
+  "pages": [
+    "pages/index/index"
+  ],
+  "permissions": [],
+  "window": {
+    "navigationBarTitleText": "",
+    "backgroundColor": "#000000"
+  }
+}

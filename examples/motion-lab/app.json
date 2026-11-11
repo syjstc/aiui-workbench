@@ -1,0 +1,15 @@
+{
+  "name": "Motion Lab",
+  "agentName": "Motion Lab",
+  "agentDesc": "Orientation sensor, head motion and lifecycle cleanup.",
+  "version": "0.1.0",
+  "engine": ">=0.19.0",
+  "pages": [
+    "pages/index/index"
+  ],
+  "permissions": [],
+  "window": {
+    "navigationBarTitleText": "",
+    "backgroundColor": "#000000"
+  }
+}

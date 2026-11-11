@@ -1,0 +1,12 @@
+{
+  "version": "5.0.1",
+  "upstream": "https://github.com/Genymobile/scrcpy",
+  "release": "https://github.com/Genymobile/scrcpy/releases/tag/v5.0.1",
+  "checksums": "https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/SHA256SUMS.txt",
+  "platforms": {
+    "darwin-arm64": { "archive": "scrcpy-macos-aarch64-v5.0.1.tar.gz", "bytes": 12565912, "sha256": "33611e51977a8289e2e124b220f727895181ef2eb9060e0987a4dc2db9cf0d6b" },
+    "darwin-x64": { "archive": "scrcpy-macos-x86_64-v5.0.1.tar.gz", "bytes": 13478118, "sha256": "31a5467a9e907f162b093267cbbab1276b15c6e709c2ea8159566a8d165beb50" },
+    "win32-x64": { "archive": "scrcpy-win64-v5.0.1.zip", "bytes": 11264634, "sha256": "b12a2c4ee8be317422451fc7dcf8ee20a71b5ea7ef9ad73ddd825a25316227a5" },
+    "linux-x64": { "archive": "scrcpy-linux-x86_64-v5.0.1.tar.gz", "bytes": 17883742, "sha256": "9f969d30cc574816077edecda65719c1c70b0aee1df1ba5fa00779ac07b8fd6e" }
+  }
+}

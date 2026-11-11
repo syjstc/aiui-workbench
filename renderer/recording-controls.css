@@ -1,0 +1,4 @@
+.recording-controls{margin:14px 0;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);min-width:0}
+.recording-buttons{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--secondary)}
+.recording-buttons>span{font-weight:500}.recording-buttons select{padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)}
+.recording-controls>small{display:block;font-size:11px;color:var(--secondary);line-height:1.8;margin-top:8px}.recording-error{font-size:12px;color:var(--danger);overflow-wrap:anywhere}
