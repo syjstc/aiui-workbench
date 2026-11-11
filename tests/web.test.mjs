@@ -9,9 +9,11 @@ import { startDaemon } from '../core/daemon.mjs';
 import { atomicJson } from '../core/util.mjs';
 
 async function setup(t) {
-  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-web-test-')); t.after(() => fs.rm(home, { recursive: true, force: true }));
-  const daemon = await startDaemon(home); t.after(() => daemon.close());
-  const opened = [], web = await startWeb({ home, open: async (...args) => { opened.push(args); } }); t.after(() => web.close());
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-web-test-'));
+  let daemon, web;
+  t.after(async () => { await web?.close(); await daemon?.close(); await fs.rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }); });
+  daemon = await startDaemon(home);
+  const opened = []; web = await startWeb({ home, open: async (...args) => { opened.push(args); } });
   const key = new URLSearchParams(new URL(web.url).hash.slice(1)).get('key');
   const post = (route, data, headers = {}) => fetch(web.origin + '/api/' + route, { method: 'POST', headers: { Origin: web.origin, 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(data) });
   const login = await post('session', { key }); assert.equal(login.status, 200);

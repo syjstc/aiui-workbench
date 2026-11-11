@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { _electron as electron } from 'playwright';
+import { launchDesktop } from './desktop-test.mjs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { ROOT, atomicJson, readJson, run, sha, sleep } from '../core/util.mjs';
@@ -40,7 +40,7 @@ async function stop() {
   }
 }
 async function launch() {
-  app = await electron.launch({ executablePath, args: [], cwd: ROOT, env });
+  app = await launchDesktop({ executablePath, args: [], cwd: ROOT, env });
   page = await app.firstWindow(); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
