@@ -55,6 +55,10 @@ async function launch() {
 }
 try {
   await fs.access(executablePath);
+  const probe = await run(executablePath, ['-e', 'console.log(JSON.stringify(process.versions))'], { env: { ...env, ELECTRON_RUN_AS_NODE: '1' }, timeout: 15000 });
+  report.runtimeProbe = probe;
+  await atomicJson(path.join(output, 'verification.json'), report);
+  assert.equal(probe.code, 0, probe.output);
   let config, project;
   await check('packaged app and bundled MCP start with no system Node, npm or ADB on PATH', async () => { config = await launch(); assert.ok((await mcp.listTools()).tools.length >= 30); });
   await check('bundled npm and ADB run without external tools', async () => {

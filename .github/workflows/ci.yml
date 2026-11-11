@@ -1,5 +1,6 @@
 name: Checks
 on:
+  workflow_dispatch:
   push:
   pull_request:
 permissions:
@@ -25,12 +26,15 @@ jobs:
       - run: npm run prepare:tools
       - run: npm run check:public
       - run: npm test
+        timeout-minutes: 3
       - run: npm run build
       - name: Build Windows portable package
         if: runner.os == 'Windows'
         run: npm run package:win
       - name: Verify Windows app with an empty PATH
         if: runner.os == 'Windows'
+        env:
+          DEBUG: pw:browser*
         run: npm run qa:portable
       - uses: actions/upload-artifact@v4
         if: runner.os == 'Windows' && always()
