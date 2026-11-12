@@ -4,6 +4,7 @@
 *.cjs text eol=lf
 *.ink text eol=lf
 *.png binary
+vendor/official/**/documentation/image/** -text
 *.icns binary
 *.ico binary
 # Preserve the exact upstream snapshot, including original Markdown whitespace.
