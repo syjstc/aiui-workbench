@@ -23,6 +23,7 @@ import { TOOL_DEFINITIONS } from './tool-definitions.mjs';
 import { toolCatalog } from './tool-catalog.mjs';
 import { installMcpLauncher } from './mcp-launcher.mjs';
 import { ProjectRemoval } from './project-removal.mjs';
+import { Platform } from './platform.mjs';
 
 export class Workbench {
   constructor(home) { this.home = home; this.origin = ''; this.events = []; this.sequence = 0; this.clients = new Map(); this.emit = this.emit.bind(this); this.projects = new Projects(home, this.emit); this.knowledge = new Knowledge(home); this.previews = new Previews(this.projects, home, this.emit); this.jobs = new Jobs(this.emit, home); this.adb = new AdbTools(home); this.glasses = new GlassesTools(home, this.adb); this.devices = new DeviceDiscovery((args, options) => this.cli(args, options), (_command, args, options) => this.adb.execute(args, options)); }
@@ -43,18 +44,37 @@ export class Workbench {
     this.automation = new Automation(this);
     this.recordings = await new Recordings(this).init();
     this.projectRemoval = new ProjectRemoval(this);
+    this.platform = await new Platform(this).init();
     return this;
   }
   async cli(args, options, releaseId) { return run(process.execPath, [this.sdk.cliPath(releaseId), ...args], { ...options, env: { ...process.env, ...options?.env, ...await this.adb.environment() } }); }
   runtimeInfo(project) { const release = project ? this.sdk.forProject(project) : this.sdk.get(); return { runtime: release.runtime, webSdkVersion: release.versions.ink, cliVersion: release.versions.cli, toolchainId: release.id }; }
   config() { return this.mcpConfig; }
-  status() { return { version: APP_VERSION, ...this.runtimeInfo(), sdk: this.sdk.status(), home: this.home, projects: this.projects.list(), knowledge: this.knowledge.status(), previews: this.previews.list(), jobs: this.jobs.list(), recordings:this.recordings?.status().recordings||[], clients: [...this.clients.values()].filter(c => Date.now()-c.lastSeen < 60000), sequence: this.sequence }; }
+  status() { return { version: APP_VERSION, ...this.runtimeInfo(), sdk: this.sdk.status(), home: this.home, projects: this.projects.list(), knowledge: this.knowledge.status(), previews: this.previews.list(), jobs: this.jobs.list(), recordings:this.recordings?.status().recordings||[], clients: [...this.clients.values()].filter(c => Date.now()-c.lastSeen < 60000), sequence: this.sequence, platform: this.platform?.status() }; }
   async call(tool, args = {}, actor = 'desktop') {
     if (args.projectId && !tool.startsWith('ui_project_removal_') && this.projectRemoval?.locked(args.projectId)) throw new Error('此项目正在移除，请等待操作完成');
     this.clients.set(actor, { name: actor, lastSeen: Date.now() });
     const definition = TOOL_DEFINITIONS.find(([name]) => name === tool);
     if (definition) args = z.object(definition[2]).parse(args);
     switch (tool) {
+      case 'ui_platform_session': {
+        if (actor !== 'desktop-session') throw new Error('官方登录会话仅由桌面客户端同步');
+        return this.platform.setSession(args.token,args.desktopKey,args.expiresAt);
+      }
+      case 'ui_platform_review_confirmation':
+      case 'ui_platform_review_submit': {
+        if (actor !== 'desktop-confirmation') throw new Error('提审仅可由桌面用户确认');
+        return tool.endsWith('_submit') ? this.platform.submitConfirmed(args) : this.platform.confirmation(args.projectId,args.draftId,args.desktopKey);
+      }
+      case 'ui_platform_bind': {
+        if(!['desktop','web'].includes(actor))throw new Error('应用的官方绑定只能在工坊中设置');
+        return this.platform.bind(args);
+      }
+      case 'aiui_platform_status': return args.reconcile ? this.platform.reconcile(args.projectId) : this.platform.status(args.projectId);
+      case 'aiui_platform_agents': return this.platform.list();
+      case 'aiui_platform_upload': return this.platform.upload(args);
+      case 'aiui_platform_review_prepare': return this.platform.prepareReview(args);
+      case 'aiui_platform_review_request': return this.platform.requestReview(args);
       case 'ui_project_removal_begin': return this.projectRemoval.begin(args);
       case 'ui_project_removal_commit': return this.projectRemoval.commit(z.string().min(1).parse(args.intentId));
       case 'ui_project_removal_cancel': return this.projectRemoval.cancel(z.string().min(1).parse(args.intentId));
@@ -85,7 +105,10 @@ export class Workbench {
       case 'aiui_project_refresh': return this.projects.refresh(args.projectId);
       case 'aiui_project_create': return this.projects.create(args, this.knowledge);
       case 'aiui_docs_sync': return this.jobs.start('knowledge', null, context => this.knowledge.sync(context));
-      case 'aiui_docs_search': return { documents: await this.knowledge.search(args.query, args), knowledge: this.knowledge.status() };
+      case 'aiui_docs_settings': return this.knowledge.settings(args);
+      case 'aiui_docs_image': return this.knowledge.image(args);
+      case 'aiui_docs_catalog': return { ...await this.knowledge.catalog(args), knowledge: this.knowledge.status() };
+      case 'aiui_docs_search': return { ...await this.knowledge.searchPage(args.query, args), knowledge: this.knowledge.status() };
       case 'aiui_docs_read': { const doc = await this.knowledge.read(args.path, args.revision, args.from); const offset = Math.max(0, args.offset || 0), limit = Math.min(24000, args.limit || 16000); return { ...doc, content: doc.content.slice(offset, offset + limit), totalLength: doc.content.length, nextOffset: offset+limit < doc.content.length ? offset+limit : null }; }
       case 'aiui_context_get': {
         const project = args.projectId ? this.projects.get(args.projectId) : null;
@@ -195,7 +218,7 @@ export class Workbench {
     return p.lastCheck;
   }
   async platformReceipt(p, result) {
-    const receipt = { stage: 'prepared-locally', projectId: p.id, applicationName: p.name, version: p.version, artifact: result.path, sha256: result.sha256, sourceRevision: result.revision, studioUrl: 'https://aiui.rokid.com/space', uploaded: false, submittedForReview: false, message: 'AIX 已保存在本机。下一步：到官方平台登录并上传，完善资料后提交审核。上传与审核进度请以官方平台页面为准。' };
+    const receipt = { stage: 'prepared-locally', projectId: p.id, applicationName: p.name, version: p.version, artifact: result.path, sha256: result.sha256, sourceRevision: result.revision, studioUrl: 'https://aiui.rokid.com/space', uploaded: false, submittedForReview: false, message: 'AIX 已保存在本机。下一步：使用 aiui_platform_upload 上传云端草稿，aiui_platform_review_prepare 准备提审材料；用户在工坊确认后才能提交审核。' };
     await atomicJson(path.join(path.dirname(result.path), 'platform-preflight.json'), receipt); p.platform = receipt; await this.projects.save(); return receipt;
   }
   pack(projectId) { return this.jobs.start('pack', projectId, context => this.packNow(projectId, context)); }
@@ -208,5 +231,5 @@ export class Workbench {
     const bytes = await fs.readFile(file), record = { path: file, sha256: sha(bytes), bytes: bytes.length, revision, toolchainId, at: new Date().toISOString() };
     p.lastBuild = record; await this.projects.refresh(p.id); await this.projects.save(); return record;
   }
-  async close() { await this.mirroring?.close(); await this.jobs.close(); await this.recordings?.close(); this.previews.close(); await this.sdk?.close(); await this.projects.close(); }
+  async close() { await this.knowledge.close(); await this.mirroring?.close(); await this.jobs.close(); await this.recordings?.close(); this.previews.close(); await this.sdk?.close(); await this.projects.close(); }
 }

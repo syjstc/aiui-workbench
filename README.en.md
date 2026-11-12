@@ -26,7 +26,7 @@ The maintainer has no physical Windows machine and has not completed full Window
 - **Project removal:** two-stage confirmation with the full project name and path. Unbinding preserves local files; deletion moves the entire project folder to the system Trash/Recycle Bin. See [the illustrated guide](docs/project-removal.md).
 - **Shared projects:** import an AIUI directory or create a Page. External source changes refresh the preview automatically.
 - **Official runtime:** run real `.ink` source, replay temple keys and repeated swipe events, inject orientation with the mouse, 3D head model, sliders or motion loops. Use local photos or an explicitly enabled computer camera.
-- **Offline knowledge:** 468 official documents and the public `aiui-dev` skill, with search and verified snapshot updates. Prepare SDK/CLI upgrades, check compatibility and migrate projects individually.
+- **Offline knowledge:** 468 official documents, 81 diagrams and the public `aiui-dev` skill, with the official navigation hierarchy, full-corpus text/code search, automatic daily updates and expandable offline images. Long articles load automatically. Prepare SDK/CLI upgrades, check compatibility and migrate projects individually.
 - **AI integration:** MCP and the Workshop CLI share previews, assertions, screenshots, silent recordings, build results and logs with desktop/Web.
 - **Glasses tools:** device information, files, real APK names/icons, screenshots, logs, and embedded mirroring with an optional separate window that closes when mirroring ends.
 - **Read-only AIUI catalogs:** separate development, store, and system-provided apps. Store and system-provided apps have no delete, uninstall, or clear-data controls. Restricted store inventories are reported as unavailable, with an unknown count.
@@ -82,7 +82,7 @@ Projects, camera fixtures, platform sessions and task records stay on your compu
 
 The bundled Ink Web SDK is **0.19.1**, its WASM engine is **0.19.0**, and the CLI is **0.12.0**. Photo fixtures, computer camera streams and frame snapshots are supported. Original glasses capture resolution/optics, audio/video capture, Bluetooth, location tracks, speech/model services and arbitrary outbound app networking are not fully simulated. No AI model is bundled.
 
-Simulation, physical installation, worn-device acceptance and store publishing are separate. Automatic platform upload/review is unverified. macOS updates verify and stage a signed application, restart, and restore the previous app if replacement fails. Windows packages are installed manually.
+Simulation, physical installation, worn-device acceptance and store publishing are separate. Draft upload and cloud package/source digest verification have been checked with a real account. Review submission requires the user's native desktop confirmation; building or uploading does not mean a version is published. See [platform drafts and review](docs/platform-uploads.md). macOS updates verify and stage a signed application, restart, and restore the previous app if replacement fails. Windows packages are installed manually.
 
 ## Development and licensing
 

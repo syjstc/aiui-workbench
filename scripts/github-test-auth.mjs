@@ -3,7 +3,8 @@
 export function githubTestFetcher(repository, token, fetcher = fetch) {
   return (input, options = {}) => {
     const url = new URL(input);
-    if (!token || url.origin !== 'https://api.github.com' || !url.pathname.startsWith('/repos/' + repository + '/releases/')) return fetcher(input, options);
+    const releases = '/repos/' + repository + '/releases';
+    if (!token || url.origin !== 'https://api.github.com' || !(url.pathname === releases || url.pathname.startsWith(releases + '/'))) return fetcher(input, options);
     const headers = new Headers(options.headers); headers.set('Authorization', 'Bearer ' + token);
     return fetcher(input, { ...options, headers });
   };

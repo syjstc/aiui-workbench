@@ -80,5 +80,5 @@ test('incremental logs paginate with stable cursors, filters and explicit retent
 test('capability cards have complete English titles and descriptions and honest upload status',()=>{
   for(const capability of CAPABILITIES){assert.ok(en[capability.title],capability.title);assert.ok(en[capability.description],capability.description);}
   for(const capability of CAPABILITIES)for(const tool of [capability.tool,...(capability.relatedTools||[])])assert.ok(TOOL_DEFINITIONS.some(([name])=>name===tool),tool);
-  assert.equal(CAPABILITIES.find(c=>c.id==='platform').status,'manual');
+  assert.equal(CAPABILITIES.find(c=>c.id==='platform').status,'available');
 });

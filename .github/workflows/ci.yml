@@ -43,3 +43,9 @@ jobs:
         with:
           name: windows-verification
           path: output/qa/portable/
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && success()
+        with:
+          name: windows-package
+          path: output/desktop/AIUI-Workbench-*.zip
+          if-no-files-found: error

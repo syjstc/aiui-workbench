@@ -28,7 +28,9 @@ MCP 与共享 CLI 不要求自己的应用版本和后台服务版本一致，�
 
 ## 一次完成模拟
 
-先用 `aiui_project_import` 或 `aiui_project_create` 获取项目 ID，再调用：
+先用 `aiui_project_import` 或 `aiui_project_create` 获取项目 ID。导入支持项目根目录或 `agent/` 子目录；直接导入 `agent/` 时，工坊也会读取并监听同级的 `assets/`、`branding/`、`icons/` 图标，遵循 `current.json` 选定的版本。导入目录仍是项目绑定和删除的范围，品牌素材不会加入应用源码包。未提供图标的项目显示默认应用图标。
+
+再调用：
 
 ```json
 {
@@ -121,7 +123,7 @@ node web/cli.mjs mcp
 
 `aiui_preview_logs` 支持 `afterSequence`、`level`、`contains` 和 `runId`。下一次将 `afterSequence` 设为上次 `nextSequence`，即可增量读取；`truncated` 表示游标之前的日志已超出保留范围。清空日志不会重用序号。
 
-`aiui_project_build` 遇到官方检查失败会停止打包，返回诊断；检查与打包期间源码/SDK 变化也会失败。`uploaded`、`submittedForReview` 始终为 `false`。平台登录、导入、上传和审核仍需独立完成，当前没有已验证的自动上传/提审接口。
+`aiui_project_build` 遇到官方检查失败会停止打包，返回诊断；检查与打包期间源码/SDK 变化也会失败。构建结果的 `uploaded`、`submittedForReview` 为 `false`。后续用 `aiui_platform_upload` 上传并核对云端草稿，用 `aiui_platform_review_prepare` 上传材料并保存提审草稿，`aiui_platform_review_request` 请求用户在工坊确认。MCP 不能代替用户确认或发布，详见 [草稿上传与提审](platform-uploads.md)。
 
 ## 复验
 

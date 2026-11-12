@@ -5,7 +5,7 @@ import { watch } from 'chokidar';
 import ignore from 'ignore';
 import { atomicJson, readJson, id, inside, sha, ROOT } from './util.mjs';
 import { t } from '../shared/i18n.mjs';
-import { projectIcon } from './project-icon.mjs';
+import { projectIcon, projectIconWatchPaths } from './project-icon.mjs';
 
 const SKIP = new Set(['node_modules', '.git', '.aix', '.local', 'dist', 'output', 'artifacts', '.DS_Store', '.claude', '.cursor', '.agents', '.mcp.json', '.aiui-workbench.json']);
 export function sourceRevision(files) {
@@ -88,8 +88,12 @@ export class Projects {
   watch(p) {
     if (this.watchers.has(p.id)) return;
     let timer;
-    const watcher = watch(p.projectPath, { ignoreInitial: true, followSymlinks: false, ignored: entry => path.relative(p.projectPath, entry).split(path.sep).some(part => SKIP.has(part) || part.startsWith('.mcp.json.backup-')), awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 } });
-    watcher.on('all', () => { clearTimeout(timer); timer = setTimeout(async () => { try { await this.refresh(p.id); } catch(e) { p.error = e.message; await this.save(); } }, 250); });
+    const watcher = watch(projectIconWatchPaths(p), { ignoreInitial: true, followSymlinks: false, ignored: entry => path.relative(p.projectPath, entry).split(path.sep).some(part => SKIP.has(part) || part.startsWith('.mcp.json.backup-')), awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 } });
+    const refresh = () => { clearTimeout(timer); timer = setTimeout(async () => { try { await this.refresh(p.id); } catch(e) { p.error = e.message; await this.save(); } }, 250); };
+    // Reconcile the gap between reading metadata and the native watch becoming
+    // active; initial events are ignored and can coalesce with an atomic save.
+    watcher.on('ready', refresh);
+    watcher.on('all', refresh);
     watcher.on('error', error => this.emit('log', { level: 'error', message: error.message }));
     this.watchers.set(p.id, { watcher, close: () => { clearTimeout(timer); return watcher.close(); } });
   }

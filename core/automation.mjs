@@ -125,7 +125,7 @@ export class Automation {
       const project = await w.projects.refresh(options.projectId);
       if (artifact.revision!==check.revision || project.revision!==check.revision || artifact.toolchainId!==check.toolchainId || project.toolchainId!==check.toolchainId) throw failed('检查与打包期间源码或 SDK 已变化，请重新构建', { stage: 'pack', stale: true, check, artifact, uploaded: false, submittedForReview: false });
       const receipt = await w.platformReceipt(project, artifact);
-      context.progress('本地 AIX 已生成，下一步到官方平台上传');
+      context.progress('本地 AIX 已生成，可上传为云端草稿');
       return { ...receipt, check, artifact, stale: false };
     });
     return w.jobs.wait(job.id, options.waitMs);

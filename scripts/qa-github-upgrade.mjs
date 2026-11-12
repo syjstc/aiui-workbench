@@ -18,8 +18,8 @@ import { githubTestFetcher, installDesktopGithubTestAuth } from './github-test-a
 const repository = process.env.AIUI_UPDATE_REPOSITORY || 'syjstc/aiui-workbench';
 const target = process.env.AIUI_UPDATE_TARGET_VERSION || APP_VERSION;
 const githubToken = process.env.CI ? process.env.AIUI_QA_GITHUB_TOKEN : '';
-const from = process.env.AIUI_UPDATE_FROM_VERSION || (semver.patch(target) > 0 ? `${semver.major(target)}.${semver.minor(target)}.${semver.patch(target) - 1}` : '0.3.1');
-assert.ok(semver.valid(target) && semver.valid(from) && semver.lt(from, target));
+let from = process.env.AIUI_UPDATE_FROM_VERSION || null;
+assert.ok(semver.valid(target) && (!from || (semver.valid(from) && semver.lt(from, target))));
 const base = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-github-upgrade-')), home = path.join(base, 'user-data');
 const output = path.join(ROOT, 'output/qa/github-upgrade', process.platform + '-' + process.arch); await fs.mkdir(output, { recursive: true });
 const report = { repository, fromVersion: from, targetVersion: target, realGitHub: true, responsesMocked: false, isolatedUserData: true, authenticatedGitHubApi: !!githubToken, checks: [], errors: [] };
@@ -60,8 +60,14 @@ try {
     const probe = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, { signal: AbortSignal.timeout(15000) }).catch(() => null);
     if (probe) { report.anonymousApiProbe = { status: probe.status, remaining: probe.headers.get('x-ratelimit-remaining') }; await probe.body?.cancel(); }
   }
-  manager = await new AppUpdates(home, { version: from, fetcher: githubTestFetcher(repository, githubToken) }).init();
+  manager = await new AppUpdates(home, { version: from || target, fetcher: githubTestFetcher(repository, githubToken) }).init();
   await manager.settings({ source: 'github', sources: { github: { repository } }, autoCheck: true });
+  if (!from) {
+    const releases = (await manager.json(`https://api.github.com/repos/${repository}/releases?per_page=100`, manager.controller.signal)).value;
+    from = releases.filter(release => !release.draft && !release.prerelease).map(release => semver.valid(release.tag_name.replace(/^v/, ''))).filter(version => version && semver.lt(version, target)).sort(semver.rcompare)[0];
+    assert.ok(from, 'No previous published stable release is available');
+    report.fromVersion = from;
+  }
   const baselineRelease = (await manager.json(`https://api.github.com/repos/${repository}/releases/tags/v${from}`, manager.controller.signal)).value;
   const manifestUrl = baselineRelease.assets.find(asset => asset.name === 'workbench-update.json')?.browser_download_url; assert.ok(manifestUrl, 'Previous release manifest missing');
   const baselineManifest = (await manager.json(manifestUrl, manager.controller.signal)).value;

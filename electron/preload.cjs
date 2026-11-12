@@ -14,5 +14,8 @@ contextBridge.exposeInMainWorld('workbench',{
   reveal:file=>ipcRenderer.invoke('workbench:reveal',file),
   openOfficial:url=>ipcRenderer.invoke('workbench:external',url),
   openStudio:()=>ipcRenderer.invoke('workbench:studio'),
+  logoutPlatform:()=>ipcRenderer.invoke('workbench:platform-logout'),
+  onPlatformSession:callback=>{const listener=(_event,status)=>callback(status);ipcRenderer.on('workbench:platform-session',listener);return()=>ipcRenderer.removeListener('workbench:platform-session',listener);},
+  confirmReview:args=>ipcRenderer.invoke('workbench:review-confirm',args),
   openMirror:serial=>ipcRenderer.invoke('workbench:mirror-window',serial),
 });

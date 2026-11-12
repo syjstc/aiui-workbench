@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { previewTestSchema, buildSchema, jobWaitSchema, recordingSchema,clipSchema } from './automation-contract.mjs';
+import { platformUploadSchema, platformReviewSchema } from './platform-contract.mjs';
 const string=z.string(), project={projectId:string}, session={sessionId:string};
 export const TOOL_DEFINITIONS=[
  ['aiui_tools_list','读取当前运行服务实际支持的工具、参数与能力契约；MCP 连接不要求工坊版本相同',{}],
@@ -26,7 +27,10 @@ export const TOOL_DEFINITIONS=[
  ['aiui_project_refresh','刷新项目源码版本与元数据',project],
  ['aiui_context_get','获取项目上下文、官方 Skill 与模拟支持边界',{projectId:string.optional()}],
  ['aiui_docs_sync','检查上游并同步官方文档与完整 aiui-dev Skill，返回任务 ID',{}],
- ['aiui_docs_search','本地检索已同步的官方资料，支持官方目录、标题或路径排序及分页',{query:string,locale:z.enum(['zh-CN','en']).optional(),sort:z.enum(['recommended','title','path']).optional(),offset:z.number().optional(),limit:z.number().optional(),revision:string.optional()}],
+ ['aiui_docs_settings','设置文档自动更新：服务启动补查、每天或每周检查，失败保留离线快照并稍后重试',{autoUpdate:z.boolean().optional(),intervalHours:z.union([z.literal(24),z.literal(168)]).optional()}],
+ ['aiui_docs_catalog','一次获取完整官方目录树和全部文档元数据，无需逐页加载',{locale:z.enum(['zh-CN','en']).optional(),sort:z.enum(['recommended','title','path']).optional(),revision:string.optional()}],
+ ['aiui_docs_image','读取当前文档引用的官方图片，按快照版本校验并缓存以供离线查看',{path:string,from:string,revision:string.optional()}],
+ ['aiui_docs_search','全文检索全部官方资料（含未打开的正文和代码），支持中英文常用词匹配、命中章节、摘要、总数与排序分页',{query:string,locale:z.enum(['zh-CN','en']).optional(),sort:z.enum(['recommended','title','path']).optional(),offset:z.number().optional(),limit:z.number().optional(),revision:string.optional()}],
  ['aiui_docs_read','分段读取官方资料，支持官网文档链接；相对链接可通过 from 指定来源文档，保留来源和版本',{path:string,from:string.optional(),revision:string.optional(),offset:z.number().optional(),limit:z.number().optional()}],
  ['aiui_preview_open','用官方 Ink 运行时打开项目源码，返回桌面与浏览器可用的会话',{...project,page:string.optional(),target:z.enum(['_blank','_current']).optional()}],
  ['aiui_preview_state','读取实际预览运行状态与模拟传感器状态',session],
@@ -62,6 +66,11 @@ export const TOOL_DEFINITIONS=[
  ['aiui_project_check','运行官方静态检查，报告关联源码版本',project],
  ['aiui_project_pack','调用官方 CLI 打包，保存 SHA256 和源码版本',project],
  ['aiui_platform_prepare','准备平台导入包与本地核对清单；不会假报上传成功',project],
+ ['aiui_platform_status','读取官方登录、应用绑定、AIX 上传和提审草稿回执。绑定仅由用户在工坊设置。reconcile=true 只回读核对未知结果，不会重传。',{projectId:string.optional(),reconcile:z.boolean().optional()}],
+ ['aiui_platform_agents','只读当前官方账号的完整原生智能体列表、草稿资料、审核版本和已上架版本；不支持修改或删除已有云端记录。上传新草稿必须匹配工坊设置的应用绑定，不从本地开发身份猜测商店身份。',{}],
+ ['aiui_platform_upload','将当前已检查和打包的 AIX 上传为指定智能体的云端草稿，回读包 MD5、目标和版本后才报告 uploaded=true。使用官方 STS/OSS 保存 AIX 和一致的代码 ZIP，保留目标正式名称；不提审或发布。断线不自动重传，显式恢复需同一回执 resumeUploadId、包摘要和资料。',platformUploadSchema.shape],
+ ['aiui_platform_review_prepare','上传本机图标、3–5 个 PNG/JPG/MP4 素材并保存介绍、开场白、更新日志和权限用途为提审草稿。previewFiles 省略时沿用云端素材。返回 draftId，尚未提交审核。',platformReviewSchema.shape],
+ ['aiui_platform_review_request','请求用户在工坊核对并确认指定提审草稿。只进入 awaiting-user，不能通过 MCP 传 confirm=true 或代替用户确认，不会发布。',{...project,draftId:string}],
  ['aiui_job_get','读取长任务进度、日志与最终结果',{jobId:string}],
  ['aiui_job_cancel','取消正在运行的任务',{jobId:string}],
  ['aiui_jobs_delete','删除明确选中的已结束任务及日志，持久保存；跳过正在运行的任务',{jobIds:z.array(string).min(1).max(60)}],

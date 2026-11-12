@@ -66,6 +66,7 @@ export async function startDaemon(home = homePath()) {
   const connection = { origin:service.origin,token,pid:process.pid,version:APP_VERSION,startedAt:new Date().toISOString() };
   await atomicJson(path.join(home,'connection.json'),connection);
   service.sdk.start();
+  service.knowledge.start(() => service.jobs.start('knowledge', null, context => service.knowledge.sync(context), { automatic: true }));
   const close = async () => {
     await service.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     const file = path.join(home, 'connection.json'), current = await readJson(file, null);

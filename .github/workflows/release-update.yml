@@ -6,12 +6,10 @@ on:
     inputs:
       target_version:
         description: Published target version
-        default: '0.3.2'
-        required: true
+        required: false
       from_version:
-        description: Previous published version
-        default: '0.3.1'
-        required: true
+        description: Previous published version (blank selects the latest stable version below the target)
+        required: false
 permissions:
   contents: read
 concurrency:

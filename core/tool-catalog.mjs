@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { TOOL_DEFINITIONS } from './tool-definitions.mjs';
 import { APP_VERSION } from './version.mjs';
 
-export const MCP_INSTRUCTIONS = '先调用 aiui_context_get 获取官方 Skill、能力清单和示例。工具和参数以当前服务返回的 tools/list 为准，不要求 MCP 入口与工坊版本相同。优先 aiui_preview_test 一次执行模拟与截图/断言/日志报告，aiui_project_build 一次完成检查与打包；仅 status=running 时调用 aiui_job_wait。需要视频时用 aiui_preview_test 的 record=true 或 aiui_record_clip。源码用现有编码工具编辑。项目传 projectId，逐步预览传 sessionId。模拟、真机、平台发布分别验收；自动平台上传未验证。';
+export const MCP_INSTRUCTIONS = '先调用 aiui_context_get 获取官方 Skill、能力清单和示例。工具和参数以当前服务返回的 tools/list 为准，不要求 MCP 入口与工坊版本相同。优先 aiui_preview_test 一次执行模拟与截图/断言/日志报告，aiui_project_build 一次完成检查与打包；仅 status=running 时调用 aiui_job_wait。需要视频时用 aiui_preview_test 的 record=true 或 aiui_record_clip。源码用现有编码工具编辑。项目传 projectId，逐步预览传 sessionId。模拟、真机、平台发布分别验收。用 aiui_platform_upload 上传草稿，aiui_platform_review_prepare 上传并保存提审资料；aiui_platform_review_request 只请求用户在工坊确认，不能自动提审或发布。';
 
 export function toolCatalog() {
   return {

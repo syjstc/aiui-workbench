@@ -64,6 +64,8 @@ GitHub Actions 在 Linux、macOS 和 Windows 运行基础检查；Windows 另构
 
 ## 文档截图
 
+资料库行为见 [官方资料库](document-library.md)。`npm run qa:documents` 检查完整目录层级、未打开长文的全文搜索与章节定位、更新设置持久化、真实离线配图、阅读历史和内部链接；加 `--desktop` 运行 Electron 验收。`npm run prepare:doc-images` 补齐已固定快照的离线图片。
+
 `npm run qa:screenshots` 复制仓库内公开示例到全新的临时目录，完成实际运行、断言和截图，更新 `docs/screenshots/`。不读取日常客户端数据、设备或官方账号会话。报告保存在 `output/qa/documentation.json`。
 
 ## 输入与翻译

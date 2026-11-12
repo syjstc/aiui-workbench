@@ -51,7 +51,7 @@ try{
     const definitions=(await mcp.listTools()).tools;report.toolCount=definitions.length;
     for(const name of ['aiui_capabilities_get','aiui_cli_info','aiui_preview_test','aiui_project_build','aiui_job_wait'])assert.ok(definitions.some(t=>t.name===name));
     report.simulationSchemaBytes=JSON.stringify(definitions.find(t=>t.name==='aiui_preview_test').inputSchema).length;assert.ok(report.simulationSchemaBytes<9000);
-    const resource=await mcp.readResource({uri:'aiui://capabilities'});assert.equal(JSON.parse(resource.contents[0].text).platform.upload,'not-verified');
+    const resource=await mcp.readResource({uri:'aiui://capabilities'});assert.equal(JSON.parse(resource.contents[0].text).platform.upload,'cloud-draft');
     assert.match((await mcp.getPrompt({name:'develop-aiui',arguments:{request:'验证交互并打包'}})).messages[0].content.text,/aiui_preview_test/);
   });
   await check('AI 从官方模板创建项目并使用真实目录编写测试应用',async()=>{

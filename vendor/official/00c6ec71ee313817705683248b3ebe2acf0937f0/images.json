@@ -1,0 +1,417 @@
+[
+  {
+    "path": "documentation/image/account-auth/1.png",
+    "sha": "eda410dc0a4743a1ff131daf041f7f6f52dec6c6",
+    "size": 513499
+  },
+  {
+    "path": "documentation/image/account-auth/2.png",
+    "sha": "84a23cdf218684d72962de4c49475472f5d513b1",
+    "size": 874300
+  },
+  {
+    "path": "documentation/image/account-auth/3.png",
+    "sha": "48b10461f2b58b5520804e713328de12d634b1a3",
+    "size": 474833
+  },
+  {
+    "path": "documentation/image/account-auth/4.png",
+    "sha": "baf18bb36c9afccc21efe745508a852798e834cc",
+    "size": 59655
+  },
+  {
+    "path": "documentation/image/craft.en-us/01.png",
+    "sha": "2f69e194b880db2469e6ceda4e7a8cc7cc0f1597",
+    "size": 522899
+  },
+  {
+    "path": "documentation/image/craft.en-us/02.png",
+    "sha": "987414609a8ce5cc7ff4533b84e82a1624b9d6c5",
+    "size": 347165
+  },
+  {
+    "path": "documentation/image/craft.en-us/03.png",
+    "sha": "1cb801a8b24d58b38bf66f22a75e639571740151",
+    "size": 207608
+  },
+  {
+    "path": "documentation/image/craft.en-us/04.png",
+    "sha": "f6899ffc0ce773e6b0b881b95457066547657002",
+    "size": 100687
+  },
+  {
+    "path": "documentation/image/craft.en-us/05.png",
+    "sha": "9c10b876f6ecd9ae522d901e9ef5547479de4513",
+    "size": 120090
+  },
+  {
+    "path": "documentation/image/craft.en-us/06.png",
+    "sha": "bc1a4a9ee09624c9c709406ab7184fd4d2013391",
+    "size": 408135
+  },
+  {
+    "path": "documentation/image/craft.en-us/07.png",
+    "sha": "e4abbccaf46e6318386e945463dd532db5802145",
+    "size": 567189
+  },
+  {
+    "path": "documentation/image/craft.en-us/08.png",
+    "sha": "8486ce75847b29d17a7edfe565f07dfd1edde6c0",
+    "size": 530719
+  },
+  {
+    "path": "documentation/image/craft.en-us/09.png",
+    "sha": "f78bc35e66db984b8f9ef76e61497de9ad7e4d53",
+    "size": 480061
+  },
+  {
+    "path": "documentation/image/craft.en-us/10.png",
+    "sha": "293717db0d8263d0085ea5c6995f917b5fa63282",
+    "size": 118382
+  },
+  {
+    "path": "documentation/image/craft.en-us/11.png",
+    "sha": "2f69e194b880db2469e6ceda4e7a8cc7cc0f1597",
+    "size": 522899
+  },
+  {
+    "path": "documentation/image/craft.en-us/12.png",
+    "sha": "987414609a8ce5cc7ff4533b84e82a1624b9d6c5",
+    "size": 347165
+  },
+  {
+    "path": "documentation/image/craft.en-us/13.png",
+    "sha": "598c614856ba6692cef2ab23ba9075d6d7be743f",
+    "size": 77565
+  },
+  {
+    "path": "documentation/image/craft.en-us/14.png",
+    "sha": "8b3871cd609bde22e0b05b2061792de741a9ba55",
+    "size": 239999
+  },
+  {
+    "path": "documentation/image/craft.en-us/15.png",
+    "sha": "27a5eaa2c906af24096901421e1980b1294704d7",
+    "size": 569791
+  },
+  {
+    "path": "documentation/image/craft.en-us/16.png",
+    "sha": "54f6e0f1acc3a66943ab7a46a12aa7f35e8ebd21",
+    "size": 527063
+  },
+  {
+    "path": "documentation/image/craft.en-us/17.png",
+    "sha": "607e07a0739b5451fb2b259f5f78b27964b03f5c",
+    "size": 430541
+  },
+  {
+    "path": "documentation/image/craft.en-us/18.png",
+    "sha": "0d2f2a757e589233fe86b69dda96b5887e640b28",
+    "size": 409174
+  },
+  {
+    "path": "documentation/image/craft.en-us/19.png",
+    "sha": "12d4c872577cc13ffb712222687f722157ac2b8e",
+    "size": 1215247
+  },
+  {
+    "path": "documentation/image/craft.en-us/20.png",
+    "sha": "760281e6443fbc4fbc1aff7c9fadcacd43a550fc",
+    "size": 95767
+  },
+  {
+    "path": "documentation/image/craft.en-us/21.png",
+    "sha": "af55080a88ab1b5257bcad1dfd75f412f66e8631",
+    "size": 818135
+  },
+  {
+    "path": "documentation/image/craft/01.png",
+    "sha": "2f69e194b880db2469e6ceda4e7a8cc7cc0f1597",
+    "size": 522899
+  },
+  {
+    "path": "documentation/image/craft/02.png",
+    "sha": "987414609a8ce5cc7ff4533b84e82a1624b9d6c5",
+    "size": 347165
+  },
+  {
+    "path": "documentation/image/craft/03.png",
+    "sha": "a33ac88f7dc030fe6b947a87a0df3c5a320a4a10",
+    "size": 161407
+  },
+  {
+    "path": "documentation/image/craft/04.png",
+    "sha": "0718a2ec54e4956432598d35bc76693d69bcf862",
+    "size": 115645
+  },
+  {
+    "path": "documentation/image/craft/05.png",
+    "sha": "8af9189136247933b1683657a955841391e15d63",
+    "size": 121246
+  },
+  {
+    "path": "documentation/image/craft/06.png",
+    "sha": "79f5eaefc0c3130105bb9df4826dcca47fa69b86",
+    "size": 423716
+  },
+  {
+    "path": "documentation/image/craft/07.png",
+    "sha": "2f43ed45c6a25261bb43376513c8b684b0c25541",
+    "size": 546145
+  },
+  {
+    "path": "documentation/image/craft/08.png",
+    "sha": "1c69a0c27f120315652b55ebbaedb999e809eb0d",
+    "size": 518700
+  },
+  {
+    "path": "documentation/image/craft/09.png",
+    "sha": "56705da180e9b2e343305d0f956adb8bf1c2d40a",
+    "size": 456354
+  },
+  {
+    "path": "documentation/image/craft/10.png",
+    "sha": "a2f1baa4d8e3c4e47e2c06dd24dda1e5b51cccb6",
+    "size": 109627
+  },
+  {
+    "path": "documentation/image/craft/11.png",
+    "sha": "2f69e194b880db2469e6ceda4e7a8cc7cc0f1597",
+    "size": 522899
+  },
+  {
+    "path": "documentation/image/craft/12.png",
+    "sha": "987414609a8ce5cc7ff4533b84e82a1624b9d6c5",
+    "size": 347165
+  },
+  {
+    "path": "documentation/image/craft/13.png",
+    "sha": "fa32c7e31346ac627964cd53184eb058803325e0",
+    "size": 73193
+  },
+  {
+    "path": "documentation/image/craft/14.png",
+    "sha": "e48e54080bfaa464c257f0eae182481124802729",
+    "size": 214979
+  },
+  {
+    "path": "documentation/image/craft/15.png",
+    "sha": "1bfd5d9579ff9d7d50de63c7a5a816f5fb2bd9c9",
+    "size": 546873
+  },
+  {
+    "path": "documentation/image/craft/16.png",
+    "sha": "18fa9f22ed02e0b1931baf2689e7dbb8311f8a73",
+    "size": 545690
+  },
+  {
+    "path": "documentation/image/craft/17.png",
+    "sha": "d54d1a146d03a6347b14fd8a8f84d0aa4853368a",
+    "size": 388278
+  },
+  {
+    "path": "documentation/image/craft/18.png",
+    "sha": "925163884a5902d0450609d844f6fd9ea1026791",
+    "size": 399211
+  },
+  {
+    "path": "documentation/image/craft/19.png",
+    "sha": "2585945d71037831711bd93e62a7a1096d36c2e0",
+    "size": 1147994
+  },
+  {
+    "path": "documentation/image/craft/20.png",
+    "sha": "760281e6443fbc4fbc1aff7c9fadcacd43a550fc",
+    "size": 95767
+  },
+  {
+    "path": "documentation/image/craft/21.png",
+    "sha": "8a594d1ac5af7f2dd543db5129c3788538483d3b",
+    "size": 713399
+  },
+  {
+    "path": "documentation/image/framework/app-lifecycle-flow-v2.svg",
+    "sha": "12e24306d681f9541916e8c066ee19a3801ac9db",
+    "size": 2855
+  },
+  {
+    "path": "documentation/image/framework/component-lifecycle-flow.svg",
+    "sha": "a3bb7481080364304e1920048ebe944a9538b8bc",
+    "size": 3392
+  },
+  {
+    "path": "documentation/image/framework/page-lifecycle-flow.svg",
+    "sha": "45dab47dc86a7580ed92ee442be3b761e4bccab3",
+    "size": 3430
+  },
+  {
+    "path": "documentation/image/overview/aiui-ecosystem.png",
+    "sha": "ef4b0f8d9c2cbeaecd122e4416e843bb9e6659ec",
+    "size": 1236910
+  },
+  {
+    "path": "documentation/image/overview/architecture.en-US.svg",
+    "sha": "4a2f24126dff916205bf798a5f2c5721606b4be4",
+    "size": 14109
+  },
+  {
+    "path": "documentation/image/overview/architecture.svg",
+    "sha": "6c8bf9cf42e7b9e682588087352fe29b6b73d926",
+    "size": 12730
+  },
+  {
+    "path": "documentation/image/overview/interaction-loop.png",
+    "sha": "9f31672d5eac75fbabc837206b200ab4263af585",
+    "size": 964458
+  },
+  {
+    "path": "documentation/image/publish.en-US/review-workflow.en-US.png",
+    "sha": "0f9fad2a30a479ee7f0c4a81eac9ca65f44b60ab",
+    "size": 73869
+  },
+  {
+    "path": "documentation/image/publish/review-workflow.png",
+    "sha": "5a79a5beb6728383a74dea5a954c32cfee33a71a",
+    "size": 92349
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/1.png",
+    "sha": "293717db0d8263d0085ea5c6995f917b5fa63282",
+    "size": 118382
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/10.png",
+    "sha": "a3e4e63b8f2bc55cfc64abef2fb675af66450779",
+    "size": 568467
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/11.png",
+    "sha": "12d4c872577cc13ffb712222687f722157ac2b8e",
+    "size": 1215247
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/12.png",
+    "sha": "760281e6443fbc4fbc1aff7c9fadcacd43a550fc",
+    "size": 95767
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/13.png",
+    "sha": "078eea25c2a43eccfb0823293b4c0abeee560315",
+    "size": 659648
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/14.png",
+    "sha": "af55080a88ab1b5257bcad1dfd75f412f66e8631",
+    "size": 818135
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/2.png",
+    "sha": "2f69e194b880db2469e6ceda4e7a8cc7cc0f1597",
+    "size": 522899
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/3.png",
+    "sha": "987414609a8ce5cc7ff4533b84e82a1624b9d6c5",
+    "size": 347165
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/4.png",
+    "sha": "598c614856ba6692cef2ab23ba9075d6d7be743f",
+    "size": 77565
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/5.png",
+    "sha": "8b3871cd609bde22e0b05b2061792de741a9ba55",
+    "size": 239999
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/6.png",
+    "sha": "0c2e5cb78182663f55b9a80b7135be619edb95b4",
+    "size": 37714
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/7.png",
+    "sha": "0de1f66848964c277e0ca61e3bf6f14c986d50d6",
+    "size": 36937
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/8.png",
+    "sha": "9067a920b4aab73be720085533a6d64e29c78946",
+    "size": 57259
+  },
+  {
+    "path": "documentation/image/quickstart.en-us/9.png",
+    "sha": "45dd2a0089c9059d2b97c1088030933bb3e22376",
+    "size": 524284
+  },
+  {
+    "path": "documentation/image/quickstart/1.png",
+    "sha": "a2f1baa4d8e3c4e47e2c06dd24dda1e5b51cccb6",
+    "size": 109627
+  },
+  {
+    "path": "documentation/image/quickstart/10.jpg",
+    "sha": "8a28b5e78c020445c317deb8a9e91c74b85b3ce2",
+    "size": 464058
+  },
+  {
+    "path": "documentation/image/quickstart/11.png",
+    "sha": "2585945d71037831711bd93e62a7a1096d36c2e0",
+    "size": 1147994
+  },
+  {
+    "path": "documentation/image/quickstart/12.png",
+    "sha": "760281e6443fbc4fbc1aff7c9fadcacd43a550fc",
+    "size": 95767
+  },
+  {
+    "path": "documentation/image/quickstart/13.png",
+    "sha": "080ac3a7cf588620ca6d0e5923f8b0ce144e51a5",
+    "size": 679730
+  },
+  {
+    "path": "documentation/image/quickstart/14.png",
+    "sha": "8a594d1ac5af7f2dd543db5129c3788538483d3b",
+    "size": 713399
+  },
+  {
+    "path": "documentation/image/quickstart/2.png",
+    "sha": "2f69e194b880db2469e6ceda4e7a8cc7cc0f1597",
+    "size": 522899
+  },
+  {
+    "path": "documentation/image/quickstart/3.png",
+    "sha": "987414609a8ce5cc7ff4533b84e82a1624b9d6c5",
+    "size": 347165
+  },
+  {
+    "path": "documentation/image/quickstart/4.png",
+    "sha": "fa32c7e31346ac627964cd53184eb058803325e0",
+    "size": 73193
+  },
+  {
+    "path": "documentation/image/quickstart/5.png",
+    "sha": "e48e54080bfaa464c257f0eae182481124802729",
+    "size": 214979
+  },
+  {
+    "path": "documentation/image/quickstart/6.png",
+    "sha": "2f643a9f05f0c2125da6bedae9a64c5327da498e",
+    "size": 33020
+  },
+  {
+    "path": "documentation/image/quickstart/7.png",
+    "sha": "9093ab0b4da0720ac6609fdce1826821f45a5119",
+    "size": 34146
+  },
+  {
+    "path": "documentation/image/quickstart/8.png",
+    "sha": "3de404bbce4bdc5124288623929b334b3be82123",
+    "size": 52571
+  },
+  {
+    "path": "documentation/image/quickstart/9.png",
+    "sha": "f9e360568b24d6db06c563e59f7b152cfe6bfa63",
+    "size": 547080
+  }
+]

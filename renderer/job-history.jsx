@@ -2,7 +2,7 @@ import { t, getLocale, translateMessage } from './i18n.jsx';
 import React, { useState } from 'react';
 import { AlertCircle, Check, ChevronDown, FolderOpen, LoaderCircle, Trash2 } from 'lucide-react';
 
-export const jobLabels = { recording:'录制短片', 'preview-test': '模拟测试', build: '检查并打包', 'sdk-prepare': 'SDK 兼容性检查', knowledge: '同步官方资料', check: '官方源码检查', pack: '构建 AIX', deploy: '安装到眼镜', launch: '启动眼镜页面', 'device-setup': '准备眼镜环境', 'platform-prepare': '准备平台导入', 'glasses-pull': '导出眼镜文件', 'glasses-push': '导入眼镜文件', 'glasses-install': '安装 APK', 'glasses-app': '管理眼镜应用', 'glasses-aiui-uninstall': '卸载 AIUI 开发应用' };
+export const jobLabels = { 'platform-upload':'上传云端草稿','platform-review-prepare':'保存提审草稿','platform-review-submit':'提交审核', recording:'录制短片', 'preview-test': '模拟测试', build: '检查并打包', 'sdk-prepare': 'SDK 兼容性检查', knowledge: '同步官方资料', check: '官方源码检查', pack: '构建 AIX', deploy: '安装到眼镜', launch: '启动眼镜页面', 'device-setup': '准备眼镜环境', 'platform-prepare': '准备平台导入', 'glasses-pull': '导出眼镜文件', 'glasses-push': '导入眼镜文件', 'glasses-install': '安装 APK', 'glasses-app': '管理眼镜应用', 'glasses-aiui-uninstall': '卸载 AIUI 开发应用' };
 const time = value => value ? new Date(value).toLocaleString(getLocale(), { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : t("尚未运行");
 function description(job) {
   const diagnostics = job.result?.diagnostics?.diagnostics;

@@ -1,7 +1,7 @@
 {
   "name": "aiui-workbench",
   "productName": "AIUI 工坊",
-  "version": "0.4.0",
+  "version": "0.5.8",
   "type": "module",
   "main": "electron/main.cjs",
   "description": "Local AIUI desktop workbench, official runtime simulator and MCP tools",
@@ -21,6 +21,8 @@
     "vendor/scrcpy/",
     "docs/web-and-updates.md",
     "docs/ai-tool-workflows.md",
+    "docs/platform-uploads.md",
+    "docs/document-library.md",
     "README.md",
     "README.en.md",
     "LICENSE",
@@ -51,6 +53,7 @@
     "qa:mcp-stability": "node scripts/qa-mcp-stability.mjs",
     "qa:camera": "node scripts/qa-camera.mjs",
     "qa:documents": "npm run build && node scripts/qa-documents.mjs",
+    "prepare:doc-images": "node scripts/cache-document-images.mjs",
     "qa:sdk": "node scripts/qa-sdk.mjs",
     "package:win": "npm run build && node scripts/package.mjs --platform win32 --arch x64",
     "qa:portable": "node scripts/qa-portable.mjs",
@@ -63,7 +66,8 @@
     "package:dmg": "node scripts/create-dmg.mjs",
     "qa:screenshots": "npm run build && node scripts/capture-docs.mjs",
     "qa:project-removal": "npm run build && node scripts/qa-project-removal.mjs",
-    "qa:github-upgrade": "node scripts/qa-github-upgrade.mjs"
+    "qa:github-upgrade": "node scripts/qa-github-upgrade.mjs",
+    "qa:platform": "npm run build && node scripts/qa-platform.mjs"
   },
   "engines": {
     "node": ">=22.22.0"

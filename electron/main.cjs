@@ -1,6 +1,8 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, clipboard, session, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const platformDesktopKey=require('node:crypto').randomBytes(32).toString('hex');
+const {PlatformLogin}=require('./platform-login.cjs');
 const {spawn}=require('node:child_process');
 const ROOT = path.resolve(__dirname,'..');
 const home = process.env.AIUI_WORKBENCH_HOME || path.join(app.getPath('appData'),'AIUI Workbench');
@@ -12,21 +14,20 @@ const mirrorWindows=new Map();
 const mirrorWindowLifecycle=require('./mirror-window-lifecycle.cjs').createMirrorWindowLifecycle({windows:mirrorWindows,getSession:async serial=>(await client.call('aiui_glasses_mirror_embed_status',{serial},'desktop')).session});
 let allowed, updates, upgradeTask, quittingForUpgrade=false;
 let desktopLocale = 'zh-CN';
+let platformLogin;
+const syncPlatformSession=()=>platformLogin.sync();
 function trusted(event) { if(event.sender!==mainWindow?.webContents || event.senderFrame!==mainWindow?.webContents.mainFrame)throw new Error('无效的桌面调用来源'); }
 async function connectService(){
   // core/client sets Node-only mode on its service child. Setting it on the
   // desktop can race Chromium utility startup, especially on Windows.
   const {connect}=await import('../core/client.mjs');client=await connect(home);
 }
-function studioWindow(){
-  if(studio&&!studio.isDestroyed()){studio.focus();return;}
-  studio=new BrowserWindow({width:1240,height:850,title:desktopLocale==='en'?'Rokid Official Platform':'Rokid 官方平台',webPreferences:{partition:'persist:rokid-studio',nodeIntegration:false,contextIsolation:true,sandbox:true}});
-  studio.webContents.setWindowOpenHandler(({url})=>{if(/^https:\/\/[^/]*rokid\.com(?:\/|$)/i.test(url)){studio.loadURL(url);return{action:'deny'};}return{action:'deny'};});
-  studio.loadURL('https://aiui.rokid.com/space');
-}
+function studioWindow(){return platformLogin.open();}
 app.whenReady().then(async()=>{
   desktopLocale = /^zh(?:-|$)/i.test(app.getLocale()) ? 'zh-CN' : 'en';
   await connectService();
+  platformLogin=await new PlatformLogin({home,session,BrowserWindow,safeStorage,client,desktopKey:platformDesktopKey,getLocale:()=>desktopLocale,onStatus:status=>{if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send('workbench:platform-session',status);}}).init();
+  app.on('before-quit',()=>platformLogin.close());
   ({UI_TOOLS:allowed}=await import('../core/ui-tools.mjs'));
   const {AppUpdates}=await import('../core/updates.mjs');
   updates=await new AppUpdates(home).init();
@@ -34,7 +35,20 @@ app.whenReady().then(async()=>{
   mainWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   mainWindow.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('file://'))event.preventDefault();});
   require('./media-permissions.cjs').installMediaPermissions(session.defaultSession, { getWebContents:()=>mainWindow?.webContents, origin:client.connection.origin });
-  ipcMain.handle('workbench:call',async(event,tool,args)=>{trusted(event);if(!allowed.has(tool))throw new Error('未知操作');const result=await client.call(tool,args,'desktop');if(tool==='aiui_glasses_mirror_embed_stop')mirrorWindowLifecycle.close(args.serial,result?.id);return result;});
+  ipcMain.handle('workbench:call',async(event,tool,args)=>{trusted(event);if(!allowed.has(tool))throw new Error('未知操作');if(tool.startsWith('aiui_platform_'))await syncPlatformSession();const result=await client.call(tool,args,'desktop');if(tool==='aiui_glasses_mirror_embed_stop')mirrorWindowLifecycle.close(args.serial,result?.id);return result;});
+  const confirmingReviews=new Set();
+  ipcMain.handle('workbench:review-confirm',async(event,args)=>{
+    trusted(event);await syncPlatformSession();
+    const draft=await client.call('ui_platform_review_confirmation',{...args,desktopKey:platformDesktopKey},'desktop-confirmation');
+    if(confirmingReviews.has(draft.id))throw new Error('此提审确认窗口已打开');
+    confirmingReviews.add(draft.id);
+    try{
+      const en=desktopLocale==='en';
+      const choice=await dialog.showMessageBox(mainWindow,{type:'question',buttons:en?['Cancel','Submit for review']:['取消','提交审核'],defaultId:0,cancelId:0,noLink:true,title:en?'Confirm review submission':'确认提交审核',message:`${draft.agentName} · ${draft.version}`,detail:(en?'Submit this reviewed draft to Rokid?\n':'将已核对的草稿提交 Rokid 审核？\n')+`Agent ID: ${draft.agentId}\nSHA256: ${draft.sha256}\n\n${draft.content.description}\n\n${draft.content.versionLog}\n\n`+(en?'Confirm this version and its materials are ready for public release. Review and store availability follow the official platform\'s rules.':'请确认此版本与材料可公开发布后再提交。审核通过后的上架规则以官方平台为准。')});
+      if(choice.response!==1)return{cancelled:true,draftId:draft.id};
+      return await client.call('ui_platform_review_submit',{projectId:draft.projectId,draftId:draft.id,digest:draft.digest,approvalId:draft.approvalId,desktopKey:platformDesktopKey},'desktop-confirmation');
+    }finally{confirmingReviews.delete(draft.id);}
+  });
   ipcMain.handle('workbench:project-remove',async(event,args)=>{
     trusted(event);
     const intent=await client.call('ui_project_removal_begin',args,'desktop');
@@ -48,7 +62,7 @@ app.whenReady().then(async()=>{
       throw error;
     }
   });
-  ipcMain.handle('workbench:locale',async(event,locale)=>{trusted(event);if(!['zh-CN','en'].includes(locale))throw new Error('Unsupported language');desktopLocale=locale;studio?.setTitle(locale==='en'?'Rokid Official Platform':'Rokid 官方平台');return true;});
+  ipcMain.handle('workbench:locale',async(event,locale)=>{trusted(event);if(!['zh-CN','en'].includes(locale))throw new Error('Unsupported language');desktopLocale=locale;platformLogin.studio?.setTitle(locale==='en'?'Rokid Official Platform':'Rokid 官方平台');return true;});
   ipcMain.handle('workbench:updates',async(event,method,args)=>{
     trusted(event);
     if(method==='status')return {...updates.status(),canInstall:process.platform==='darwin'&&app.isPackaged,installing:!!upgradeTask};
@@ -84,7 +98,8 @@ app.whenReady().then(async()=>{
   ipcMain.handle('workbench:clipboard',async(event,text)=>{trusted(event);clipboard.writeText(String(text));return true;});
   ipcMain.handle('workbench:reveal',async(event,file)=>{trusted(event);if(typeof file!=='string'||!path.isAbsolute(file))throw new Error('无效路径');shell.showItemInFolder(file);return true;});
   ipcMain.handle('workbench:external',async(event,url)=>{trusted(event);if(!/^https:\/\/(?:github\.com|js\.rokid\.com|yodaos-project\.github\.io|jsar-project\.github\.io|modelcontextprotocol\.io|developer\.android\.com|global\.rokid\.com|x-docs\.rokid\.com)\//.test(url))throw new Error('仅支持打开已知官方资料来源');await shell.openExternal(url);});
-  ipcMain.handle('workbench:studio',event=>{trusted(event);studioWindow();return true;});
+  ipcMain.handle('workbench:studio',async event=>{trusted(event);await studioWindow();return true;});
+  ipcMain.handle('workbench:platform-logout',async event=>{trusted(event);return platformLogin.logout();});
   ipcMain.handle('workbench:mirror-window',async(event,serial)=>{
     trusted(event);
     const {session}=await client.call('aiui_glasses_mirror_embed_status',{serial},'desktop');

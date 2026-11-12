@@ -55,11 +55,14 @@ function App(){
  function notify(message,error=false){setToast({message:translateMessage(message),error});clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(null),6000);}
  async function refresh(){const request=++stateRequest.current,value=await call('aiui_status');if(request===stateRequest.current)setState(value);return value;}
  useEffect(()=>{refresh().catch(e=>notify(e.message,true));const timer=setInterval(()=>refresh().catch(()=>{}),1300);return()=>clearInterval(timer);},[]);
+ useEffect(()=>api.onPlatformSession?.(()=>refresh().catch(()=>{})),[]);
  // Check on every UI launch, including when the shared service is already running.
  // This runs alongside the initial status load; the service coalesces in-flight checks.
  useEffect(()=>{call('aiui_sdk_check').catch(()=>{});},[]);
  useEffect(()=>{setLogs([]);if(!preview)return;let cancelled=false,fetching=false;async function readLogs(){if(fetching)return;fetching=true;try{const value=await call('aiui_preview_logs',{sessionId:preview.id,limit:14});if(!cancelled&&(!session?.logGeneration||value.logGeneration===session.logGeneration))setLogs(value.logs);}catch{}finally{fetching=false;}}readLogs();const timer=setInterval(readLogs,1400);return()=>{cancelled=true;clearInterval(timer);};},[preview?.id,session?.logGeneration]);
  useEffect(()=>{const request=[...(state?.previews||[])].filter(s=>['MCP','CLI'].includes(s.requestedBy)&&s.requestedAt>lastRequest.current).sort((a,b)=>b.requestedAt-a.requestedAt)[0];if(request?.url){lastRequest.current=request.requestedAt;setPreview(request);setSelected(request.projectId);setView('simulator');}},[state?.previews]);
+ const reviewNotice=useRef(new Set());
+ useEffect(()=>{const draft=state?.platform?.reviews?.find(item=>item.stage==='awaiting-user'&&!reviewNotice.current.has(item.id));if(draft){reviewNotice.current.add(draft.id);setSelected(draft.projectId);setView('publish');notify(t('提审草稿已就绪，请核对并确认'));}},[state?.platform?.reviews]);
  useEffect(()=>{const candidate=state?.sdk?.candidate;if(candidate&&sdkNotice.current!==candidate.id){sdkNotice.current=candidate.id;notify(t("发现官方 SDK / CLI 新版本，可在「SDK 更新」检查兼容性后启用"));}},[state?.sdk?.candidate?.id]);
  async function perform(name,fn){setBusy(name);try{const result=await fn();await refresh();return result;}catch(e){notify(e.message,true);}finally{setBusy('');}}
  async function importProject(){await perform('import',async()=>{const directory=await api.chooseDirectory();if(!directory)return;const p=await call('aiui_project_import',{directory});setSelected(p.id);notify(t("项目已加入，正在监听源码变化"));});}
