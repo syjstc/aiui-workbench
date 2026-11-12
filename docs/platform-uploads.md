@@ -1,6 +1,49 @@
 # 官方平台草稿与提审
 
+[English](platform-uploads.en.md) · [返回 README](../README.md)
+
 AI 准备应用代码、商店文案、图标、图片和视频，然后调用工坊 MCP / CLI。工坊执行上传、保存提审草稿、核对云端和用户确认后的提审。确认窗口要求用户确认版本与材料可公开发布；审核通过后的上架规则以官方平台为准，工坊不承诺平台另有发布确认步骤。
+
+> **实验功能（0.5.8）**：此集成依赖官方 Studio 当前接口，并非承诺稳定的公开 API。两个标签页顶部均显示警告。真实账号草稿上传和摘要回读已验证；真实提审、审核结果与上架仍需分别验证。结果不明时先回查，不重复点击上传或提审。
+
+## 第一次完整操作
+
+1. 打开桌面“构建与上传”，点击蓝色“登录官方平台”，在官方窗口完成登录。成功后主界面立即显示“官方账号已连接”，登录窗口自动关闭。Web、CLI、MCP 共用此授权，使用时保持桌面工坊运行；在普通浏览器登录官网不能代替这一步。
+2. 切到“打包与上传”，在顶部选择本地应用，再点击“设置官方绑定”。核对正式名称和高亮的完整官网 Agent ID 后保存。已有应用使用原来的官方身份；新应用先在官网创建。后续板块共用同一个选择，MCP 不能更改绑定。
+3. 点击“检查并打包 AIX”。成功后核对本地包，再点击“上传为草稿”；也可以让 AI 调用 `aiui_project_build` 和 `aiui_platform_upload`。只有回读核对成功才会显示“云端 AIX 已核对”。
+4. 让 AI 通过 `aiui_platform_review_prepare` 准备介绍、开场白、更新日志、图标、预览素材和权限用途。也可展开“填写或更新提审材料”，编辑文案和预览文件路径；替换图标、填写权限用途使用 MCP 对应参数。保存成功后仍未提交审核。
+5. AI 调用 `aiui_platform_review_request` 请求你确认，或由你点击桌面“核对完成，确认提交审核”。核对目标、版本、包摘要、文案、权限和预览，再在原生窗口确认。取消窗口不会提交。
+6. 切到“官网应用”，点击“刷新官方状态”，查看官方返回的草稿、审核和已上架版本。审核通过后的上架规则由官方平台决定；不要假定还有一次独立的发布确认。
+
+本地应用版本和云端版本并非同一个编号。官方保存草稿或提审材料可能递增云端版本，应以每次回读结果为准。同一应用可以同时存在“旧版已上架”和“新版草稿”，列表中的“已上架”不证明最新草稿已经提交或发布。
+
+## 操作权限
+
+| 操作 | 用户入口 | AI / MCP 能力 |
+| --- | --- | --- |
+| 官方登录、退出 | 桌面官方窗口与账号按钮 | 不接收密码、Cookie 或会话令牌；读取登录状态 |
+| 设置官方目标绑定 | 工坊界面；核对正式名称和 Agent ID | 读取绑定，不能更改 |
+| 检查与打包 | “打包与上传” | `aiui_project_build`，只生成本地包 |
+| 上传新云端草稿 | “上传为草稿” | `aiui_platform_upload`，核对回执，不提审 |
+| 上传并保存提审材料 | 表单或 MCP | `aiui_platform_review_prepare`，不提审 |
+| 请求本人确认 | 桌面按钮或 MCP | `aiui_platform_review_request`，只到 `awaiting-user` |
+| 正式提交审核 | 本人确认桌面原生窗口 | 没有正式提审工具，不能代替本人确认 |
+| 查看已有云端资料和状态 | “官网应用”，只读 | `aiui_platform_agents` / `aiui_platform_status`，只读回查 |
+| 删除云端记录 | 本人前往官网 | 工坊和 MCP 均不提供 |
+
+## 材料要求
+
+| 材料 | 当前工坊校验 |
+| --- | --- |
+| 功能介绍 | 1–500 字符 |
+| 开场白 | 1–300 字符 |
+| 更新日志 | 5–1000 字符，说明实际变化及未验证范围 |
+| 图标、预览图片 | PNG / JPG / JPEG，1 KB–5 MB；内容须与扩展名一致 |
+| 预览视频 | MP4，1 KB–50 MB，可读取且不超过 60 秒 |
+| 预览数量 | 3–5 个，至少一张图片和一个视频；省略 `previewFiles` 时沿用满足要求的云端素材 |
+| 权限用途 | `permissionUsage` 覆盖本地应用声明的每项权限，每项 1–500 字符；无权限时可用 `{}` |
+
+文件参数使用工坊所在电脑上的绝对路径。素材符合本地校验不代表满足官方全部审核要求，用户仍需核对内容与官网规范。
 
 ## 登录一次，复用官方会话
 
@@ -33,19 +76,58 @@ AI 准备应用代码、商店文案、图标、图片和视频，然后调用�
    在工坊为所选本地应用设置一次官方绑定；`aiui_platform_status` 的 `binding` 返回当前账号绑定，上传参数必须一致。
 3. `aiui_project_build` 检查并生成当前源码和 SDK 的 AIX。
 4. `aiui_platform_upload` 上传指定目标的草稿，默认递增云端版本并保留目标正式名称。只有云端目标、版本、包 MD5 回读一致，才返回 `uploaded: true`。结果同时保留本地 SHA256、源码和 SDK 指纹。
-5. `aiui_platform_review_prepare` 上传素材、保存提审资料并回读核对。传 `description`、`prologue`、`versionLog`、可选 `iconFile`、`previewFiles` 和 `permissionUsage`。素材使用本机绝对路径；省略 `previewFiles` 时沿用现有云端素材。
-6. `aiui_platform_review_request` 传 `projectId` 和返回的 `draftId`。此调用只将草稿设为 `awaiting-user`，工坊显示资料供用户核对。
+5. `aiui_platform_review_prepare` 上传素材、保存提审资料并回读核对。传 `description`、`prologue`、`versionLog`、可选 `iconFile`、`previewFiles` 和 `permissionUsage`。素材使用本机绝对路径；省略 `previewFiles` 时沿用现有云端素材。任务成功后，`job.result.id` 是提审草稿 ID。
+6. `aiui_platform_review_request` 传 `projectId`，并将上一步的 `job.result.id` 作为 `draftId`，不要使用 `job.id`。此调用直接返回草稿，只将其设为 `awaiting-user`，工坊显示资料供用户核对。
 7. 用户在工坊查看目标、版本、介绍、开场白、日志、权限、图片、视频和包摘要，点击确认，并在原生确认窗口提交审核。
 
 长任务默认等待 45 秒，只有 `status: running` 才继续调用 `aiui_job_wait`。
 
-```json
-{"projectId":"<projectId>","agentId":"<cloudAgentId>","waitMs":45000}
-```
+调用上传工具：
 
 ```json
-{"projectId":"<projectId>","description":"真实功能介绍","prologue":"首次进入的引导语","versionLog":"本次版本的具体变化","previewFiles":["/absolute/preview-1.png","/absolute/preview-2.png","/absolute/demo.mp4"],"permissionUsage":{},"waitMs":45000}
+{"name":"aiui_platform_upload","arguments":{"projectId":"<projectId>","agentId":"<cloudAgentId>","waitMs":45000}}
 ```
+
+上传材料并保存草稿，示例应用声明了 `camera` 权限：
+
+```json
+{"name":"aiui_platform_review_prepare","arguments":{"projectId":"<projectId>","description":"真实功能介绍","prologue":"首次进入的引导语","versionLog":"本次版本的具体变化与验证范围。","iconFile":"/absolute/app-icon.png","previewFiles":["/absolute/preview-1.png","/absolute/preview-2.png","/absolute/demo.mp4"],"permissionUsage":{"camera":"用户主动拍照，供本应用识别画面内容。"},"waitMs":45000}}
+```
+
+无权限的应用使用 `"permissionUsage": {}`；省略 `iconFile` 会保留当前图标。请求本人确认：
+
+```json
+{"name":"aiui_platform_review_request","arguments":{"projectId":"<projectId>","draftId":"<reviewPrepareJob.result.id>"}}
+```
+
+以上为 MCP 调用格式。CLI 的 `--args-file` 文件只保存 `arguments` 对象，调用示例见 [AI 工具工作流](ai-tool-workflows.md#草稿上传与用户确认提审)。占位符均须替换为实际 ID 和本机文件路径，不传登录凭据。
+
+## 如何判断结果
+
+| 回执或状态 | 已完成的步骤 | 下一步 |
+| --- | --- | --- |
+| 构建任务 `succeeded`，`uploaded: false` | 本地检查和 AIX 打包 | 上传新草稿 |
+| 上传任务 `succeeded`，`result.stage: verified`、`uploaded: true` | 云端 AIX、代码草稿和目标已核对 | 准备提审材料 |
+| 准备材料任务 `succeeded`，`result.stage: ready` | 资料已保存并核对 | 请求本人确认，草稿 ID 为 `result.id` |
+| `stage: awaiting-user` | 已请求确认，未提审 | 本人在桌面核对，并确认原生窗口 |
+| `stage: submitted`、`submittedForReview: true` | 官方接受了提审请求 | 刷新官网审核状态；不代表审核通过或已上架 |
+| `stage: unknown` | 写请求的结果尚未确定 | 只读回查；不得自动重复写入 |
+
+任务的 `status` 和回执的 `stage` 是两个字段。`published: false` 表示工坊这次流程没有主动发布，不表示该应用没有旧的已上架版本；已有商店状态应读取“官网应用”。
+
+## 常见问题与恢复
+
+| 情况 | 处理 |
+| --- | --- |
+| 普通浏览器已登录，但 MCP 提示未登录 | 在桌面工坊的官方窗口登录，并保持桌面运行；浏览器会话不会作为工坊授权 |
+| 重启后需要登录 | 先确认平台会话是否到期或被拒绝；工坊只复用有效会话。系统无法提供可靠加密时不持久化明文凭据 |
+| 上传目标不一致或未绑定 | 在工坊顶部设置官方绑定，核对完整 Agent ID；不要让 AI 按名称或本地 UUID 猜测 |
+| 上传按钮不可用或提示源码已变化 | 完成当前源码与 SDK 的检查、打包，再上传；旧确认不沿用到新的包 |
+| 上传或材料保存结果待确认 | 刷新登录与云端结果，或调用 `aiui_platform_status` 并传 `reconcile: true`；不要通过删除回执或清缓存强行重试 |
+| 明确需要恢复同一次上传 | 保持同一账号、项目、目标、AIX 和资料，使用界面的“恢复这次上传”或传原回执的 `resumeUploadId`；服务仍会重新核对 |
+| 已确认提审但响应丢失 | 去官网核对实际审核状态，不再次自动提交 |
+| 原生确认失效 | 重新核对账号、绑定、源码、SDK、包及云端资料；有变化时重新准备草稿 |
+| 想删除官网应用 | 本人到官网操作；清理工坊的本机任务记录不会删除云端内容 |
 
 ## 确认与失败边界
 
@@ -60,3 +142,12 @@ MCP 没有提交审核或发布工具，传入 `confirm: true` 不会取得用�
 平台会把代码草稿的 OSS 键扩展为临时签名下载链接。工坊验证官方来源与智能体身份后，只保留稳定的对象键；签名不进入 MCP 返回或提审确认摘要，避免签名轮换误判为云端代码变化。
 
 现有资料保存接口不回传更新日志与 `needParam`，与 Studio 保留本地待提审内容的方式一致。工坊单独保存这些内容，展示其本地状态，将其与云端资料摘要一起纳入原生确认；确认提审时才通过商店审核接口发送。保存响应丢失后，刷新核对可以将已一致的资料恢复成可确认草稿，不再次保存或增加版本号。任何一侧的内容变化都会使原确认失效。
+
+## 已验证范围
+
+| 验证 | 结论与边界 |
+| --- | --- |
+| 平台单元测试与 `npm run qa:platform` | 隔离账号和模拟官方接口，覆盖统一绑定、登录同步与关窗、加密会话恢复、上传摘要、只读列表、原生确认与取消、退出撤权和不重放；不会操作真实账号 |
+| 真实官方账号草稿上传 | 已验证 AIX / 代码 ZIP 上传、摘要及资料回读；不等于真实提审已通过 |
+| macOS / Windows 0.4.0 → 0.5.8 | [真实 GitHub 升级验收通过](https://github.com/syjstc/aiui-workbench/actions/runs/43202875753)，覆盖下载校验、项目保留、新版启动和 MCP |
+| 真实提审、审核结果、上架 | 尚未完成端到端验证，分别以用户确认及官方实际状态为准 |

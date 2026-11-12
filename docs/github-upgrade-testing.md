@@ -8,10 +8,10 @@ GitHub 托管 runner 的匿名 API 配额可能耗尽。CI 使用只读工作流
 npm run qa:github-upgrade
 ```
 
-默认目标版本取当前 `package.json`，上一版为同一版本线的前一个 patch。可指定：
+默认目标版本取当前 `package.json`；上一版从真实已发布的稳定 Release 中选择低于目标版本的最高版本，不按前一个 patch 猜测，跳过草稿和预发布。可指定：
 
 ```sh
-AIUI_UPDATE_FROM_VERSION=0.3.1 AIUI_UPDATE_TARGET_VERSION=0.3.2 npm run qa:github-upgrade
+AIUI_UPDATE_FROM_VERSION=0.4.0 AIUI_UPDATE_TARGET_VERSION=0.5.8 npm run qa:github-upgrade
 ```
 
 两版 Release 都必须已经公开，并且包含匹配系统架构的 ZIP 和 `workbench-update.json`。macOS 使用 Apple Silicon；Windows 使用 x64。

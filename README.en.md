@@ -1,8 +1,8 @@
 # AIUI Workshop
 
-[中文](README.md) · [Download](https://github.com/syjstc/aiui-workbench/releases/latest) · [AI / MCP workflows](docs/ai-tool-workflows.md)
+[中文](README.md) · [Download](https://github.com/syjstc/aiui-workbench/releases/latest) · [Draft uploads and review](docs/platform-uploads.en.md) · [AI / MCP workflows](docs/ai-tool-workflows.md)
 
-A local workbench for Rokid AIUI development. Manage projects, read official documentation offline, run the real Ink runtime, build AIX packages and connect your AI coding tools through MCP. Available as a desktop app and a local Web interface.
+A local workbench for Rokid AIUI development. Manage projects, read official documentation offline, run the real Ink runtime, build AIX packages, upload cloud drafts and submit them for review after user confirmation. Connect your AI coding tools through MCP. Available as a desktop app and a local Web interface.
 
 **Independent community project; not affiliated with or endorsed by Rokid.** Upstream runtimes, documentation and tools retain their original licenses.
 
@@ -10,7 +10,7 @@ A local workbench for Rokid AIUI development. Manage projects, read official doc
 
 ## Download
 
-Current version: **0.4.0**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest).
+Current version: **0.5.8**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest).
 
 | Platform | Install | Signing |
 | --- | --- | --- |
@@ -28,6 +28,8 @@ The maintainer has no physical Windows machine and has not completed full Window
 - **Official runtime:** run real `.ink` source, replay temple keys and repeated swipe events, inject orientation with the mouse, 3D head model, sliders or motion loops. Use local photos or an explicitly enabled computer camera.
 - **Offline knowledge:** 468 official documents, 81 diagrams and the public `aiui-dev` skill, with the official navigation hierarchy, full-corpus text/code search, automatic daily updates and expandable offline images. Long articles load automatically. Prepare SDK/CLI upgrades, check compatibility and migrate projects individually.
 - **AI integration:** MCP and the Workshop CLI share previews, assertions, screenshots, silent recordings, build results and logs with desktop/Web.
+- **Official platform drafts and review:** AI prepares materials and calls MCP; Workshop uploads AIX packages, verifies cloud digests and saves review drafts. Submission requires the user's native desktop confirmation. Reuse an OS-encrypted official session after signing in, with an explicit sign-out action.
+- **Read-only cloud catalog:** separate Build & upload and Official apps tabs. One official Agent ID binding drives build, upload and review; show and copy the full ID. Inspect official icons, descriptions, permissions, images, videos and draft/review/published versions. Neither Workshop nor MCP provides cloud deletion.
 - **Glasses tools:** device information, files, real APK names/icons, screenshots, logs, and embedded mirroring with an optional separate window that closes when mirroring ends.
 - **Read-only AIUI catalogs:** separate development, store, and system-provided apps. Store and system-provided apps have no delete, uninstall, or clear-data controls. Restricted store inventories are reported as unavailable, with an unknown count.
 - **Update notice:** a persistent bottom-left notice offers download and restart on macOS. Windows offers package download and manual installation.
@@ -43,6 +45,20 @@ All documentation screenshots use only this repository's public examples in a fr
 4. Check and build an AIX package. For physical glasses, follow **Getting started**: use the dedicated debugging cable for your model and enable glasses ADB debugging in the Rokid AI phone app.
 
 [`examples/motion-lab`](examples/motion-lab) demonstrates orientation sensors and lifecycle cleanup. The [illustrated guide](docs/getting-started.md) has more details.
+
+## Upload drafts and submit for review
+
+**The official platform integration is experimental.** Studio endpoints may change. Verify official results after uploading or submitting; do not repeat an operation with an uncertain result. Real-account draft upload and digest verification have been checked; real review submission and store availability remain unverified.
+
+1. Sign in once through the desktop app's **Build & upload → Sign in to Rokid**. Successful sign-in immediately synchronizes and closes the sign-in window. Valid encrypted sessions are reused. Keep the desktop app running when using Web, CLI or MCP.
+2. In **Build & upload**, select one local app and set its official binding after checking its formal name and full official Agent ID. Build, upload and review share this target. Create a new official identity on the website first when needed.
+3. Check/build the AIX and upload a cloud draft. Workshop reports success only after verifying the target, version and digest. Local and cloud versions are tracked separately.
+4. Let AI upload the icon, preview images/video and text through MCP, save review materials and request your confirmation. Saving materials does not submit a review.
+5. Check the draft on desktop and confirm submission in the native dialog. **The version and materials must be ready for public release: store availability after approval follows official rules, and Workshop does not guarantee a separate publication confirmation.**
+
+**Official apps** is a read-only catalog. Delete records manually on the official website. MCP may upload new drafts, prepare materials and request confirmation; it has no submission, publishing or cloud-deletion tool. Signing out revokes authorization, clears credentials and stops platform tasks while preserving local projects and receipts.
+
+See [the complete guide, material requirements, permissions and troubleshooting](docs/platform-uploads.en.md).
 
 ## Run from source
 
@@ -82,7 +98,7 @@ Projects, camera fixtures, platform sessions and task records stay on your compu
 
 The bundled Ink Web SDK is **0.19.1**, its WASM engine is **0.19.0**, and the CLI is **0.12.0**. Photo fixtures, computer camera streams and frame snapshots are supported. Original glasses capture resolution/optics, audio/video capture, Bluetooth, location tracks, speech/model services and arbitrary outbound app networking are not fully simulated. No AI model is bundled.
 
-Simulation, physical installation, worn-device acceptance and store publishing are separate. Draft upload and cloud package/source digest verification have been checked with a real account. Review submission requires the user's native desktop confirmation; building or uploading does not mean a version is published. See [platform drafts and review](docs/platform-uploads.md). macOS updates verify and stage a signed application, restart, and restore the previous app if replacement fails. Windows packages are installed manually.
+Simulation, physical installation, worn-device acceptance and store publishing are separate. Draft upload and cloud package/source digest verification have been checked with a real account. Review submission requires the user's native desktop confirmation; building or uploading does not mean a version is published. See [platform drafts and review](docs/platform-uploads.en.md). macOS updates verify and stage a signed application, restart, and restore the previous app if replacement fails. Windows packages are installed manually.
 
 ## Development and licensing
 

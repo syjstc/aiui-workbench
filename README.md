@@ -1,8 +1,8 @@
 # AIUI 工坊 · AIUI Workshop
 
-[English](README.en.md) · [下载桌面版](https://github.com/syjstc/aiui-workbench/releases/latest) · [使用指南](docs/getting-started.md) · [AI / MCP 工作流](docs/ai-tool-workflows.md)
+[English](README.en.md) · [下载桌面版](https://github.com/syjstc/aiui-workbench/releases/latest) · [使用指南](docs/getting-started.md) · [草稿上传与提审](docs/platform-uploads.md) · [AI / MCP 工作流](docs/ai-tool-workflows.md)
 
-一个面向 Rokid AIUI 的本地开发工作台：管理项目、阅读官方资料、运行真实 Ink 模拟器、构建 AIX，并通过 MCP 与你常用的 AI 编程工具协作。提供 macOS、Windows 桌面客户端及本地 Web 界面。
+一个面向 Rokid AIUI 的本地开发工作台：管理项目、阅读官方资料、运行真实 Ink 模拟器、构建 AIX、上传官方平台草稿，并在用户确认后提交审核。通过 MCP 与你常用的 AI 编程工具协作，提供 macOS、Windows 桌面客户端及本地 Web 界面。
 
 **独立社区项目，与 Rokid 官方无隶属关系。** 内置官方运行时和公开资料，第三方组件保留原有许可。
 
@@ -10,7 +10,7 @@
 
 ## 下载与安装
 
-当前版本 **0.4.0**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
+当前版本 **0.5.8**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
 
 | 平台 | 安装方式 | 签名 |
 | --- | --- | --- |
@@ -28,6 +28,8 @@
 - **真实 Ink 模拟器**：运行 `.ink`，回放镜腿按键、长滑与重复事件；鼠标、头模、三轴滑条和自动动作共享姿态输入。支持本地照片和主动开启的电脑摄像头。
 - **官方资料与 SDK**：内置 468 份资料、81 张配图和公开 `aiui-dev` Skill，提供官方层级目录、全库全文搜索和每日自动更新，长文自动读取、图片可离线查看和放大。见 [资料库说明](docs/document-library.md)。SDK/CLI 升级先检查项目兼容性，支持逐项目切换与回退。
 - **MCP / CLI 协作**：AI 可读取规范、操作预览、执行断言、截图、录制短片及检查打包；桌面、Web、CLI 和 MCP 共享项目、日志与任务。
+- **官方平台草稿与提审**：AI 准备材料并调用 MCP，工坊上传 AIX、核对云端摘要、保存提审资料；正式提审必须由用户在桌面原生窗口确认。一次登录后复用系统加密会话，支持明确退出。
+- **官网应用只读列表**：“打包与上传”和“官网应用”分为两个标签页。统一绑定一个官网 Agent ID，完整显示并支持复制；查看官方图标、介绍、权限、图片、视频及草稿／审核／已上架版本。工坊和 MCP 不提供云端删除。
 - **眼镜工具**：设备诊断、文件与 APK 管理、真实名称与图标、截图、日志和默认内嵌的实时投屏。小窗口可单独打开或召回，结束投屏时同步关闭。
 - **AIUI 分类查看**：开发版、商店正式版与系统内置信息分开显示。正式版和内置版仅供查看，工坊不提供删除、卸载或清空数据。部分固件未开放商店清单权限，会明确显示不可读取，不会把未知数量显示成零。
 - **升级提醒**：启动与回到应用时自动检查，左下角提示新版本；macOS 支持下载、校验并重启升级，Windows 提供下载和手动安装入口。更新源可修改、可恢复默认。
@@ -45,6 +47,20 @@
 4. 在“构建与上传”中检查、打包；连接眼镜时，按“新手指南”准备对应机型的数据调试线，并在手机 Rokid AI App 中开启眼镜 ADB 调试。
 
 完整步骤见 [图文使用指南](docs/getting-started.md)。公开示例包括 [菜单与离散输入](examples/hello-aiui) 和 [姿态传感器](examples/motion-lab)。
+
+## 上传草稿与提交审核
+
+**官方平台对接仍为实验功能。** Studio 接口可能随平台更新失效；上传、提审后应核对官网结果，结果不明时不要重复提交。真实账号草稿上传与摘要回读已验证，真实提审及上架结果尚未完成验证。
+
+1. 在桌面“构建与上传 → 登录官方平台”登录一次。登录成功立即同步并关闭登录窗口；后续复用尚有效的加密会话。使用 Web、CLI 或 MCP 时也需保持该桌面客户端运行。
+2. 在“打包与上传”只选择一次本地应用，通过“设置官方绑定”核对正式名称和完整官网 Agent ID。构建、上传和提审共用此绑定；新应用先在官网创建身份。
+3. 检查并打包 AIX，上传为云端草稿。工坊回读目标、版本和摘要后才报告上传成功；本地版本与云端版本分别保留。
+4. 让 AI 通过 MCP 上传图标、预览图片／视频和文案，保存提审草稿并请求你确认。保存材料不会提交审核。
+5. 在桌面核对资料，点击“核对完成，确认提交审核”，再在原生窗口确认。**确认时应确保版本与材料可公开发布；审核通过后的上架规则以官网为准，工坊不保证还有单独的发布确认步骤。**
+
+“官网应用”仅提供只读查询和刷新，删除须本人去官网操作。MCP 仍可上传新草稿、准备材料和请求确认，但没有正式提审、发布或云端删除工具。“退出官方账号”会撤销授权、清除登录凭据并停止平台任务，本地项目与回执保留。
+
+详见 [完整操作、材料要求、权限边界与故障处理](docs/platform-uploads.md) 和 [MCP 上传流程](docs/ai-tool-workflows.md#草稿上传与用户确认提审)。
 
 ## 从源码运行
 
@@ -95,6 +111,8 @@ aiui_context_get → 创建或导入项目 → AI 编辑本地源码
 
 - [图文使用指南](docs/getting-started.md)
 - [AI / MCP / CLI 工作流](docs/ai-tool-workflows.md)
+- [官方平台草稿上传与提审](docs/platform-uploads.md)
+- [官方资料库与离线配图](docs/document-library.md)
 - [Web 与更新源](docs/web-and-updates.md)
 - [Windows 与语言维护](docs/windows-and-language.md)
 - [源码结构与验证](docs/development.md)

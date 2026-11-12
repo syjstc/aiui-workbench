@@ -23,6 +23,11 @@ MCP 与共享 CLI 不要求自己的应用版本和后台服务版本一致，�
 | 等待长任务 | `aiui_job_wait` | 同一任务的最新或最终结果，不会重新执行 |
 | 定位 CLI | `aiui_cli_info` | 本机可执行路径、参数、数据目录和同步边界 |
 | 录制短片 | `aiui_record_clip` | 一次录制 1–30 秒，返回完成封装的视频、SHA256 与来源 |
+| 官方登录与回执 | `aiui_platform_status` | 登录、统一绑定、上传及提审回执；`reconcile: true` 只读回查未知结果 |
+| 官网应用列表 | `aiui_platform_agents` | 当前账号的图标、资料、媒体、草稿／审核／已上架版本，只读 |
+| 上传新草稿 | `aiui_platform_upload` | AIX 与一致的代码 ZIP 上传、官方摘要核对，不提审 |
+| 保存提审材料 | `aiui_platform_review_prepare` | 文案、图标、预览和权限用途保存为提审草稿，不提审 |
+| 请求本人确认 | `aiui_platform_review_request` | `awaiting-user` 草稿与 `requiresUserConfirmation: true`，不提交审核 |
 
 `aiui_preview_test` 和 `aiui_project_build` 默认等待最多 45 秒；完成时直接返回 `status` 和 `result`。只有返回 `status: "running"` 才需用任务 `id` 调用 `aiui_job_wait`。`waitMs: 0` 可立即返回任务；通过 `aiui_job_cancel` 取消。MCP 中失败任务返回 `isError: true`，仍保留结构化诊断、报告和可用的截图。CLI 中失败任务输出同一份 JSON，并返回非零退出码。
 
@@ -96,6 +101,46 @@ node web/cli.mjs mcp
 工坊 CLI 的 `call` 会记录为 `CLI` 客户端，模拟器请求也会自动切换桌面。CLI 触发的任务可用 MCP 的同一任务 ID 查询；MCP 发出的模拟事件可用 CLI 读取同一日志游标。
 
 内置官方 `aix` 的路径与项目绑定版本在 `aiui_cli_info.official`。**直接执行 `aix` 是独立进程**：其终端输出不会自动进入工坊任务记录，另起的预览也不是工坊的共享会话。需要同步时使用工坊 `call`；检查、打包和安装底层仍使用绑定的官方 CLI。
+
+## 草稿上传与用户确认提审
+
+首次登录由用户在桌面“构建与上传 → 登录官方平台”完成；使用 Web / CLI / MCP 时也保持桌面运行，复用其有效加密会话。用户在工坊界面把本地应用绑定到一个正式名称和官网 Agent ID，构建、上传及提审共用此绑定。MCP 只能读取绑定，不能更改或从本地 UUID 推断官方身份。
+
+```text
+aiui_platform_status / aiui_platform_agents → 用户在工坊设置官方绑定
+→ aiui_project_build → aiui_platform_upload
+→ aiui_platform_review_prepare → aiui_platform_review_request
+→ 用户在桌面核对，并在原生窗口确认提交审核
+```
+
+上传和准备材料返回任务；只有 `status: running` 时才继续 `aiui_job_wait`。材料任务成功后，使用 **`job.result.id`** 作为后续 `draftId`，不要使用 `job.id`。例如：
+
+```json
+{"name":"aiui_platform_review_request","arguments":{"projectId":"<projectId>","draftId":"<reviewPrepareJob.result.id>"}}
+```
+
+此调用直接返回草稿，`stage: awaiting-user` 只表示等待用户确认。MCP 没有正式提审、发布或云端删除工具；传入 `confirm: true` 不会取得原生确认授权。用户确认时应确保版本和材料可公开发布，审核通过后的上架规则以官方平台为准。
+
+`aiui_platform_agents` 和工坊“官网应用”标签页只读已有官方记录。MCP 仍可通过上传工具创建新草稿、准备材料并请求本人确认。删除只能由用户在官网操作；清理本机任务日志不删除云端记录。
+
+上传或保存结果不明时，不自动重试，先调用：
+
+```json
+{"name":"aiui_platform_status","arguments":{"projectId":"<projectId>","reconcile":true}}
+```
+
+显式恢复同一次上传需保持账号、项目、绑定、包和资料不变，并传原回执 `id` 为 `resumeUploadId`；确认提审后结果不明时去官网核对，不再次提交。
+
+CLI 的参数文件只放对应工具的参数对象；不包含 Cookie、账号令牌或 `name` / `arguments` 外壳：
+
+```sh
+node web/cli.mjs tools aiui_platform_upload
+node web/cli.mjs call aiui_platform_upload --args-file /absolute/upload.json
+node web/cli.mjs call aiui_platform_review_prepare --args-file /absolute/materials.json
+node web/cli.mjs call aiui_platform_review_request --args-file /absolute/request.json
+```
+
+完整参数示例、材料限制、状态解释与当前真实验证范围见 [平台草稿与提审](platform-uploads.md) / [English guide](platform-uploads.en.md)。官方接口仍为实验集成，草稿上传成功不表示审核通过或已经上架。
 
 ## 日志与发布边界
 

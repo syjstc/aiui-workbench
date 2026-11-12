@@ -28,6 +28,21 @@ npm run dev
 
 桌面、Web、CLI 和 MCP 使用同一个本地服务；预览页面在独立来源运行，不能访问 Node 或服务控制口令。官方登录使用单独会话。
 
+## 官方平台上传与提审
+
+用户操作见 [草稿上传与提审](platform-uploads.md) / [English](platform-uploads.en.md)。维护这部分功能时，以下文件分别负责契约、传输、回执及原生授权：
+
+| 文件 | 职责 |
+| --- | --- |
+| `core/platform-contract.mjs` | MCP / CLI 参数约束、材料数量和文字长度 |
+| `core/platform-http.mjs` | 固定官方端点、媒体校验、STS / OSS 上传及地址校验 |
+| `core/platform.mjs` | 账号绑定、上传与材料回执、未知结果回查、草稿摘要及一次性确认 |
+| `electron/platform-session.cjs`、`electron/platform-login.cjs` | 独立内存官方会话、系统加密快照、即时登录同步、续期及退出撤权 |
+| `electron/main.cjs`、`electron/preload.cjs` | 受控 IPC 和用户原生提审确认；不向渲染层或 MCP 暴露确认密钥 |
+| `renderer/platform-panel.jsx`、`renderer/platform-records.jsx` | 统一应用选择、两个标签页、顶部警告、只读官方资料 |
+
+更改后应同步中英文 README、两份平台指南和 MCP 示例。保持已有官方记录的读取入口只读，不添加云端删除工具；MCP 允许上传新草稿和准备材料，正式提审仅由桌面原生用户确认。网络响应丢失时不得自动重放写请求；变更账号、绑定、包或资料后原确认必须失效。
+
 ## 验证
 
 ```sh
@@ -47,7 +62,10 @@ npm run qa:recording         # 短片解码与退出封装；需 ffmpeg / ffprob
 npm run qa:documents
 npm run qa:i18n
 npm run qa:web-updates
+npm run qa:platform          # 隔离官方会话、模拟 HTTP/OSS、真实 AIX 与 stdio MCP
 ```
+
+`qa:platform` 覆盖登录立即同步与关窗、系统加密会话恢复、统一官方绑定、只读官网资料与图片、包/代码摘要、MCP 无法越过确认、取消与原生确认、退出后撤权。脚本的模拟提审不是实际提审，不使用日常账号；报告位于 `output/qa/platform/integration.json`。真实草稿上传、真实提审和上架须另记验证证据，不能用模拟通过替代。
 
 浏览器测试默认寻找 macOS 的 Chrome。其他路径通过 `AIUI_QA_CHROME` 指定。录制测试可用 `AIUI_QA_FFMPEG`、`AIUI_QA_FFPROBE` 覆盖工具路径。
 
