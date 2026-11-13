@@ -1,6 +1,6 @@
 # AIUI Workshop
 
-[中文](README.md) · [Download](https://github.com/syjstc/aiui-workbench/releases/latest) · [Draft uploads and review](docs/platform-uploads.en.md) · [AI / MCP workflows](docs/ai-tool-workflows.md)
+[中文](README.md) · [Download](https://github.com/syjstc/aiui-workbench/releases/latest) · [Draft uploads and review](docs/platform-uploads.en.md) · [AI / MCP workflows](docs/ai-tool-workflows.md) · [Project lessons (Chinese)](docs/aiui-project-lessons.md)
 
 A local workbench for Rokid AIUI development. Manage projects, read official documentation offline, run the real Ink runtime, build AIX packages, upload cloud drafts and submit them for review after user confirmation. Connect your AI coding tools through MCP. Available as a desktop app and a local Web interface.
 
@@ -10,7 +10,7 @@ A local workbench for Rokid AIUI development. Manage projects, read official doc
 
 ## Download
 
-Current version: **0.6.0**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.0).
+Current version: **0.6.1**; see the [changelog (Chinese)](CHANGELOG.md). Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.1).
 
 | Platform | Install | Signing |
 | --- | --- | --- |
@@ -18,6 +18,8 @@ Current version: **0.6.0**. Download packages and `SHA256SUMS.txt` from [GitHub 
 | Windows 10 / 11, x64 | Extract the entire `win32-x64.zip`, launch `AIUI Workshop.exe` | Unsigned |
 
 The app includes Electron/Node, npm, official CLI, Ink WASM, documentation, ADB and scrcpy. No separate Node.js, Android Studio or PATH setup is needed. Windows may show a reputation warning for the unsigned app; verify the source and checksum before running it. Intel Mac, Windows ARM64 and Linux release downloads are not currently provided.
+
+The maintainer has no physical Windows machine and has not completed full Windows hardware acceptance. Automated checks do not guarantee that every Windows environment will run perfectly. Testing and issue reports are welcome.
 
 ## Build with AI
 
@@ -27,11 +29,10 @@ Copy one instruction from **Connect AI tools** into your usual AI client. The AI
 
 ## Features
 
-The maintainer has no physical Windows machine and has not completed full Windows hardware acceptance. Automated checks do not guarantee that every Windows environment will run perfectly. Testing and issue reports are welcome.
-
+- **Feedback & suggestions**: Preview a sanitized Workshop report or user suggestion, then let a shared bot create an issue in the saved update repository. No GitHub account or captcha required; duplicate and frequency limits apply. [Details (Chinese)](docs/feedback.md).
 - **Project removal:** two-stage confirmation with the full project name and path. Unbinding preserves local files; deletion moves the entire project folder to the system Trash/Recycle Bin. See [the illustrated guide](docs/project-removal.md).
 - **Shared projects:** import an AIUI directory or create a Page. External source changes refresh the preview automatically.
-- **Official runtime:** run real `.ink` source, replay temple keys and repeated swipe events, inject orientation with the mouse, 3D head model, sliders or motion loops. Use local photos or an explicitly enabled computer camera.
+- **Official runtime:** run real `.ink` source, replay temple keys, adjustable long presses and repeated swipe events, inject orientation with the mouse, 3D head model, sliders or motion loops. Use local photos or an explicitly enabled computer camera.
 - **Offline knowledge:** 468 official documents, 81 diagrams and the public `aiui-dev` skill, with the official navigation hierarchy, full-corpus text/code search, automatic daily updates and expandable offline images. Long articles load automatically. Prepare SDK/CLI upgrades, check compatibility and migrate projects individually.
 - **AI integration:** MCP and the Workshop CLI share previews, assertions, screenshots, silent recordings, build results and logs with desktop/Web.
 - **Shared diagnostics:** AI tool responses include unread problems for the current project and shared environment, with project names, paths and recovery steps. Read history remains available; marking a problem read does not mark it fixed.
@@ -47,7 +48,7 @@ All documentation screenshots use only this repository's public examples in a fr
 
 ## Quick start
 
-1. A fresh workspace opens **Connect AI tools**. Optionally enter your idea, click **Copy for AI** and paste into your AI client. Workshop confirms the connection after the AI successfully reads its context.
+1. A fresh workspace opens **Connect AI tools**. Optionally enter your idea, click **Copy full setup request** and paste the complete content, including this computer's configuration, into your AI client. Workshop confirms the connection after the AI successfully reads its context.
 2. Describe an app. It appears in **My projects**; you can also import [`examples/hello-aiui`](examples/hello-aiui) or create a Page project.
 3. Open the project to see its live preview and continue with an idea or a preset instruction. Select **Open full simulator** for orientation, camera and repeated swipe controls.
 4. Ask AI to validate and build. Follow **Getting started → Install on glasses** when ready to connect through a supported USB or wireless ADB setup, then continue the same task.

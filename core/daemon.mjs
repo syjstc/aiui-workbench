@@ -39,11 +39,29 @@ export async function startDaemon(home = homePath()) {
         return send(res,{error:'Method not allowed'},405);
       }
       if(recording){if(req.method!=='POST')return send(res,{error:'Method not allowed'},405);const session=service.previews.authorize(recording[1],req.headers['x-preview-key']);return send(res,{result:await service.recordings.receive(session,recording[2],req)});}
-      const match = url.pathname.match(/^\/session\/([a-f0-9-]+)\/(bundle|poll|ack|state|log|storage)$/);
+      const ai=url.pathname.match(/^\/session\/([a-f0-9-]+)\/ai$/);
+      if(ai){
+        if(req.method!=='POST')return send(res,{error:'Method not allowed'},405);
+        if(req.headers.origin&&req.headers.origin!==service.origin)return send(res,{error:'Invalid origin'},403);
+        const session=service.previews.authorize(ai[1],req.headers['x-preview-key']),value=await body(req),controller=new AbortController();
+        const abort=()=>{if(!res.writableEnded)controller.abort();};req.once('aborted',abort);res.once('close',abort);
+        try{
+          const response=await service.simulatorAi.request(session,value,{runId:req.headers['x-preview-run'],signal:controller.signal});
+          if(res.destroyed)return;
+          if(!value.stream)return send(res,response);
+          const choice=response.choices[0],delta={...choice.message};
+          if(delta.tool_calls)delta.tool_calls=delta.tool_calls.map((call,index)=>({...call,index}));
+          const chunk=(delta,finish_reason)=>JSON.stringify({id:response.id,object:'chat.completion.chunk',created:response.created,model:response.model,choices:[{index:0,delta,finish_reason}]});
+          res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store'});
+          res.end(`data: ${chunk(delta,null)}\n\ndata: ${chunk({},choice.finish_reason)}\n\ndata: [DONE]\n\n`);return;
+        }finally{req.removeListener('aborted',abort);res.removeListener('close',abort);}
+      }
+      const match = url.pathname.match(/^\/session\/([a-f0-9-]+)\/(bundle|poll|ack|state|log|storage|ai-config)$/);
       if (match) {
         const s = service.previews.authorize(match[1], req.headers['x-preview-key']);
-        if (match[2] === 'bundle') return send(res, { ...await service.projects.bundle(s.projectId), session: service.previews.public(s), cameraFixture: s.fixture, storage:await service.previews.storage.read(s.projectId) });
-        if (match[2] === 'poll') { s.lastSeen = new Date().toISOString(); return send(res,{ commands:s.queue.splice(0,30), logGeneration:s.logGeneration, logsClearedAt:s.logsClearedAt || 0 }); }
+        if (match[2] === 'bundle') {if(req.headers['x-preview-run'])service.simulatorAi.run(s,req.headers['x-preview-run']);return send(res, { ...await service.projects.bundle(s.projectId), session: service.previews.public(s), cameraFixture: s.fixture, storage:await service.previews.storage.read(s.projectId) });}
+        if (match[2] === 'ai-config') {if(req.method!=='GET')return send(res,{error:'Method not allowed'},405);service.simulatorAi.active(s.id);return send(res,{endpoint:`${service.origin}/session/${s.id}/ai`,apiStyle:'openai-chat-completions',defaultModel:'workbench-active-ai',shareVendorHeaders:false,headers:{'X-Preview-Key':s.key,'X-Preview-Run':s.aiRunId}});}
+        if (match[2] === 'poll') { s.lastSeen = new Date().toISOString(); return send(res,{ commands:s.queue.splice(0,30), logGeneration:s.logGeneration, logsClearedAt:s.logsClearedAt || 0,ai:service.simulatorAi.status(s.id) }); }
         const value = await body(req);
         if (match[2] === 'storage') return send(res,await service.previews.storage.update(s.projectId,value));
         if (match[2] === 'ack') service.previews.acknowledge(s,value);
@@ -58,7 +76,7 @@ export async function startDaemon(home = homePath()) {
       if (url.pathname === '/api/tools' && req.method === 'GET') return send(res,await service.call('aiui_tools_list',{},'MCP-discovery'));
       if (url.pathname === '/api/call' && req.method === 'POST') { const value = await body(req); return send(res,{result:await service.call(value.tool,value.args,value.actor || 'client')}); }
       return send(res,{error:'Not found'},404);
-    } catch(e) { send(res,{error:redact(e.message),diagnosticId:e.diagnosticId,sharedDiagnostics:e.sharedDiagnostics},400); }
+    } catch(e) { if(!res.destroyed&&!res.writableEnded)send(res,{error:redact(e.message),deviceRequired:e.deviceRequired||undefined,diagnosticId:e.diagnosticId,sharedDiagnostics:e.sharedDiagnostics},400); }
   });
   try { await new Promise((resolve,reject) => { server.once('error',reject); server.listen(0,'127.0.0.1',resolve); }); }
   catch(error) { await service.close(); throw error; }
@@ -67,7 +85,8 @@ export async function startDaemon(home = homePath()) {
   const connection = { origin:service.origin,token,pid:process.pid,version:APP_VERSION,startedAt:new Date().toISOString() };
   await atomicJson(path.join(home,'connection.json'),connection);
   service.sdk.start();
-  service.knowledge.start(() => service.jobs.start('knowledge', null, context => service.knowledge.sync(context), { automatic: true }));
+  service.knowledge.start(() => service.jobs.start('knowledge', null, context => service.syncKnowledge(context), { automatic: true }));
+  service.skillRefresh=service.refreshAgentSkills().catch(()=>{});
   const close = async () => {
     await service.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
     const file = path.join(home, 'connection.json'), current = await readJson(file, null);

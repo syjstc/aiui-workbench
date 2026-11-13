@@ -48,6 +48,10 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       else if(params.name==='aiui_diagnostics_get')result=await diagnostics.read({...args,limit:Math.max(1,Math.min(args.limit||30,100))},'MCP');
       else {try{client=await connect(undefined,{requireCurrentVersion:false});result=await client.call(params.name,args,'MCP');await discover();}catch(error){const d=await diagnostics.record(error,{source:'startup',tool:params.name});throw Object.assign(error,{diagnosticId:d.id});}}
     }else result=await client.call(params.name,params.arguments||{},'MCP');
+    if(params.name==='aiui_ai_wait'&&result.images?.length){
+      const {images,...meta}=result;
+      return {content:[...images.map(({mimeType,data})=>({type:'image',mimeType,data})),{type:'text',text:JSON.stringify({...meta,images:images.map(({data,...info})=>info)})}]};
+    }
     if (params.name === 'aiui_preview_capture' || params.name === 'aiui_glasses_screenshot' || (params.name === 'aiui_glasses_read_file' && result.type === 'image')) {
       const { data, ...meta } = result;
       return { content: [{ type: 'image', data, mimeType: result.mime || 'image/png' }, { type: 'text', text: JSON.stringify(meta) }] };

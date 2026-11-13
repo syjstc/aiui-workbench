@@ -19,12 +19,13 @@ const storagePending=[];
 async function flushStorage(){while(storagePending.length){await request('storage',storagePending[0]);storagePending.shift();}storageError=null;}
 let motion = { ...DEFAULT_MOTION }, motionOrigin = { ...pose }, motionStart = 0;
 let networkOnline = true, focused = true, target = '_blank';
+let aiInfo={enabled:false};
 const sensorSessions = new Map(), batterySessions = new Map(), readings = { orientation:0, photos:0 };
 const camera = new SimulatorCamera({ emit:event, changed:()=>{if(currentStatus==='ready')publish().catch(()=>{});}, onPhoto:()=>readings.photos++ });
 const recording = new CanvasRecording(canvas,async(id,blob,metadata)=>{const response=await fetch(`/session/${sessionId}/recording/${id}`,{method:'POST',headers:{'X-Preview-Key':key,'Content-Type':blob.type,'X-Recording-Metadata':JSON.stringify(metadata)},body:blob});const result=await response.json();if(!response.ok)throw new Error(result.error||'视频保存失败');return result.result;},()=>publish().catch(()=>{}));
 camera.installBrowserMedia();
 const wait = ms => new Promise(resolve => setTimeout(resolve,ms));
-async function request(route, value) { const r=await fetch(`/session/${sessionId}/${route}`,{ method:value===undefined?'GET':'POST', headers:{'Content-Type':'application/json','X-Preview-Key':key}, body:value===undefined?undefined:JSON.stringify(value) }); const data=await r.json(); if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);return data; }
+async function request(route, value) { const r=await fetch(`/session/${sessionId}/${route}`,{ method:value===undefined?'GET':'POST', headers:{'Content-Type':'application/json','X-Preview-Key':key,'X-Preview-Run':runId}, body:value===undefined?undefined:JSON.stringify(value) }); const data=await r.json(); if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);return data; }
 for(const level of ['log','info','warn','error','debug']) {
   const original = console[level].bind(console);
   console[level] = (...args) => {
@@ -36,7 +37,7 @@ for(const level of ['log','info','warn','error','debug']) {
 window.addEventListener('error',e=>console.error('RUNTIME_ERROR',e.message));
 window.addEventListener('unhandledrejection',e=>console.error('UNHANDLED_REJECTION',String(e.reason?.stack||e.reason)));
 function flushLogs() { logFlush=logFlush.catch(()=>{}).then(async()=>{while(logEntries.length){const entries=logEntries.splice(0,80);try{await request('log',{entries});}catch(error){logEntries=[...entries,...logEntries].slice(-500);throw error;}}});return logFlush; }
-function state() { return { runId, running:view?.isRunning()||false, rendering:view?.isRendering()||false, inputEnabled:view?.isInputEnabled()||false, recording:recording.state(), focused, target, network:{online:networkOnline}, pose:{...pose}, mouse:{...mouse}, motion:{...motion}, sensorSessions:sensorSessions.size, readings:{...readings}, camera:camera.state(), battery, sdkVersion:current?.session?.webSdkVersion, runtime:view?getInkVersion():null, bundleVersion:view?getInkBundleVersion():null, sourceUnmodified:true, runtimePolyfills:{imageEncoding:'image/png',imageCapturePhoto:'preview-frame',storage:'project-persistent-simulation'}, capabilities:{temple:'simulated',orientation:'simulated',camera:camera.source==='webcam'?'computer-camera':'photo-fixture-stream',battery:'simulated',bluetooth:'unsupported',languageModel:'not-configured',network:'status-events-only'} }; }
+function state() { return { runId, running:view?.isRunning()||false, rendering:view?.isRendering()||false, inputEnabled:view?.isInputEnabled()||false, recording:recording.state(), focused, target, network:{online:networkOnline}, pose:{...pose}, mouse:{...mouse}, motion:{...motion}, sensorSessions:sensorSessions.size, readings:{...readings}, camera:camera.state(), battery, ai:{...aiInfo}, sdkVersion:current?.session?.webSdkVersion, runtime:view?getInkVersion():null, bundleVersion:view?getInkBundleVersion():null, sourceUnmodified:true, runtimePolyfills:{imageEncoding:'image/png',imageCapturePhoto:'preview-frame',storage:'project-persistent-simulation'}, capabilities:{temple:'simulated',orientation:'simulated',camera:camera.source==='webcam'?'computer-camera':'photo-fixture-stream',battery:'simulated',bluetooth:'unsupported',languageModel:aiInfo.enabled?'active-ai-automation':'device-test-required',network:'status-events-only'} }; }
 function notifyParent(allowClosed=false) { if(window.parent!==window&&!(currentStatus==='closed'&&(!allowClosed||commandActive)))window.parent.postMessage({channel:'aiui-preview-state',sessionId,status:currentStatus,state:state()},'*'); }
 function publish(status=currentStatus) {
   notifyParent();
@@ -81,6 +82,7 @@ function capabilities() {
     },
     battery:{start(req){batterySessions.set(req.targetId,req);return battery;},stop(req){batterySessions.delete(req.targetId);}},
     media:camera.capabilities(),
+    languageModel:{async getConfig(){if(!networkOnline)throw new Error('NetworkError: 模拟网络已断开');return request('ai-config');}},
     geolocation:{async getCurrentPosition(){throw new Error('PositionUnavailableError: 尚未设置模拟定位');},async watchPosition(){throw new Error('PositionUnavailableError: 首版未启用模拟定位轨迹');},clearWatch(){}},
     speech:{async speak(req){console.info('SDK speech.speak',JSON.stringify(req));throw new Error('NotSupportedError: 首版未接入语音合成服务');},cancelSpeak(){}},
   };
@@ -93,6 +95,7 @@ async function load() {
   runId=crypto.randomUUID();
   const restore=!current;
   current=await request('bundle');
+  aiInfo=current.session.ai||{enabled:false};
   if(restore&&current.cameraFixture)await camera.setFixture(current.cameraFixture);
   logGeneration=current.session.logGeneration;
   if(restore){pose=updatePose(pose,current.session.state?.pose||{});pose.connected=current.session.state?.pose?.connected!==false;mouse={...mouse,...current.session.state?.mouse,dragging:false};canvas.classList.toggle('mouse-look',mouse.enabled);}
@@ -134,6 +137,18 @@ async function execute(action,args={}) {
     case 'observe': break;
     case 'key': {if(!/^(Enter|Backspace|Escape|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Space)$/.test(args.code)||!['keydown','keyup'].includes(args.type||'keyup'))throw new Error('不支持的按键');await rawKey(args.type||'keyup',args.code,args.timestamp);break;}
     case 'tap': await rawKey('keydown','Enter');await wait(25);await rawKey('keyup','Enter');break;
+    case 'longpress': {
+      const durationMs=args.durationMs===undefined?1500:args.durationMs,pressedView=view;
+      if(!Number.isInteger(durationMs)||durationMs<500||durationMs>5000)throw new Error('长按时长范围为 500–5000 毫秒');
+      await rawKey('keydown','Enter');
+      try { await wait(durationMs); }
+      finally {
+        // An app can close itself while held. Never deliver the release to a
+        // closed instance or to a replacement runtime after a reload.
+        if(view===pressedView&&currentStatus==='ready'&&!pressedView.isDestroyed())await rawKey('keyup','Enter');
+      }
+      console.info('SIMULATED_LONGPRESS',JSON.stringify({durationMs}));break;
+    }
     case 'back': await rawKey('keydown','Backspace');await wait(25);await rawKey('keyup','Backspace');break;
     case 'swipe': {
       const codes=args.direction==='backward'?['ArrowLeft','ArrowUp']:['ArrowRight','ArrowDown'];
@@ -177,7 +192,7 @@ async function execute(action,args={}) {
   }
   await publish();return state();
 }
-async function poll(){while(!dead){try{const value=await request('poll');if(value.logGeneration!==logGeneration){logEntries=logEntries.filter(entry=>entry.createdAt>value.logsClearedAt);logGeneration=value.logGeneration;}for(const c of value.commands)pendingCommands=pendingCommands.then(async()=>{commandActive=true;try{await flushLogs();const startedAt=performance.timeOrigin+performance.now(),startedRunId=runId;const result=await execute(c.action,c.args);await storageQueue;if(storageError)throw storageError;await flushLogs();await request('ack',{id:c.id,result,startedAt,runId:startedRunId});}catch(e){console.error(e);await flushLogs().catch(()=>{});await request('ack',{id:c.id,error:e.message});}finally{commandActive=false;notifyParent(true);}});}catch(e){if(!dead)notice.textContent='本地服务连接中断';}await wait(90);}}
+async function poll(){while(!dead){try{const value=await request('poll');if(JSON.stringify(value.ai)!==JSON.stringify(aiInfo)){aiInfo=value.ai||{enabled:false};notifyParent();}if(value.logGeneration!==logGeneration){logEntries=logEntries.filter(entry=>entry.createdAt>value.logsClearedAt);logGeneration=value.logGeneration;}for(const c of value.commands)pendingCommands=pendingCommands.then(async()=>{commandActive=true;try{await flushLogs();const startedAt=performance.timeOrigin+performance.now(),startedRunId=runId;const result=await execute(c.action,c.args);await storageQueue;if(storageError)throw storageError;await flushLogs();await request('ack',{id:c.id,result,startedAt,runId:startedRunId});}catch(e){console.error(e);await flushLogs().catch(()=>{});await request('ack',{id:c.id,error:e.message});}finally{commandActive=false;notifyParent(true);}});}catch(e){if(!dead)notice.textContent='本地服务连接中断';}await wait(90);}}
 setInterval(()=>flushLogs().catch(()=>{}),250);
 setInterval(()=>{if(view&&!reloading)publish().catch(()=>{});},1000);
 window.addEventListener('beforeunload',()=>{dead=true;clearInterval(timer);clearTimeout(posePublishTimer);cancelAnimationFrame(poseFrame);mouseInput.destroy();camera.destroy();sensorSessions.clear();view?.destroy();});

@@ -27,6 +27,8 @@ import {IdeaComposer} from './idea-composer.jsx';
 import {ConnectPage} from './connect-page.jsx';
 import {connectionReady} from './ai-connection.mjs';
 import {UpdateNotice} from './update-notice.jsx';
+import {FeedbackPage} from './feedback-page.jsx';
+import {MessageSquare} from 'lucide-react';
 import appIcon from '../assets/branding/icon-64.png';
 
 const api=window.workbench;
@@ -42,7 +44,7 @@ const navigationGroups=[
  ['眼镜管理',[['devices',Glasses,'连接眼镜'],['glasses',SlidersHorizontal,'眼镜工具']]],
  ['资源与工具',[['knowledge',BookOpen,'官方资料'],['connect',Plug,'连接 AI 工具'],['sdk',Package,'SDK 更新'],['logs',Terminal,'日志与记录']]],
 ];
-const navigation=navigationGroups.flatMap(([,items])=>items);
+const navigation=[...navigationGroups.flatMap(([,items])=>items),['feedback',MessageSquare,'反馈与建议']];
 function Pill({children,tone=''}){return <span className={'pill '+tone}>{children}</span>}
 function Empty({icon:Icon=Box,title,children,action}){return <div className="empty"><span className="empty-icon"><Icon size={30}/></span><h3>{title}</h3><p>{children}</p>{action}</div>}
 function Button({children,icon:Icon,className='',busy,...props}){return <button className={'button '+className} {...props}>{busy?<LoaderCircle size={15} className="spin"/>:Icon&&<Icon size={15}/>} {children}</button>}
@@ -101,6 +103,7 @@ function App(){
    <div className="sidebar-navigation">
    {navigationGroups.map(([label,items])=><div className="navigation-group" key={label}><p className="nav-label">{t(label)}</p><nav aria-label={t(label)}>{items.map(([key,Icon,title])=><button key={key} aria-label={t(title)} aria-current={view===key||(view==='project'&&key==='projects')?'page':undefined} className={'nav-item '+(view===key||(view==='project'&&key==='projects')?'active':'')} onClick={()=>key==='connect'?openAiSetup():chooseView(key)}><Icon size={17}/><span>{t(title)}</span>{key==='projects'&&<em>{projects.length}</em>}{key==='connect'&&connectionReady(state)&&<span className="dot"/>}{key==='sdk'&&state?.sdk?.updateAvailable&&<em>{t('新版')}</em>}</button>)}</nav></div>)}</div>
    <div className="sidebar-bottom">
+   <button aria-label={t('反馈与建议')} aria-current={view==='feedback'?'page':undefined} className={'nav-item '+(view==='feedback'?'active':'')} onClick={()=>chooseView('feedback')}><MessageSquare size={17}/><span>{t('反馈与建议')}</span></button>
    <UpdateNotice api={api} updates={appUpdates} onUpdate={setAppUpdates}/>
    <button aria-label={t("新手指南")} aria-current={view==='guide'?'page':undefined} className={'nav-item '+(view==='guide'?'active':'')} onClick={()=>chooseView('guide')}><HelpCircle size={17}/><span>{t("新手指南")}</span></button>
    <button aria-label={t("设置")} aria-current={view==='settings'?'page':undefined} className={'nav-item '+(view==='settings'?'active':'')} onClick={()=>chooseView('settings')}><Settings2 size={17}/><span>{t("设置")}</span>{appUpdates?.updateAvailable&&<em>{t("新版")}</em>}</button>
@@ -109,6 +112,7 @@ function App(){
   <div className="main-shell">
    <header className="topbar"><div className="breadcrumb">{t("工作空间 ")}<ChevronRight size={12}/><strong>{view==='project'?t('我的项目'):t([...navigation,['connect',null,'连接 AI 工具'],['guide',null,'新手指南'],['sdk',null,'SDK 更新'],['logs',null,'日志与记录'],['settings',null,'设置']].find(n=>n[0]===view)?.[2] || '')}</strong>{['simulator','project'].includes(view)&&project&&<><ChevronRight size={12}/><span>{project.name}</span></>}</div><div className="topbar-right"><div className="language-switcher" role="group" aria-label="Language / 语言" title="Language / 语言"><Globe2 size={17} aria-hidden="true"/><button type="button" lang="zh-CN" aria-label="切换到中文" aria-pressed={locale==='zh-CN'} onClick={()=>setLocale('zh-CN')}>中文</button><button type="button" lang="en" aria-label="Switch to English" aria-pressed={locale==='en'} onClick={()=>setLocale('en')}>EN</button></div><span className="service-state"><span className={'dot '+(!state?'muted':'')}/>{state?t("本地服务已连接"):t("正在连接本地服务")}</span></div></header>
    <main ref={contentRef} className={'content view-'+view}>
+   {view==='feedback'&&<FeedbackPage api={api}/>}
    {view==='project'&&project&&<ProjectPage key={project.id} state={state} project={project} api={api} notify={notify} go={v=>v==='connect'?openAiSetup(project):chooseView(v)} onOpenPreview={openPreview} previewRequest={preview} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs}/>}
    {view==='projects'&&<>
     <div className="page-heading"><div><h1>{t("我的项目")}</h1><p>{t("打开一个项目，看看效果，或继续和 AI 完善想法。")}</p></div><div className="heading-actions"><Button icon={FolderOpen} onClick={importProject} busy={busy==='import'}>{t("导入项目")}</Button><Button className="primary" icon={Plus} onClick={()=>setModal({type:'create'})}>{t("新建项目")}</Button></div></div>

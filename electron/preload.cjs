@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('workbench',{
   platform:process.platform,
   setLocale:locale=>ipcRenderer.invoke('workbench:locale',locale),
   updates:(method,args)=>ipcRenderer.invoke('workbench:updates',method,args),
+  feedback:(method,args)=>ipcRenderer.invoke('workbench:feedback',method,args),
   removeProject:args=>ipcRenderer.invoke('workbench:project-remove',args),
   call:(tool,args={})=>ipcRenderer.invoke('workbench:call',tool,args),
   chooseDirectory:()=>ipcRenderer.invoke('workbench:choose','directory'),

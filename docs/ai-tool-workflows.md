@@ -1,5 +1,7 @@
 > 完整自动制作优先使用 `aiui_workflow_start → 编辑真实源码 → aiui_workflow_continue`；阻塞读共享诊断并继续原任务。详见 [自动制作与故障恢复](automated-development.md)。以下逐项工具仍完整保留。
 
+工坊反馈可直接填写「反馈与建议」表单，无需 AI。已经连接 MCP 的外部助手也可调用 `aiui_feedback_prepare` 填写草稿，用 `aiui_feedback_status` 读取记录。工坊本机按固定规则脱敏并生成预览，此反馈流程不调用模型。只接受已定位的工坊缺陷或用户主动建议，目标跟随当前更新源仓库，由用户核对后通过统一机器人提交。普通应用错误留在原项目，不批量公开诊断；MCP 不提供 issue 发布工具。详见 [反馈范围与部署](feedback.md)。
+
 # AI 工具：MCP 与共享 CLI
 
 AI 用现有编码工具修改真实源码，工坊负责运行、等待、模拟输入和结果核对。MCP、桌面、Web 和工坊 CLI 连接同一个本地服务；使用相同的 `AIUI_WORKBENCH_HOME`，即可共享项目 ID、预览会话、应用/SDK 日志、截图路径、构建任务和结果。
@@ -33,7 +35,35 @@ MCP 与共享 CLI 不要求自己的应用版本和后台服务版本一致，�
 
 `aiui_preview_test` 和 `aiui_project_build` 默认等待最多 45 秒；完成时直接返回 `status` 和 `result`。只有返回 `status: "running"` 才需用任务 `id` 调用 `aiui_job_wait`。`waitMs: 0` 可立即返回任务；通过 `aiui_job_cancel` 取消。MCP 中失败任务返回 `isError: true`，仍保留结构化诊断、报告和可用的截图。CLI 中失败任务输出同一份 JSON，并返回非零退出码。
 
+## Skill 更新和常用流程
+
+`aiui_context_get` 先检查磁盘上的工坊管理副本，再处理 `existingSkills`。已加载的同名 Skill 不会造成重复安装，也不再跳过全局/继承副本的版本检查。未修改的管理副本连同参考文件一起更新；完整内容与已知官方原版一致的副本可纳入管理；用户改动和符号链接保留。项目官方规范仍使用绑定版本，全局官方副本跟随当前官方资料。
+
+成功读取过的用户/项目范围会保存在工坊中，在下次启动和官方资料同步后再次检查已有管理副本，不另行安装缺失副本。客户端可能缓存已加载的 Skill，因此当前调用直接返回最新入口规范；参考文件可按需用 `aiui_skill_read` 读取，无须重复拉取完整上下文。常用场景包含镜腿输入、3DoF、相机、录制、失败恢复和临时 AI 验证。
+
+## 仅供 AI 自动化的模型接管
+
+普通用户在模拟器中使用识图、问答等 AI 功能时，界面提示到真机测试。工坊不启动独立 AI 进程，不唤醒空闲聊天。独立模型后端需要自行配置和维护，属于备选集成方案，当前没有配置界面，不推荐作为默认路径。
+
+AI 正在自动验证应用时，可临时接管实际 `LanguageModel` 请求：
+
+```text
+aiui_ai_configure（如实声明 supportsImages）
+→ 触发应用，或 aiui_preview_test(waitMs=0)
+→ aiui_ai_wait（本地阻塞等待新请求）
+→ 当前 AI 查看问题/图片并推理 → aiui_ai_reply
+→ 检查应用行为/继续原测试 → aiui_ai_configure(enabled=false)
+```
+
+图片通过 MCP 原生附件提供，正文只保留附件编号，避免重复 Base64。AI 没有图片多模态能力或无法确认时必须声明 false；图片请求返回 `device-required`，AI 必须主动提示用户去真机测试，不得伪造识图通过。完整步骤按需读取 `aiui_skill_read(path="references/simulator-ai.md")`。
+
+默认接管有效期 3 分钟、最多 6 个请求，每次输入 12,000 字符、输出 2,000 字符；最多 2 张图片，每张 1 MB、最长边 1024 像素。空闲等待只返回简短 `idle`，AI 随即停止监听，不循环轮询。关闭、重载、源码变化、超时和额度耗尽会取消旧请求，一次性回填凭据不能用于新会话。`promptStreaming` 接收最终答案的一次增量，未模拟模型逐 token 生成的延迟。语音与设备服务链路仍在真机验收。
+
+`npm run qa:simulator-ai` 用真实 Ink SDK、HTTP 和 stdio MCP 验证接管传输；默认回答是明确标记的固定测试数据。设置 `AIUI_AI_QA_MANUAL=1` 可由当前 AI 实际查看返回图片后回填，不能将固定数据测试称作真实识图。证据在 `output/qa/simulator-ai/`。
+
 ## 一次完成模拟
+
+模拟器右侧「交互」提供「长按镜腿」，可选择 0.5–5 秒，默认 1.5 秒。点击画面使其获得焦点后，也可按住键盘 Enter。MCP/CLI 的 `aiui_preview_action`、`aiui_preview_test` 和 `scenario` 支持 `action: "longpress", parameters: { "durationMs": 1500 }`：按下 Enter，保持指定实际时长，再抬起一次。长按业务由应用自己的按键处理判断；长滑重复事件测试仍是独立操作。
 
 先用 `aiui_project_import` 或 `aiui_project_create` 获取项目 ID。导入支持项目根目录或 `agent/` 子目录；直接导入 `agent/` 时，工坊也会读取并监听同级的 `assets/`、`branding/`、`icons/` 图标，遵循 `current.json` 选定的版本。导入目录仍是项目绑定和删除的范围，品牌素材不会加入应用源码包。未提供图标的项目显示默认应用图标。
 

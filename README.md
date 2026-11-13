@@ -1,6 +1,6 @@
 # AIUI 工坊 · AIUI Workshop
 
-[English](README.en.md) · [下载桌面版](https://github.com/syjstc/aiui-workbench/releases/latest) · [使用指南](docs/getting-started.md) · [草稿上传与提审](docs/platform-uploads.md) · [AI / MCP 工作流](docs/ai-tool-workflows.md)
+[English](README.en.md) · [下载桌面版](https://github.com/syjstc/aiui-workbench/releases/latest) · [使用指南](docs/getting-started.md) · [草稿上传与提审](docs/platform-uploads.md) · [AI / MCP 工作流](docs/ai-tool-workflows.md) · [项目经验](docs/aiui-project-lessons.md)
 
 一个面向 Rokid AIUI 的本地开发工作台：管理项目、阅读官方资料、运行真实 Ink 模拟器、构建 AIX、上传官方平台草稿，并在用户确认后提交审核。通过 MCP 与你常用的 AI 编程工具协作，提供 macOS、Windows 桌面客户端及本地 Web 界面。
 
@@ -10,7 +10,7 @@
 
 ## 下载与安装
 
-当前版本 **0.6.0**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.0) 下载安装包及 `SHA256SUMS.txt`。
+当前版本 **0.6.1**，新增内容见 [更新记录](CHANGELOG.md)。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.1) 下载安装包及 `SHA256SUMS.txt`。
 
 | 平台 | 安装方式 | 签名 |
 | --- | --- | --- |
@@ -29,9 +29,10 @@
 
 ## 可以做什么
 
+- **反馈与建议**：工坊自身问题或功能建议可从左下角「反馈与建议」生成脱敏预览，核对后直接由统一机器人创建 issue。目标跟随已保存的更新源仓库，用户无需 GitHub 账号或验证码；相同内容去重并限制提交频率。详见 [反馈范围与部署](docs/feedback.md)。
 - **解绑与删除**：项目卡片“…”菜单提供两步确认、完整名称输入与路径核对。解绑保留文件，删除移到系统废纸篓／回收站。见 [操作说明](docs/project-removal.md)。
 - **项目库与实时预览**：导入 AIUI 目录或新建项目；编辑器与 AI 修改的就是同一份源码，文件变化自动刷新。
-- **真实 Ink 模拟器**：运行 `.ink`，回放镜腿按键、长滑与重复事件；鼠标、头模、三轴滑条和自动动作共享姿态输入。支持本地照片和主动开启的电脑摄像头。
+- **真实 Ink 模拟器**：运行 `.ink`，回放镜腿按键、可调时长的长按、长滑与重复事件；鼠标、头模、三轴滑条和自动动作共享姿态输入。支持本地照片和主动开启的电脑摄像头。
 - **官方资料与 SDK**：内置 468 份资料、81 张配图和公开 `aiui-dev` Skill，提供官方层级目录、全库全文搜索和每日自动更新，长文自动读取、图片可离线查看和放大。见 [资料库说明](docs/document-library.md)。SDK/CLI 升级先检查项目兼容性，支持逐项目切换与回退。
 - **MCP / CLI 协作**：AI 可读取规范、操作预览、执行断言、截图、录制短片及检查打包；桌面、Web、CLI 和 MCP 共享项目、日志与任务。
 - **官方平台草稿与提审**：AI 准备材料并调用 MCP，工坊上传 AIX、核对云端摘要、保存提审资料；正式提审必须由用户在桌面原生窗口确认。一次登录后复用系统加密会话，支持明确退出。
@@ -47,7 +48,7 @@
 
 ## 第一次使用
 
-1. 首次打开进入“连接 AI 工具”。可填写想法，点击“复制给 AI”，粘贴到你常用的 AI 工具；AI 准备连接、开发指引和环境。成功读取工坊后，界面自动确认。
+1. 首次打开进入“连接 AI 工具”。可填写想法，点击“复制完整连接指令”，将包含本机配置的完整内容粘贴到你常用的 AI 工具；AI 准备连接、开发指引和环境。成功读取工坊后，界面自动确认。
 2. 告诉 AI 要做什么；生成的应用出现在“我的项目”。也可导入本仓库的 [`examples/hello-aiui`](examples/hello-aiui) 或新建 Page。
 3. 打开项目查看实时预览，用想法框或继续完善、检查修复、验证打包等预置指令接着制作。需要姿态、相机或重复滑动控制时，点击“打开完整模拟器”。
 4. 让 AI 验证、打包；准备好安装时，按“新手指南 → 装到眼镜”开启调试，用专用线或支持的无线方式连接，再继续原任务。

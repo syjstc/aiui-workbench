@@ -19,16 +19,15 @@ export function ConnectPage({state,project,copyConfig,notify,go}){
   return <>
     <div className="page-heading"><div><h1>{t('连接 AI 工具')}</h1><p>{t('复制一次，让 AI 准备好，再一起做应用。')}</p></div><span className={'pill '+(ready?'success':'')}>{ready?<><CheckCircle2 size={14}/>{t('AI 已成功读取工坊')}</>:!state?t('正在检查连接'):t('等待 AI 完成连接检查')}</span></div>
     <div className="connect-welcome">
-      <section className="connect-command panel"><div className="connect-command-title"><Plug size={22}/><div><h2>{t('把这句话发给你的 AI')}</h2><p>{t('继续使用熟悉的 AI 工具，配置和开发指引交给它准备。')}</p></div></div>
-        <blockquote>{t('连接 AIUI 工坊，准备好开发环境，然后问我想做什么。')}</blockquote>
+      <section className="connect-command panel"><div className="connect-command-title"><Plug size={22}/><div><h2>{t('复制连接指令，发给 AI')}</h2><p>{t('点击下方按钮，复制包含本机配置的完整指令，再到你常用的 AI 工具里粘贴。')}</p></div></div>
         <label htmlFor="setup-idea">{t(project?'这次想改什么？':'有想法，也可以一起告诉 AI')} <span>{t('可选')}</span></label>
         {project&&<p className="subtle">{t('将继续当前项目：{0}',{0:project.name})}</p>}
         <textarea id="setup-idea" maxLength={6000} value={idea} onChange={e=>updateIdea(e.target.value)} placeholder={t('比如：做一个眼镜上的清单，滑动选择、单击勾选，自动保存。')}/>
         <p className="connect-idea-hint">{t('填了就直接开始制作；留空时，AI 准备好后会问你想做什么。')}</p>
         {!saved&&<p className="connect-copy-warning" role="status">{t('暂时无法保存，离开前请先复制')}</p>}
-        <button className="button primary connect-copy-command" disabled={!config||!state} onClick={copySetup}>{copied?<Check size={17}/>:<Copy size={17}/>} {t(copied?'已复制，去 AI 里粘贴':'复制给 AI')}<ArrowRight size={16}/></button>
+        <button className="button primary connect-copy-command" disabled={!config||!state} onClick={copySetup}>{copied?<Check size={17}/>:<Copy size={17}/>} {t(copied?'已复制，去 AI 工具粘贴':'复制完整连接指令')}<ArrowRight size={16}/></button>
         {configError&&<div className="connect-copy-warning" role="alert"><p>{t('连接配置暂时未读到，请重新检查。')}</p><button className="text-button" onClick={loadConfig}><RefreshCw size={14}/>{t('重新检查')}</button></div>}
-        <p className="connect-idea-hint">{t('指令包含本机连接配置，AI 可以直接使用，不需要你找路径。')}</p>
+        <p className="connect-idea-hint">{t('按钮会自动带上本机连接配置和上面的想法，无需手动拼接。')}</p>
       </section>
       <section className="connect-expectations" aria-label={t('AI 会自动完成')}><h2>{t('接下来，AI 会帮你准备')}</h2>{[
         ['连接工坊','配置 MCP，并读取当前真实可用的工具。'],

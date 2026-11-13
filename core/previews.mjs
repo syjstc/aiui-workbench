@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { id, redact, sha } from './util.mjs';
 import {PreviewStorage} from './preview-storage.mjs';
+import {previewParameters} from './automation-contract.mjs';
 
 export class Previews {
   constructor(projects, home, emit) { this.projects = projects; this.home = home; this.emit = emit; this.sessions = new Map(); this.storage=new PreviewStorage(home); }
@@ -11,7 +12,7 @@ export class Previews {
     let sdk = {};
     try { const release = this.getToolchain?.(this.projects.get(s.projectId)); if (release) sdk = { toolchainId: release.id, webSdkVersion: release.versions.ink, runtime: release.runtime, sdkUrl: `/sdk/${release.id}/index.js` }; } catch (e) { sdk = { sdkError: e.message }; }
     const sourceRevision = this.projects.get(s.projectId).revision;
-    return { ...result, ...sdk, sourceRevision, stale: s.revision !== sourceRevision, status:s.status==='ready'&&s.lastSeen&&Date.now()-Date.parse(s.lastSeen)>4500?'detached':s.status, url: this.url(s, s.origin), logCount: logs.length };
+    return { ...result, ...sdk, ai:this.ai?.status(s.id), sourceRevision, stale: s.revision !== sourceRevision, status:s.status==='ready'&&s.lastSeen&&Date.now()-Date.parse(s.lastSeen)>4500?'detached':s.status, url: this.url(s, s.origin), logCount: logs.length };
   }
   get(sessionId) { const s = this.sessions.get(sessionId); if (!s) throw new Error('预览会话不存在，请先打开预览'); return s; }
   open(projectId, origin, { target = '_blank', page, requestedBy = 'desktop' } = {}) {
@@ -40,6 +41,8 @@ export class Previews {
   async action(sessionId, action, args = {}, { signal, observe = false } = {}) {
     signal?.throwIfAborted();
     const s = this.get(sessionId);
+    if(action==='longpress')args=previewParameters.longpress.parse(args);
+    if(['reload','exit'].includes(action))this.ai?.cancelSession(sessionId,action);
     let nextFixture;
     if (action === 'camera_fixture') {
       if (!/\.(png|jpe?g|webp)$/i.test(args.path || '')) throw new Error('请选择 PNG、JPEG 或 WebP 图片');
@@ -63,7 +66,7 @@ export class Previews {
     clearTimeout(pending.timer); s.pending.delete(body.id);
     if (body.error) pending.reject(new Error(redact(body.error))); else pending.resolve(pending.observe?{value:body.result,startedAt:body.startedAt,runId:body.runId}:body.result);
   }
-  update(s, body) { s.status = body.status || s.status; s.state = body.state || s.state; s.lastSeen = new Date().toISOString(); if(s.status==='ready'&&s.state.running)s.readyAt=Date.now(); if(s.status==='failed')s.failedAt=Date.now(); if (body.revision) s.revision = body.revision; this.emit('preview', this.public(s)); }
+  update(s, body) { if(body.state?.runId&&s.aiRunId&&body.state.runId!==s.aiRunId)return; s.status = body.status || s.status; s.state = body.state || s.state; s.lastSeen = new Date().toISOString(); if(['closed','failed'].includes(s.status))this.ai?.cancelSession(s.id,s.status); if(s.status==='ready'&&s.state.running)s.readyAt=Date.now(); if(s.status==='failed')s.failedAt=Date.now(); if (body.revision) s.revision = body.revision; this.emit('preview', this.public(s)); }
   async capture(sessionId, options) {
     const result = await this.action(sessionId, 'capture', {}, options), s = this.get(sessionId);
     if (!result.dataUrl?.startsWith('data:image/png;base64,')) throw new Error('预览未返回有效截图');
@@ -73,7 +76,7 @@ export class Previews {
     const revision = result.revision || s.revision;
     return { path: file, width: result.width, height: result.height, revision, runId: result.runId || null, sha256: sha(bytes), stale: revision !== this.projects.get(s.projectId).revision, simulated: true, data: result.dataUrl.split(',')[1] };
   }
-  reload(projectId) { for (const s of this.sessions.values()) if (s.projectId === projectId && s.status !== 'closed') { s.status = 'loading'; if(!s.queue.some(c=>c.action==='reload'))s.queue.push({ id: id(), action: 'reload', args: {} }); } }
-  removeProject(projectId) { for (const session of this.sessions.values()) if (session.projectId === projectId) { for (const pending of [...session.pending.values()]) pending.reject(new Error('项目已解绑')); session.queue = []; this.sessions.delete(session.id); } }
-  async close() { for (const s of this.sessions.values()) for (const p of s.pending.values()) { clearTimeout(p.timer); p.reject(new Error('预览已关闭')); } this.sessions.clear(); await this.storage.close(); }
+  reload(projectId) { for (const s of this.sessions.values()) if (s.projectId === projectId && s.status !== 'closed') { this.ai?.cancelSession(s.id,'source-changed');s.status = 'loading'; if(!s.queue.some(c=>c.action==='reload'))s.queue.push({ id: id(), action: 'reload', args: {} }); } }
+  removeProject(projectId) { for (const session of this.sessions.values()) if (session.projectId === projectId) { this.ai?.cancelSession(session.id,'project-removed');for (const pending of [...session.pending.values()]) pending.reject(new Error('项目已解绑')); session.queue = []; this.sessions.delete(session.id); } }
+  async close() { this.ai?.close();for (const s of this.sessions.values()) for (const p of s.pending.values()) { clearTimeout(p.timer); p.reject(new Error('预览已关闭')); } this.sessions.clear(); await this.storage.close(); }
 }

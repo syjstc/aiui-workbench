@@ -34,16 +34,19 @@ async function drag(locator,dx,dy,{shift=false,button=null}={}){
 async function poseMatches(expected){return until(async()=>{const p=(await state()).state.pose;return Object.entries(expected).every(([k,v])=>Math.abs(p[k]-v)<.6)&&p;});}
 const fixture=`<script def>{"navigationBarTitleText":""}</script><script setup>
 export default {
- data:{readout:'等待姿态',taps:0},
- onLoad(){this.sensor=null;this.last=0;},
+ data:{readout:'等待姿态',taps:0,holds:0},
+ onLoad(){this.sensor=null;this.last=0;this.clearInput();},
  onShow(){this.sensor=new AbsoluteOrientationSensor({frequency:60});this.sensor.addEventListener('reading',()=>{if(Date.now()-this.last<200)return;this.last=Date.now();const q=Array.from(this.sensor.quaternion);console.info('POSE_PROBE',JSON.stringify({q,taps:this.data.taps}));this.setData({readout:q.map(v=>v.toFixed(3)).join('  ')});});this.sensor.start();},
- onHide(){if(this.sensor)this.sensor.stop();},onUnload(){if(this.sensor)this.sensor.stop();},
- onKeyDown(e){if(['Enter','Backspace'].includes(e.code))e.preventDefault();},
- onKeyUp(e){if(e.code==='Enter'){e.preventDefault();this.tap();}if(e.code==='Backspace'){e.preventDefault();window.close();}},
+ onHide(){if(this.sensor)this.sensor.stop();this.clearInput();},onUnload(){if(this.sensor)this.sensor.stop();this.clearInput();},
+ clearInput(){if(this.holdTimer!==undefined&&this.holdTimer!==null)clearTimeout(this.holdTimer);this.holdTimer=null;this.holdStart=null;this.held=false;},
+ hold(){if(this.held)return;this.held=true;this.setData({holds:this.data.holds+1});console.info('PROBE_LONGPRESS',this.data.holds);},
+ onKeyDown(e){if(['Enter','Backspace'].includes(e.code))e.preventDefault();if(e.code==='Enter'&&this.holdStart===null){this.holdStart=Date.now();console.info('PROBE_CONFIRM_DOWN');this.holdTimer=setTimeout(()=>this.hold(),600);}},
+ onKeyUp(e){if(e.code==='Enter'){e.preventDefault();const durationMs=this.holdStart===null?0:Date.now()-this.holdStart;if(this.holdTimer!==null)clearTimeout(this.holdTimer);this.holdTimer=null;if(durationMs>=600)this.hold();console.info('PROBE_CONFIRM_RELEASE',JSON.stringify({durationMs,held:this.held}));if(!this.held)this.tap();this.clearInput();}if(e.code==='Backspace'){e.preventDefault();window.close();}},
  tap(){this.setData({taps:this.data.taps+1});console.info('PROBE_TAP',this.data.taps);}
 };
-</script><page><view class="root" bindtap="tap"><text class="title">3DoF 姿态测试</text><text>移动鼠标，观察姿态传感器</text><text>{{readout}}</text><text>确认次数 {{taps}}</text><text>返回键退出到桌面</text></view></page><style>.root{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#000;color:#b6ef9f;font-size:14px}.title{font-size:26px;}</style>`;
+</script><page><view class="root" bindtap="tap"><text class="title">3DoF 姿态测试</text><text>移动鼠标，观察姿态传感器</text><text>{{readout}}</text><text>确认次数 {{taps}} · 长按次数 {{holds}}</text><text>返回键退出到桌面</text></view></page><style>.root{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#000;color:#b6ef9f;font-size:14px}.title{font-size:26px;}</style>`;
 try{
+ await page.getByRole('button',{name:'切换到中文',exact:true}).click();
  await page.getByRole('button',{name:'模拟器',exact:true}).click();
  await check('空桌面提供导入入口',async()=>{await page.getByText('桌面还没有应用',{exact:true}).waitFor();});
  let probe;
@@ -99,6 +102,40 @@ try{
   await page.getByRole('button',{name:'鼠标模拟 3DoF',exact:true}).click();await until(async()=>(await state()).state.mouse.enabled===false);const p=(await state()).state.pose;
   await screen().click();await until(async()=>(await logs()).filter(l=>l.message.includes('PROBE_TAP')).length===before+1);assert.deepEqual((await state()).state.pose,p);
   await page.getByRole('button',{name:'鼠标模拟 3DoF',exact:true}).click();await until(async()=>(await state()).state.mouse.enabled);await screen().click();await until(async()=>(await logs()).filter(l=>l.message.includes('PROBE_TAP')).length===before+2);
+ });
+ await check('长按按钮使用所选时长，只触发一次且释放不产生单击',async()=>{
+  await page.getByRole('button',{name:'交互',exact:true}).click();
+  await page.getByRole('slider',{name:'长按时长',exact:true}).fill('1.1');
+  const sequence=(await logs()).at(-1)?.sequence||0;
+  await page.getByRole('button',{name:'长按镜腿',exact:false}).click();
+  assert.ok(await page.getByRole('button',{name:'正在长按…',exact:false}).isDisabled());
+  assert.ok(await page.getByRole('button',{name:'单击确认',exact:false}).isDisabled());
+  await until(async()=>(await logs()).some(l=>l.sequence>sequence&&l.message.includes('PROBE_CONFIRM_RELEASE')));
+  const fresh=(await logs()).filter(l=>l.sequence>sequence);
+  for(const marker of ['PROBE_CONFIRM_DOWN','PROBE_LONGPRESS','PROBE_CONFIRM_RELEASE'])assert.equal(fresh.filter(l=>l.message.includes(marker)).length,1,marker);
+  assert.equal(fresh.filter(l=>l.message.includes('PROBE_TAP')).length,0);
+  const release=JSON.parse(fresh.find(l=>l.message.includes('PROBE_CONFIRM_RELEASE')).message.split('PROBE_CONFIRM_RELEASE ')[1]);
+  // Allow 2 ms for the integer app clock / browser timer resolution.
+  assert.ok(release.durationMs>=1098);assert.equal(release.held,true);
+  report.longpressRelease=release;
+  await until(async()=>!(await page.getByRole('button',{name:'长按镜腿',exact:false}).isDisabled()));
+  await page.screenshot({path:path.join(output,'06-longpress.png')});
+ });
+ await check('MCP 自动回放支持默认长按，随后单击和 keyup-only 各触发一次',async()=>{
+  const job=await call('aiui_preview_test',{projectId:probe.id,reload:false,capture:false,steps:[
+   {action:'longpress',expect:{logContains:'PROBE_LONGPRESS',logCount:{contains:'PROBE_TAP',count:0}}},
+   {action:'tap',expect:{logCount:{contains:'PROBE_TAP',count:1}}},
+   {action:'key',parameters:{code:'Enter',type:'keyup'},expect:{logCount:{contains:'PROBE_TAP',count:1}}},
+  ]});
+  assert.equal(job.status,'succeeded',JSON.stringify(job));report.longpressAutomation=job.result;
+ });
+ await check('画面聚焦后按住 Enter 支持长按，键盘自动重复不重复触发',async()=>{
+  const sequence=(await logs()).at(-1)?.sequence||0;
+  await screen().focus();await page.keyboard.down('Enter');await pause(700);await page.keyboard.down('Enter');await page.keyboard.up('Enter');
+  await until(async()=>(await logs()).some(l=>l.sequence>sequence&&l.message.includes('PROBE_CONFIRM_RELEASE')));
+  const fresh=(await logs()).filter(l=>l.sequence>sequence);
+  assert.equal(fresh.filter(l=>l.message.includes('PROBE_LONGPRESS')).length,1);
+  assert.equal(fresh.filter(l=>l.message.includes('PROBE_TAP')).length,0);
  });
  await check('应用主动退出返回桌面，可以再次启动',async()=>{
   await screen().press('Backspace');await page.getByRole('region',{name:'模拟器桌面'}).waitFor();assert.equal((await state()).status,'closed');

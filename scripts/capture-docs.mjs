@@ -36,7 +36,7 @@ try {
   await page.getByRole('button', { name: '切换到中文', exact: true }).click();
   await page.getByRole('heading', { name: 'Hello AIUI', exact: true }).waitFor({ timeout: 45000 });
   await page.locator('.sidebar').getByRole('button', { name: '连接 AI 工具', exact: true }).click();
-  await page.getByRole('heading', { name: '把这句话发给你的 AI', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '复制连接指令，发给 AI', exact: true }).waitFor();
   await page.locator('#setup-idea').fill('做一个三项清单，滑动选择、单击勾选，自动保存进度。');
   await capture('ai-setup-zh.png');
   // Verify the connection through the generated, real stdio MCP launcher.

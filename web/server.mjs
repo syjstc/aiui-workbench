@@ -77,6 +77,11 @@ export async function startWeb({ home = homePath(), port = 0, client, open = ope
         }
         if (req.method !== 'POST') return send(res, { error: 'Method not allowed' }, 405);
         const value = await json(req);
+        if(url.pathname==='/api/feedback'){
+          const operations={submit:'ui_feedback_submit',reconcile:'ui_feedback_reconcile',delete:'ui_feedback_delete',restore:'ui_feedback_restore'};
+          const tool=operations[value.method];if(!tool)throw new Error('未知反馈操作');
+          const result=await client.call(tool,value.args,'web-feedback');return send(res,{result});
+        }
         if (url.pathname === '/api/call') {
           if (!UI_TOOLS.has(value.tool)) throw new Error('未知操作');
           return send(res, { result: await client.call(value.tool, value.args, 'web') });

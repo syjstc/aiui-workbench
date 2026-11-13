@@ -37,6 +37,7 @@ export function createWebBridge() {
       try { return await invoke('call', { tool: 'ui_project_removal_commit', args: { intentId: intent.id } }); }
       catch (error) { await invoke('call', { tool: 'ui_project_removal_cancel', args: { intentId: intent.id } }).catch(() => {}); throw error; }
     },
+    feedback:(method,args)=>invoke('feedback',{method,args}),
     copy: text => navigator.clipboard.writeText(String(text)),
     reveal: file => invoke('reveal', { path: file }),
     openOfficial: url => invoke('official', { url }),

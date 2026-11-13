@@ -6,7 +6,7 @@
 
 从 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载与你系统匹配的安装包，并核对同页 SHA256。macOS 推荐打开 DMG，将 `AIUI Workshop.app` 拖到“应用程序”，也可使用 ZIP；Windows 完整解压 ZIP 后启动 `AIUI Workshop.exe`，保留同目录的资源与 DLL。
 
-首次打开空工作空间会进入“连接 AI 工具”。可填写想法，点击“复制给 AI”并粘贴到你熟悉的 AI 客户端；AI 会准备 MCP、官方开发 Skill 和环境。有想法就直接开始，留空时由 AI 询问。只有 AI 成功读取当前工坊后，才显示连接已确认；复制指令本身不代表连通。
+首次打开空工作空间会进入“连接 AI 工具”。可填写想法，点击“复制完整连接指令”，再将完整内容粘贴到你熟悉的 AI 客户端；按钮会带上本机 MCP 配置，AI 据此准备连接、官方开发 Skill 和环境。有想法就直接开始，留空时由 AI 询问。只有 AI 成功读取当前工坊后，才显示连接已确认；复制指令本身不代表连通。
 
 ![首次连接：附上想法，复制完整指令给 AI](screenshots/ai-setup-zh.png)
 

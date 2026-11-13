@@ -51,6 +51,33 @@ test('managed official snapshots update together, while user edits to either ski
   const preserved=await ensureAgentSkills(project,knowledge,options);assert.deepEqual(preserved.skills.map(s=>s.status),['user-modified','user-modified']);assert.match(await fs.readFile(reference,'utf8'),/Personal checklist rule/);assert.match(await fs.readFile(workflow,'utf8'),/Personal workflow rule/);
 });
 
+test('managed global copies and their references update despite client-reported loaded skills, without project duplicates',async t=>{
+  const {root,knowledge,project}=await fixture(t),user=path.join(root,'user');await fs.mkdir(user);
+  const globals=[path.join(user,'.agents/skills')];
+  await ensureAgentSkills({projectPath:user,agentPath:user},knowledge,{globalRoots:[],writeIgnore:false});
+  const directory=path.join(globals[0],'aiui-workshop'),markerFile=path.join(directory,'.aiui-managed.json');
+  const old='---\nname: aiui-workshop\ndescription: Original managed guide\n---\nOld version\n';
+  await fs.writeFile(path.join(directory,'SKILL.md'),old);
+  const metadata=JSON.parse(await fs.readFile(markerFile,'utf8'));metadata.version='0.1.0';metadata.files['SKILL.md']=sha(old);await fs.writeFile(markerFile,JSON.stringify(metadata));
+  const result=await ensureAgentSkills(project,knowledge,{globalRoots:globals,existingSkills:['aiui-dev','aiui-workshop']});
+  assert.equal(result.skills[1].status,'updated');assert.equal(result.reloadRequired,true);
+  assert.match(await fs.readFile(path.join(directory,'references/simulator-ai.md'),'utf8'),/supportsImages/);
+  assert.match(await fs.readFile(path.join(directory,'references/verification.md'),'utf8'),/3DoF/);
+  assert.equal(await fs.access(path.join(project.projectPath,'.agents/skills/aiui-workshop')).then(()=>true,()=>false),false);
+  await fs.appendFile(path.join(directory,'references/simulator-ai.md'),'\nPersonal rule.\n');
+  const preserved=await ensureAgentSkills(project,knowledge,{globalRoots:globals,existingSkills:['aiui-workshop']});assert.equal(preserved.skills[1].status,'user-modified');
+  assert.match(await fs.readFile(path.join(directory,'references/simulator-ai.md'),'utf8'),/Personal rule/);
+});
+
+test('a complete unmodified original can be adopted, while a modified original is preserved',async t=>{
+  const {root,knowledge,project}=await fixture(t),user=path.join(root,'user');await fs.mkdir(user);
+  await ensureAgentSkills({projectPath:user,agentPath:user},knowledge,{globalRoots:[],writeIgnore:false});
+  const directory=path.join(user,'.agents/skills/aiui-dev');await fs.unlink(path.join(directory,'.aiui-managed.json'));
+  const adopted=await ensureAgentSkills(project,knowledge,{globalRoots:[path.join(user,'.agents/skills')]});assert.equal(adopted.skills[0].status,'adopted');
+  await fs.unlink(path.join(directory,'.aiui-managed.json'));await fs.appendFile(path.join(directory,'SKILL.md'),'\nCustom instructions.\n');
+  const kept=await ensureAgentSkills(project,knowledge,{globalRoots:[path.join(user,'.agents/skills')]});assert.equal(kept.skills[0].status,'existing');assert.match(await fs.readFile(path.join(directory,'SKILL.md'),'utf8'),/Custom instructions/);
+});
+
 test('skill setup refuses symlinked destinations and an unsafe ignore file before external writes',async t=>{
   const {root,knowledge,project}=await fixture(t),outside=path.join(root,'outside');await fs.mkdir(outside);await fs.symlink(outside,path.join(project.projectPath,'.agents'),'dir');
   await assert.rejects(ensureAgentSkills(project,knowledge,options),/符号链接/);assert.deepEqual(await fs.readdir(outside),[]);

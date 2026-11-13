@@ -96,6 +96,7 @@ app.whenReady().then(async()=>{
     throw new Error('未知更新操作');
   });
   handle('workbench:choose',async(event,kind)=>{trusted(event);const options=kind==='photo'?{properties:['openFile'],filters:[{name:desktopLocale==='en'?'Photos':'照片',extensions:['png','jpg','jpeg','webp']}]}:{properties:['openDirectory','createDirectory']};const result=await dialog.showOpenDialog(mainWindow,options);return result.canceled?null:result.filePaths[0];});
+  handle('workbench:feedback',async(event,method,args)=>{trusted(event);if(!['submit','reconcile','delete','restore'].includes(method))throw new Error('未知反馈操作');return client.call('ui_feedback_'+method,args,'desktop-feedback');});
   handle('workbench:choose-files',async(event,kind)=>{trusted(event);if(!['apk','files'].includes(kind))throw new Error('无效的文件类型');const result=await dialog.showOpenDialog(mainWindow,{properties:['openFile','multiSelections'],...(kind==='apk'?{filters:[{name:'Android APK',extensions:['apk']}]}:{})});return result.canceled?[]:result.filePaths;});
   handle('workbench:clipboard',async(event,text)=>{trusted(event);clipboard.writeText(String(text));return true;});
   handle('workbench:reveal',async(event,file)=>{trusted(event);if(typeof file!=='string'||!path.isAbsolute(file))throw new Error('无效路径');shell.showItemInFolder(file);return true;});

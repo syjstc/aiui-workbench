@@ -38,9 +38,22 @@ const mul = ([ax, ay, az, aw], [bx, by, bz, bw]) => [
   aw * bw - ax * bx - ay * by - az * bz,
 ];
 
-// Android +Z gravity at neutral, quaternion order [x, y, z, w].
+// Wearer coordinates: +X right, +Y up, -Z forward. Positive controls mean
+// turn right / look up / tilt right. Apply yaw, then local pitch and roll.
+export function headQuaternion(pose) {
+  const r = Math.PI / 360, yaw = -pose.yaw * r, pitch = pose.pitch * r, roll = -pose.roll * r;
+  return mul(mul([0, Math.sin(yaw), 0, Math.cos(yaw)], [Math.sin(pitch), 0, 0, Math.cos(pitch)]),
+    [0, 0, Math.sin(roll), Math.cos(roll)]);
+}
+
+// Android TYPE_ROTATION_VECTOR maps device coordinates into a Z-up world.
+// Keep the mounting basis at the boundary; the head and SDK use the same pose.
 export function poseQuaternion(pose) {
-  const r = Math.PI / 360, yaw = pose.yaw * r, pitch = pose.pitch * r, roll = pose.roll * r;
-  return mul(mul([0, 0, Math.sin(-yaw), Math.cos(yaw)], [Math.SQRT1_2, 0, 0, Math.SQRT1_2]),
-    mul([Math.sin(pitch), 0, 0, Math.cos(pitch)], [0, 0, Math.sin(roll), Math.cos(roll)]));
+  return mul([Math.SQRT1_2, 0, 0, Math.SQRT1_2], headQuaternion(pose));
+}
+
+export function rotateHeadVector([x,y,z], quaternion) {
+  const [qx,qy,qz,qw] = quaternion;
+  const tx=2*(qy*z-qz*y),ty=2*(qz*x-qx*z),tz=2*(qx*y-qy*x);
+  return [x+qw*tx+qy*tz-qz*ty,y+qw*ty+qz*tx-qx*tz,z+qw*tz+qx*ty-qy*tx];
 }

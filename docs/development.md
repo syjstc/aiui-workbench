@@ -16,6 +16,7 @@ npm run dev
 
 | 目录 | 职责 |
 | --- | --- |
+| `services/feedback/` | Cloudflare 反馈机器人、验证和服务端去重限频；凭据仅放 Worker Secret |
 | `core/` | 共享本地服务、项目、SDK、资料、设备、任务与录制 |
 | `electron/` | 原生窗口、受控 IPC、系统权限和 macOS entitlements |
 | `renderer/` | React 工作台、中英文、主题、设备与资料界面 |
@@ -69,6 +70,7 @@ npm run qa:recording         # 短片解码与退出封装；需 ffmpeg / ffprob
 npm run qa:documents
 npm run qa:i18n
 npm run qa:web-updates
+npm run qa:feedback          # 桌面/Web 反馈、脱敏、仓库变化、模拟机器人及防重发
 npm run qa:platform          # 隔离官方会话、模拟 HTTP/OSS、真实 AIX 与 stdio MCP
 node scripts/qa-diagnostics.mjs # 项目隔离、MCP/CLI 已读流转、重启及英文界面
 ```

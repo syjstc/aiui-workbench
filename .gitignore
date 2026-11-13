@@ -15,6 +15,9 @@ output/
 .mcp.json.backup-*
 .aix/
 coverage/
+.wrangler/
+services/feedback/.dev.vars*
+services/feedback/*.pem
 vendor/adb/darwin/
 vendor/adb/linux/
 vendor/adb/win32/

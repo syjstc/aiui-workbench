@@ -1,7 +1,7 @@
 import {RecordingControls} from './recording-controls.jsx';
 import { t, getLocale } from './i18n.jsx';
 import React, { useEffect, useRef, useState } from 'react';
-import { Activity, ArrowLeft, ArrowRight, Camera, ChevronRight, Glasses, HelpCircle, Home, Image, Monitor, MousePointer2, Move3D, Play, Plus, RotateCcw, ShieldCheck, SlidersHorizontal, Square } from 'lucide-react';
+import { Activity, ArrowLeft, ArrowRight, Camera, ChevronRight, Glasses, HelpCircle, Home, Image, Monitor, MousePointer2, Move3D, Play, Plus, RotateCcw, ShieldCheck, SlidersHorizontal, Square, Timer } from 'lucide-react';
 import { DEFAULT_MOUSE, DEFAULT_MOTION, NEUTRAL_POSE, POSE_AXES, updatePose } from '../shared/pose.mjs';
 import { DesktopNavigation } from './desktop-navigation.mjs';
 import { ProjectIcon } from './project-icon.jsx';
@@ -57,6 +57,7 @@ export function Simulator({ projects, project, preview, session, onOpen, onHome,
         <span>{mouse.enabled ? t("移动转头 · Shift 移动侧倾 · 单击确认") : t("鼠标直接操作应用")}</span>
         <button className="pose-reset" aria-label={t("姿态回正")} disabled={!ready} onClick={() => direct('pose', NEUTRAL_POSE)}><RotateCcw size={14}/>{t("回正")}</button>
       </div>}
+      {preview&&<div className="simulator-ai-note" role="note"><HelpCircle size={14}/><span>{current.ai?.enabled?t("AI 自动化验证中 · 由当前 AI 工具临时处理"):t("识图、问答等 AI 功能请在真机上测试。")}</span></div>}
       <div className="device-mat"><div className="screen-device">
         <div className="device-top"><span/><small>AIUI DISPLAY</small><span/></div>
         <div className="screen-wrap">{preview
@@ -121,12 +122,34 @@ function Desktop({projects, initialSelected, onOpen, onImport}) {
 
 function SimulationControls({act,direct,session,ready,choosePhoto}) {
   const [tab,setTab]=useState('pose');
+  const [durationMs,setDurationMs]=useState(1500),[pressing,setPressing]=useState(false);
+  const inputReady=ready&&!pressing;
+  async function longpress() {
+    if(!inputReady)return;
+    setPressing(true);
+    try { await act('longpress',{durationMs}); }
+    finally { setPressing(false); }
+  }
   const pose=session.state?.pose||NEUTRAL_POSE,mouse=session.state?.mouse||DEFAULT_MOUSE,motion=session.state?.motion||DEFAULT_MOTION;
   return <section className="simulation-controls">
     <div className="control-heading"><SlidersHorizontal size={16}/><strong>{t("模拟控制")}</strong><span className="pill">{t("模拟输入")}</span></div>
     <HeadModel pose={pose} sensitivity={mouse.sensitivity} ready={ready} motion={motion.enabled} onPose={value=>direct('pose',value)} onInteract={()=>{if(motion.enabled)direct('pose_motion',{enabled:false});}}/>
     <div className="control-tabs">{[['pose',Move3D,t("姿态")],['motion',Play,t("演示")],['input',MousePointer2,t("交互")],['camera',Camera,t("相机")]].map(([key,Icon,label])=><button key={key} className={tab===key?'active':''} onClick={()=>setTab(key)}><Icon size={14}/>{label}</button>)}</div>
-    {tab==='input'&&<div className="control-body"><p className="control-label">{t("镜腿触控")}</p><button className="temple-tap" disabled={!ready} onClick={()=>act('tap')}><MousePointer2 size={23}/><strong>{t("单击确认")}</strong><kbd>Enter</kbd></button><div className="swipe-pair"><button disabled={!ready} onClick={()=>act('swipe',{direction:'backward'})}><ArrowLeft size={19}/><span>{t("后滑")}</span></button><button disabled={!ready} onClick={()=>act('swipe',{direction:'forward'})}><ArrowRight size={19}/><span>{t("前滑")}</span></button></div><Button disabled={!ready} icon={RotateCcw} className="full" onClick={()=>act('back')}>{t("返回 ")}<kbd>Backspace</kbd></Button><div className="control-divider"/><p className="control-label">{t("固件事件测试")}</p><button disabled={!ready} className="test-action" onClick={()=>act('swipe',{direction:'forward',repeats:8,intervalMs:60,keyupOnly:true,aliases:true})}><Activity size={15}/><span>{t("一次滑动 · 8 条重复事件")}<small>{t("keyup-only / 方向别名交替")}</small></span><ChevronRight size={14}/></button><button disabled={!ready} className="test-action" onClick={()=>act('swipe',{direction:'forward',repeats:22,intervalMs:70})}><Activity size={15}/><span>{t("长滑事件序列")}<small>{t("持续约 1.5 秒")}</small></span><ChevronRight size={14}/></button><div className="control-note"><HelpCircle size={14}/><p>{t("发送原始事件，检验应用是否正确合并。佩戴手感需在眼镜上确认。")}</p></div></div>}
+    {tab==='input'&&<div className="control-body">
+      <p className="control-label">{t("镜腿触控")}</p>
+      <div className="temple-actions">
+        <button className="temple-tap" disabled={!inputReady} onClick={()=>act('tap')}><MousePointer2 size={23}/><strong>{t("单击确认")}</strong><kbd>Enter</kbd></button>
+        <button className="temple-tap temple-longpress" disabled={!inputReady} aria-busy={pressing} onClick={longpress}><Timer size={23}/><strong>{pressing?t("正在长按…"):t("长按镜腿")}</strong><small>{(durationMs/1000).toFixed(1)}{t(" 秒")}</small></button>
+      </div>
+      <label className="axis-control longpress-duration"><span>{t("长按时长")}<strong>{(durationMs/1000).toFixed(1)}{t(" 秒")}</strong></span><input aria-label={t("长按时长")} type="range" min="0.5" max="5" step="0.1" value={durationMs/1000} disabled={!inputReady} onChange={e=>setDurationMs(Math.round(Number(e.target.value)*1000))}/></label>
+      <p className="subtle">{t("点击按钮模拟长按；也可点击画面后按住 Enter。")}</p>
+      <div className="swipe-pair"><button disabled={!inputReady} onClick={()=>act('swipe',{direction:'backward'})}><ArrowLeft size={19}/><span>{t("后滑")}</span></button><button disabled={!inputReady} onClick={()=>act('swipe',{direction:'forward'})}><ArrowRight size={19}/><span>{t("前滑")}</span></button></div>
+      <Button disabled={!inputReady} icon={RotateCcw} className="full" onClick={()=>act('back')}>{t("返回 ")}<kbd>Backspace</kbd></Button>
+      <div className="control-divider"/><p className="control-label">{t("固件事件测试")}</p>
+      <button disabled={!inputReady} className="test-action" onClick={()=>act('swipe',{direction:'forward',repeats:8,intervalMs:60,keyupOnly:true,aliases:true})}><Activity size={15}/><span>{t("一次滑动 · 8 条重复事件")}<small>{t("keyup-only / 方向别名交替")}</small></span><ChevronRight size={14}/></button>
+      <button disabled={!inputReady} className="test-action" onClick={()=>act('swipe',{direction:'forward',repeats:22,intervalMs:70})}><Activity size={15}/><span>{t("长滑事件序列")}<small>{t("持续约 1.5 秒")}</small></span><ChevronRight size={14}/></button>
+      <div className="control-note"><HelpCircle size={14}/><p>{t("发送原始事件，检验应用是否正确合并。佩戴手感需在眼镜上确认。")}</p></div>
+    </div>}
     {tab==='pose'&&<div className="control-body">
       <label className="switch-row mouse-switch"><span>{t("鼠标模拟 3DoF")}<small>{t("移入画面直接移动，无需按下")}</small></span><input aria-label={t("启用鼠标姿态")} type="checkbox" disabled={!ready} checked={mouse.enabled} onChange={e=>direct('mouse',{enabled:e.target.checked})}/></label>
       <label className="axis-control sensitivity"><span>{t("鼠标灵敏度")}<strong>{mouse.sensitivity.toFixed(2)}° / px</strong></span><input aria-label={t("鼠标灵敏度")} type="range" min="0.05" max="1" step="0.05" value={mouse.sensitivity} disabled={!ready} onChange={e=>direct('mouse',{sensitivity:Number(e.target.value)})}/></label>

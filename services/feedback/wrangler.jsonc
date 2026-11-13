@@ -1,0 +1,28 @@
+{
+  "name": "aiui-workshop-feedback",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-13",
+  "workers_dev": true,
+  "observability": {
+    "enabled": false
+  },
+  "vars": {
+    "ALLOWED_REPOSITORIES": "syjstc/aiui-workbench"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "FEEDBACK_QUEUE",
+        "class_name": "FeedbackQueue"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "FeedbackQueue"
+      ]
+    }
+  ]
+}

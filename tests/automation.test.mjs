@@ -32,6 +32,26 @@ test('simulation validates action-specific arguments before dispatch and publish
   assert.ok(JSON.stringify(schema).length<9000,'AI discovery should not repeat a large schema for each action');
 });
 
+test('longpress is discoverable and bounds the real Enter hold duration',()=>{
+  const parse=parameters=>previewTestSchema.parse({projectId:'p',steps:[{action:'longpress',parameters}]}).steps[0].parameters;
+  assert.deepEqual(parse({}),{durationMs:1500});
+  for(const durationMs of [500,1100,5000])assert.deepEqual(parse({durationMs}),{durationMs});
+  for(const parameters of [{durationMs:499},{durationMs:5001},{durationMs:1000.5},{durationMs:'1500'},{typo:true}])assert.throws(()=>parse(parameters));
+  const definition=TOOL_DEFINITIONS.find(([name])=>name==='aiui_preview_action');
+  assert.equal(z.object(definition[2]).parse({sessionId:'s',action:'longpress'}).action,'longpress');
+});
+
+test('direct longpress rejects invalid parameters before enqueueing any input',async t=>{
+  const {service,project}=await fixture(t),preview=service.previews.open(project.id,'http://127.0.0.1:1');
+  for(const parameters of [{durationMs:0},{durationMs:6000},{durationMs:'1500'},{typo:true}])await assert.rejects(service.call('aiui_preview_action',{sessionId:preview.id,action:'longpress',parameters}));
+  const session=service.previews.get(preview.id);
+  assert.equal(session.queue.length,0);assert.equal(session.pending.size,0);
+  const pending=service.call('aiui_preview_action',{sessionId:preview.id,action:'longpress'});
+  const command=session.queue[0];assert.deepEqual(command.args,{durationMs:1500});
+  service.previews.acknowledge(session,{id:command.id,result:{simulated:true}});
+  assert.deepEqual(await pending,{simulated:true});
+});
+
 test('one wait returns the same job and preserves structured failure diagnostics',async()=>{
   const jobs=new Jobs(()=>{});let finish,runs=0;
   const job=jobs.start('fixture',null,async()=>{runs++;await new Promise(resolve=>{finish=resolve;});throw Object.assign(new Error('check failed'),{result:{diagnostics:['actual failure']}});});

@@ -1,7 +1,7 @@
 {
   "name": "aiui-workbench",
   "productName": "AIUI 工坊",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "main": "electron/main.cjs",
   "description": "Local AIUI desktop workbench, official runtime simulator and MCP tools",
@@ -30,7 +30,9 @@
     "NOTICE.md",
     "THIRD_PARTY_LICENSES.json",
     "docs/automated-development.md",
-    "docs/rokid-discrete-input.md"
+    "docs/aiui-project-lessons.md",
+    "docs/rokid-discrete-input.md",
+    "docs/feedback.md"
   ],
   "scripts": {
     "build": "vite build",
@@ -51,6 +53,7 @@
     "qa:glasses": "npm run build && node scripts/qa-glasses-tools.mjs",
     "qa:logs": "node scripts/qa-logs.mjs",
     "qa:simulator": "node scripts/qa-simulator.mjs",
+    "qa:simulator-ai": "npm run build && node scripts/qa-simulator-ai.mjs",
     "qa:recording": "npm run build && node scripts/qa-recording.mjs",
     "qa:mcp-workflows": "npm run build && node scripts/qa-mcp-workflows.mjs",
     "qa:mcp-stability": "node scripts/qa-mcp-stability.mjs",
@@ -70,7 +73,8 @@
     "qa:screenshots": "npm run build && node scripts/capture-docs.mjs",
     "qa:project-removal": "npm run build && node scripts/qa-project-removal.mjs",
     "qa:github-upgrade": "node scripts/qa-github-upgrade.mjs",
-    "qa:platform": "npm run build && node scripts/qa-platform.mjs"
+    "qa:platform": "npm run build && node scripts/qa-platform.mjs",
+    "qa:feedback": "npm run build && node scripts/qa-feedback.mjs"
   },
   "engines": {
     "node": ">=22.22.0"

@@ -4,6 +4,7 @@ const empty = z.object({}).strict();
 const pose = { yaw:z.number().min(-180).max(180).optional(), pitch:z.number().min(-89).max(89).optional(), roll:z.number().min(-180).max(180).optional() };
 export const previewParameters = {
   tap: empty, back: empty, reload: empty, exit: empty,
+  longpress: z.object({ durationMs: z.number().int().min(500).max(5000).default(1500) }).strict(),
   key: z.object({ code: z.enum(['Enter', 'Backspace', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space']), type: z.enum(['keydown', 'keyup']).default('keyup'), timestamp: z.number().nonnegative().optional() }).strict(),
   swipe: z.object({ direction: z.enum(['forward', 'backward']).default('forward'), repeats: z.number().int().min(1).max(50).default(1), intervalMs: z.number().int().min(10).max(500).default(45), keyupOnly: z.boolean().optional(), aliases: z.boolean().optional() }).strict().refine(p => p.repeats * p.intervalMs <= 8000, 'A swipe burst must be at most 8 seconds'),
   pose: z.object(pose).strict(),
@@ -25,6 +26,7 @@ const expectation = z.object({
 }).strict();
 export const ACTION_HELP = {
   tap:'{}', back:'{}', key:'{code: Enter|Backspace|Escape|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Space, type?: keydown|keyup, timestamp?: ms}',
+  longpress:'{durationMs?: 500..5000, default 1500}; hold Enter, then release once',
   swipe:'{direction?: forward|backward, repeats?: 1..50, intervalMs?: 10..500, keyupOnly?: boolean, aliases?: boolean}; at most 8 seconds',
   pose:'{yaw?: -180..180, pitch?: -89..89, roll?: -180..180} degrees', pose_stream:'{enabled: boolean}',
   pose_motion:'{enabled: boolean, pattern?: yaw|pitch|roll|orbit, amplitude?: 1..60, periodMs?: 1000..20000}', mouse:'{enabled?: boolean, sensitivity?: 0.05..1}',

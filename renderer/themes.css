@@ -71,8 +71,8 @@
   --model-edge: #ecefe9;
   --model-grid: #d8ded2;
   --model-mesh: 104, 145, 118;
-  --model-mesh-alpha: .13;
-  --model-wire: rgb(106 142 106 / 8%);
+  --model-mesh-alpha: .055;
+  --model-wire: rgb(106 142 106 / 16%);
   --model-frame: #41634c;
   --model-lens: rgb(122 206 158 / 22%);
   --model-highlight: #b6d8c1;
@@ -155,8 +155,8 @@
   --model-edge: #202420;
   --model-grid: #3c493c;
   --model-mesh: 150, 188, 157;
-  --model-mesh-alpha: .16;
-  --model-wire: rgb(156 189 156 / 10%);
+  --model-mesh-alpha: .055;
+  --model-wire: rgb(156 189 156 / 20%);
   --model-frame: #a0c3a8;
   --model-lens: rgb(122 206 158 / 15%);
   --model-highlight: #d2e8d9;

@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DesktopNavigation } from '../renderer/desktop-navigation.mjs';
-import { dragPose, updatePose, poseQuaternion, motionPose, NEUTRAL_POSE } from '../shared/pose.mjs';
+import { dragPose, updatePose, poseQuaternion, headQuaternion, rotateHeadVector, motionPose, NEUTRAL_POSE } from '../shared/pose.mjs';
 import { bindMousePose } from '../preview/mouse-pose.mjs';
+import {headScene,rearSkullPoint} from '../renderer/head-scene.mjs';
 
 test('desktop navigation coalesces long swipes, keyup-only aliases, and a held key', () => {
   const nav = new DesktopNavigation();
@@ -47,6 +48,40 @@ test('sensor quaternions are normalized with the Android neutral gravity basis',
   for(const p of [{yaw:180,pitch:89,roll:-180},{yaw:-60,pitch:-45,roll:40}]) {
     assert.ok(Math.abs(Math.hypot(...poseQuaternion(p))-1)<1e-12);
   }
+});
+
+test('wearer right, up and right tilt agree between the head and Android sensor vectors',()=>{
+  const close=(actual,expected)=>actual.forEach((v,i)=>assert.ok(Math.abs(v-expected[i])<1e-10,`${actual} != ${expected}`));
+  // Independent physical landmarks: gaze is device -Z, crown is device +Y.
+  const s=Math.SQRT1_2;
+  for(const [pose,landmark,head,android] of [
+    [{yaw:90,pitch:0,roll:0},[0,0,-1],[1,0,0],[1,0,0]],
+    [{yaw:-90,pitch:0,roll:0},[0,0,-1],[-1,0,0],[-1,0,0]],
+    [{yaw:0,pitch:45,roll:0},[0,0,-1],[0,s,-s],[0,s,s]],
+    [{yaw:0,pitch:-45,roll:0},[0,0,-1],[0,-s,-s],[0,s,-s]],
+    [{yaw:0,pitch:0,roll:45},[0,1,0],[s,s,0],[s,0,s]],
+    [{yaw:0,pitch:0,roll:-45},[0,1,0],[-s,s,0],[-s,0,s]],
+  ]){close(rotateHeadVector(landmark,headQuaternion(pose)),head);close(rotateHeadVector(landmark,poseQuaternion(pose)),android);}
+  const gaze=rotateHeadVector([0,0,-1],headQuaternion({yaw:30,pitch:30,roll:25}));
+  close(gaze,[Math.sqrt(3)/4,.5,-.75]);
+  const worldGaze=rotateHeadVector([0,0,-1],poseQuaternion({yaw:30,pitch:30,roll:25}));close(worldGaze,[Math.sqrt(3)/4,.75,.5]);
+});
+
+test('the neutral rear view places lenses behind the skull and rear temples in front',()=>{
+  const rear=headScene(NEUTRAL_POSE);
+  assert.equal(rear.fromRear,true);
+  assert.equal(rear.occluded([.4,.35,-.7]),true);
+  assert.equal(rear.occluded([-.4,.35,-.7]),true);
+  assert.equal(rear.occluded([0,.43,-.78]),true);
+  assert.equal(rear.occluded([.89,.12,.38]),false);
+  assert.equal(rear.occluded([-.89,.12,.38]),false);
+  const forward=rear.direction([0,0,-1]);assert.deepEqual(forward,[0,0,-1],'Neutral gaze points directly away without camera yaw or tilt');
+  assert.equal(rear.transform([0,.35,-1])[1],0,'Far eye-height points stay on the horizon');
+  assert.equal(rear.transform([0,.35,1])[1],0,'Near eye-height points stay on the same horizon');
+  assert.ok(headScene({yaw:30,pitch:0,roll:0}).direction([0,0,-1])[0]>0,'Wearer right remains screen right');
+  assert.equal(headScene({yaw:180,pitch:0,roll:0}).occluded([.4,.35,-.7]),false,'Lenses face the observer only after the wearer turns around');
+  const front=headScene({yaw:180,pitch:0,roll:0});assert.equal(front.fromRear,false);
+  const crown=rearSkullPoint(-.16,1.08);assert.equal(rear.occluded(crown),false);assert.equal(front.occluded(crown),true,'Posterior crown detail cannot become a frontal-face feature');
 });
 
 test('automatic motion starts at the current pose and respects amplitude and period', () => {
