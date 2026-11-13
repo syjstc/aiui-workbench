@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {isIP} from 'node:net';
 import { spawn } from 'node:child_process';
 import { ROOT, atomicJson, readJson, run, normalizeEnvironment } from './util.mjs';
 
@@ -46,6 +47,14 @@ export class AdbTools {
     return { configured: true };
   }
   async execute(args, options) { return run(await this.resolve(), args, { env: this.env, ...options }); }
+  async connect({address,pairingCode}) {
+    const match=typeof address==='string'&&address.match(/^(\[[a-f\d:]+\]|[\d.]+):(\d{1,5})$/i);
+    if(!match||!isIP(match[1].replace(/^\[|\]$/g,''))||Number(match[2])<1||Number(match[2])>65535)throw new Error('请输入眼镜显示的 IP:端口，例如 192.168.1.20:5555');
+    if(pairingCode!==undefined&&!/^\d{6}$/.test(pairingCode))throw new Error('请输入眼镜显示的六位配对码');
+    const result=await this.execute(pairingCode?['pair',address,pairingCode]:['connect',address],{timeout:15000});
+    if(result.code||/failed|unable|cannot|error/i.test(result.output))throw new Error('无线 ADB 连接失败：'+result.output);
+    return {address,paired:pairingCode!==undefined,output:result.output};
+  }
   // Keep stdout separate and byte-for-byte intact for screenshots, NUL-delimited
   // filenames and log exports. The ordinary CLI runner redacts/truncates text.
   async capture(args, { signal, timeout = 30000, maxBytes = 8 * 1024 * 1024, onOutput } = {}) {

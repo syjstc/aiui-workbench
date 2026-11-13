@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { connect } from '../core/client.mjs';
 import { APP_VERSION } from '../core/version.mjs';
 import { readJson, sleep } from '../core/util.mjs';
+import {installMcpLauncher} from '../core/mcp-launcher.mjs';
 
 async function previousService(t, version, mode = 'idle') {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-handover-'));
@@ -41,4 +42,12 @@ test('an active desktop heartbeat prevents version handover', async t => {
 test('same versions reuse the daemon, and a newer daemon is never downgraded', async t => {
   const current = await previousService(t, APP_VERSION); assert.equal((await connect(current.home)).connection.pid, current.child.pid);
   const newer = await previousService(t, '99.0.0'); await assert.rejects(connect(newer.home), /同版本或更新版本/); assert.equal(newer.child.exitCode, null);
+});
+test('MCP automatically hands an idle old daemon to the registered new installation',async t=>{
+  const {home,child}=await previousService(t,'0.1.0');await installMcpLauncher(home);
+  const client=await connect(home,{requireCurrentVersion:false});assert.equal(client.connection.version,APP_VERSION);assert.notEqual(client.connection.pid,child.pid);assert.equal((await client.catalog()).tools.some(tool=>tool.name==='aiui_workflow_start'),true);
+});
+test('automatic MCP upgrade waits for active work without terminating the old service',async t=>{
+  const {home,child}=await previousService(t,'0.1.0','job');await installMcpLauncher(home);
+  const client=await connect(home,{requireCurrentVersion:false});assert.equal(client.connection.pid,child.pid);assert.equal((await client.call('aiui_status')).version,'0.1.0');assert.equal(child.exitCode,null);
 });

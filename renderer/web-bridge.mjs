@@ -2,7 +2,7 @@ import { t } from './i18n.jsx';
 async function request(route, data) {
   const response = await fetch('/api/' + route, data === undefined ? { credentials: 'same-origin' } : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   const result = await response.json();
-  if (!response.ok || result.error) throw new Error(result.error || `HTTP ${response.status}`);
+  if (!response.ok || result.error) throw Object.assign(new Error(result.error || `HTTP ${response.status}`),{diagnosticId:result.diagnosticId});
   return result.result;
 }
 

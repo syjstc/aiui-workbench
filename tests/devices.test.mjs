@@ -106,7 +106,7 @@ test('bundled ADB works with an empty PATH and no user SDK, including CLI subpro
   assert.equal(result.code, 0);
   assert.match(result.output, /Android Debug Bridge version/);
   assert.match(result.output, /37\.0\.1/);
-  const child = await run(process.execPath, ['--input-type=module', '-e', "import {spawnSync} from 'node:child_process';const r=spawnSync('adb',['version'],{encoding:'utf8'});process.stdout.write(r.stdout||'');process.exit(r.status??1)"], { env: await adb.environment() });
+  const child = await run(process.execPath, ['--input-type=module', '-e', "import {spawnSync} from 'node:child_process';const r=spawnSync('adb',['version'],{encoding:'utf8'});process.stdout.write(r.stdout||'');process.exit(r.status??1)"], { env: {...await adb.environment(),...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{})} });
   assert.equal(child.code, 0, child.output);
   assert.match(child.output, /37\.0\.1/);
 });

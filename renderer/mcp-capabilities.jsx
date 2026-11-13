@@ -14,7 +14,7 @@ export function McpCapabilities({ project, notify }) {
   async function copy(capability) { try { await window.workbench.copy(request(capability)); notify(t('能力调用示例已复制')); } catch(error) { notify(error.message,true); } }
   return <section className="mcp-capabilities" aria-label={t('连接后，AI 可以做什么')}>
     <div className="section-heading"><h2>{t('连接后，AI 可以做什么')}</h2></div>
-    <p className="muted-copy">{t('把运行、等待与结果核对交给工坊。AI 继续使用自己的编码工具修改同一份源码。')}</p>
+    <p className="muted-copy">{t('把运行、等待与结果核对交给工坊。AI 可以直接通过 MCP 修改同一份源码，也可使用自己的编码工具。')}</p>
     {!catalog?<p className="subtle">{t('正在读取能力…')}</p>:<div className="mcp-capability-grid">{catalog.capabilities.map(capability=><article className={'panel mcp-capability '+(capability.status==='manual'?'manual':'')} key={capability.id} data-capability-id={capability.id}>
       <div className="section-heading"><h3>{t(capability.title)}</h3><span className={'pill '+(capability.status==='available'?'success':'')}>{capability.status==='available'?<CheckCircle2 size={12}/>:<Hand size={12}/>} {capability.status==='available'?t('可调用'):t('需手动完成')}</span></div>
       <p>{t(capability.description)}</p>

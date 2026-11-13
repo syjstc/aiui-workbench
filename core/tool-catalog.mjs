@@ -1,8 +1,23 @@
 import { z } from 'zod';
 import { TOOL_DEFINITIONS } from './tool-definitions.mjs';
 import { APP_VERSION } from './version.mjs';
+import {DEVELOPMENT_GUIDE} from './development-flow.mjs';
 
-export const MCP_INSTRUCTIONS = '先调用 aiui_context_get 获取官方 Skill、能力清单和示例。工具和参数以当前服务返回的 tools/list 为准，不要求 MCP 入口与工坊版本相同。优先 aiui_preview_test 一次执行模拟与截图/断言/日志报告，aiui_project_build 一次完成检查与打包；仅 status=running 时调用 aiui_job_wait。需要视频时用 aiui_preview_test 的 record=true 或 aiui_record_clip。源码用现有编码工具编辑。项目传 projectId，逐步预览传 sessionId。模拟、真机、平台发布分别验收。用 aiui_platform_upload 上传草稿，aiui_platform_review_prepare 上传并保存提审资料；aiui_platform_review_request 只请求用户在工坊确认，不能自动提审或发布。';
+export function instructionsForTools(names){
+  const has=name=>names.includes(name),lines=['工具和参数以当前运行服务的 tools/list 为准；runtime 和 CLI 版本不代表工坊服务版本。只调用当前清单中存在的方法。'];
+  if(has('aiui_context_get'))lines.push('先调用 aiui_context_get，一次读取官方 aiui-dev 和工坊补充流程；官方 Skill 负责开发规范与验收要求。首次引导使用 setup=true，一次检查并补齐缺失 Skill 和环境；不要重复安装或覆盖用户修改。已有返回的上下文和成功证据不必重复读取。');
+  if(has('aiui_workflow_start')&&has('aiui_workflow_continue'))lines.push(DEVELOPMENT_GUIDE);
+  else{
+    if(has('aiui_project_create'))lines.push('需要新项目时使用 aiui_project_create，再用自己的编码工具按官方规范修改真实源码；已有项目继续使用原 projectId。');
+    if(has('aiui_preview_test'))lines.push('使用 aiui_preview_test 一次模拟交互、行为断言、截图和日志报告。');
+    if(has('aiui_project_build'))lines.push('使用 aiui_project_build 一次检查并打包。');
+    if(has('aiui_job_wait'))lines.push('仅任务 status=running 时调用 aiui_job_wait。');
+    lines.push('失败时读取当前工具返回的错误和恢复步骤，说明需要用户完成的操作后继续同一项目。');
+  }
+  lines.push('遵循用户授权范围，模拟、真机、佩戴和平台发布分别验收；正式提审由用户在工坊确认。');
+  return lines.join('\n\n');
+}
+export const MCP_INSTRUCTIONS=instructionsForTools(TOOL_DEFINITIONS.map(([name])=>name));
 
 export function toolCatalog() {
   return {
@@ -23,5 +38,9 @@ export function legacyToolCatalog(serviceVersion, capabilities) {
   const actions = capabilities?.simulation?.inputs;
   const preview = tools.find(tool => tool.name === 'aiui_preview_action');
   if (preview && Array.isArray(actions)) preview.inputSchema.properties.action.enum = actions;
-  return { schemaVersion: 1, serviceVersion, discovery: 'legacy-capabilities', instructions: MCP_INSTRUCTIONS, tools };
+  // Legacy context schemas do not support setup=true. Keep guidance within the
+  // capabilities actually attested by that service, including its parameters.
+  const instructions=instructionsForTools(tools.map(tool=>tool.name)).replace('首次引导使用 setup=true，一次检查并补齐缺失 Skill 和环境；不要重复安装或覆盖用户修改。','');
+  const context=tools.find(tool=>tool.name==='aiui_context_get');if(context){delete context.inputSchema.properties.setup;delete context.inputSchema.properties.existingSkills;}
+  return { schemaVersion: 1, serviceVersion, discovery: 'legacy-capabilities', instructions, tools };
 }

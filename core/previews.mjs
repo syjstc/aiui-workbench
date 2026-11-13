@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { id, redact, sha } from './util.mjs';
+import {PreviewStorage} from './preview-storage.mjs';
 
 export class Previews {
-  constructor(projects, home, emit) { this.projects = projects; this.home = home; this.emit = emit; this.sessions = new Map(); }
+  constructor(projects, home, emit) { this.projects = projects; this.home = home; this.emit = emit; this.sessions = new Map(); this.storage=new PreviewStorage(home); }
   list() { return [...this.sessions.values()].map(s => this.public(s)); }
   public(s) {
     const { key, pending, queue, fixture, logs, testLock, ...result } = s;
@@ -62,7 +63,7 @@ export class Previews {
     clearTimeout(pending.timer); s.pending.delete(body.id);
     if (body.error) pending.reject(new Error(redact(body.error))); else pending.resolve(pending.observe?{value:body.result,startedAt:body.startedAt,runId:body.runId}:body.result);
   }
-  update(s, body) { s.status = body.status || s.status; s.state = body.state || s.state; s.lastSeen = new Date().toISOString(); if (body.revision) s.revision = body.revision; this.emit('preview', this.public(s)); }
+  update(s, body) { s.status = body.status || s.status; s.state = body.state || s.state; s.lastSeen = new Date().toISOString(); if(s.status==='ready'&&s.state.running)s.readyAt=Date.now(); if(s.status==='failed')s.failedAt=Date.now(); if (body.revision) s.revision = body.revision; this.emit('preview', this.public(s)); }
   async capture(sessionId, options) {
     const result = await this.action(sessionId, 'capture', {}, options), s = this.get(sessionId);
     if (!result.dataUrl?.startsWith('data:image/png;base64,')) throw new Error('预览未返回有效截图');
@@ -74,5 +75,5 @@ export class Previews {
   }
   reload(projectId) { for (const s of this.sessions.values()) if (s.projectId === projectId && s.status !== 'closed') { s.status = 'loading'; if(!s.queue.some(c=>c.action==='reload'))s.queue.push({ id: id(), action: 'reload', args: {} }); } }
   removeProject(projectId) { for (const session of this.sessions.values()) if (session.projectId === projectId) { for (const pending of [...session.pending.values()]) pending.reject(new Error('项目已解绑')); session.queue = []; this.sessions.delete(session.id); } }
-  close() { for (const s of this.sessions.values()) for (const p of s.pending.values()) { clearTimeout(p.timer); p.reject(new Error('预览已关闭')); } this.sessions.clear(); }
+  async close() { for (const s of this.sessions.values()) for (const p of s.pending.values()) { clearTimeout(p.timer); p.reject(new Error('预览已关闭')); } this.sessions.clear(); await this.storage.close(); }
 }

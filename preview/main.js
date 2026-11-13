@@ -3,6 +3,7 @@ import { DEFAULT_MOUSE, DEFAULT_MOTION, NEUTRAL_POSE, motionPose, poseQuaternion
 import { bindMousePose } from './mouse-pose.mjs';
 import { SimulatorCamera } from './camera.mjs';
 import mediaRuntime from './media-runtime.js?raw';
+import storageRuntime from './storage-runtime.js?raw';
 import imageCodecRuntime from './image-codec.js?raw';
 import fflateRuntime from '../node_modules/fflate/esm/browser.js?raw';
 import { CanvasRecording } from './recording.mjs';
@@ -13,6 +14,9 @@ const canvas = document.querySelector('#screen'), notice = document.querySelecto
 let view, current, dead = false, reloading = false, currentStatus = 'loading', logEntries = [], logGeneration = null, pendingCommands = Promise.resolve(), logFlush = Promise.resolve(), runId = crypto.randomUUID();
 let pose = { ...NEUTRAL_POSE, connected: true }, mouse = { ...DEFAULT_MOUSE, dragging:false }, battery = { level:.85, charging:false, chargingTime:0, dischargingTime:28800 };
 let poseFrame = 0, posePublishTimer = 0, publishQueue = Promise.resolve(), commandActive = false;
+let storageQueue = Promise.resolve(), storageError = null;
+const storagePending=[];
+async function flushStorage(){while(storagePending.length){await request('storage',storagePending[0]);storagePending.shift();}storageError=null;}
 let motion = { ...DEFAULT_MOTION }, motionOrigin = { ...pose }, motionStart = 0;
 let networkOnline = true, focused = true, target = '_blank';
 const sensorSessions = new Map(), batterySessions = new Map(), readings = { orientation:0, photos:0 };
@@ -32,7 +36,7 @@ for(const level of ['log','info','warn','error','debug']) {
 window.addEventListener('error',e=>console.error('RUNTIME_ERROR',e.message));
 window.addEventListener('unhandledrejection',e=>console.error('UNHANDLED_REJECTION',String(e.reason?.stack||e.reason)));
 function flushLogs() { logFlush=logFlush.catch(()=>{}).then(async()=>{while(logEntries.length){const entries=logEntries.splice(0,80);try{await request('log',{entries});}catch(error){logEntries=[...entries,...logEntries].slice(-500);throw error;}}});return logFlush; }
-function state() { return { runId, running:view?.isRunning()||false, rendering:view?.isRendering()||false, inputEnabled:view?.isInputEnabled()||false, recording:recording.state(), focused, target, network:{online:networkOnline}, pose:{...pose}, mouse:{...mouse}, motion:{...motion}, sensorSessions:sensorSessions.size, readings:{...readings}, camera:camera.state(), battery, sdkVersion:current?.session?.webSdkVersion, runtime:view?getInkVersion():null, bundleVersion:view?getInkBundleVersion():null, sourceUnmodified:true, runtimePolyfills:{imageEncoding:'image/png',imageCapturePhoto:'preview-frame'}, capabilities:{temple:'simulated',orientation:'simulated',camera:camera.source==='webcam'?'computer-camera':'photo-fixture-stream',battery:'simulated',bluetooth:'unsupported',languageModel:'not-configured',network:'status-events-only'} }; }
+function state() { return { runId, running:view?.isRunning()||false, rendering:view?.isRendering()||false, inputEnabled:view?.isInputEnabled()||false, recording:recording.state(), focused, target, network:{online:networkOnline}, pose:{...pose}, mouse:{...mouse}, motion:{...motion}, sensorSessions:sensorSessions.size, readings:{...readings}, camera:camera.state(), battery, sdkVersion:current?.session?.webSdkVersion, runtime:view?getInkVersion():null, bundleVersion:view?getInkBundleVersion():null, sourceUnmodified:true, runtimePolyfills:{imageEncoding:'image/png',imageCapturePhoto:'preview-frame',storage:'project-persistent-simulation'}, capabilities:{temple:'simulated',orientation:'simulated',camera:camera.source==='webcam'?'computer-camera':'photo-fixture-stream',battery:'simulated',bluetooth:'unsupported',languageModel:'not-configured',network:'status-events-only'} }; }
 function notifyParent(allowClosed=false) { if(window.parent!==window&&!(currentStatus==='closed'&&(!allowClosed||commandActive)))window.parent.postMessage({channel:'aiui-preview-state',sessionId,status:currentStatus,state:state()},'*'); }
 function publish(status=currentStatus) {
   notifyParent();
@@ -82,6 +86,7 @@ function capabilities() {
   };
 }
 async function load() {
+  await storageQueue; await flushStorage();
   await recording.stop('source-reloaded');
   reloading=true;currentStatus='loading';notice.hidden=false;notice.textContent='正在加载官方运行时…';
   motion.enabled=false;mouseInput.cancel();camera.stopAll();sensorSessions.clear();batterySessions.clear();if(view){view.setOnClosed(()=>{});view.destroy();view=null;}
@@ -99,16 +104,22 @@ async function load() {
   console.info('INK_RUNTIME_VERSION',JSON.stringify({sdk:session.webSdkVersion,engine:getInkVersion(),bundle:getInkBundleVersion()}));
   if(!satisfiesInkEngine(project.engine))throw new Error(`项目要求 ${project.engine}，当前引擎为 ${getInkVersion()}（Web SDK ${session.webSdkVersion}）`);
   view.setHostCapabilities(capabilities());
-  view.setOnMessage(message=>console.info('APP_MESSAGE',JSON.stringify(message)));
+  view.setOnMessage(message=>{
+    if(message.data?.channel==='aiui-preview-storage'){
+      storagePending.push(message.data.change);storageQueue=storageQueue.catch(()=>{}).then(flushStorage).catch(error=>{storageError=error;console.error('SIMULATOR_STORAGE_ERROR',error.message);});
+    }else console.info('APP_MESSAGE',JSON.stringify(message));
+  });
   view.setOnClosed(async()=>{currentStatus='closing';await recording.stop('application-closed').catch(console.error);currentStatus='closed';motion.enabled=false;mouseInput.cancel();camera.stopAll();sensorSessions.clear();batterySessions.clear();console.info('APP_CLOSED');publish().catch(()=>{});});
   const files=new Map(current.files.map(f=>[f.path,Uint8Array.from(atob(f.base64),c=>c.charCodeAt(0))]));
   const polyfillRoot='__aiui_workbench_media__', encode=new TextEncoder();
-  for(const file of ['media-runtime.js','image-codec.js','fflate.js'])if(files.has(`${polyfillRoot}/${file}`))throw new Error('项目占用了模拟器媒体适配目录');
+  for(const file of ['media-runtime.js','image-codec.js','fflate.js','storage-runtime.js','storage-init.js'])if(files.has(`${polyfillRoot}/${file}`))throw new Error('项目占用了模拟器媒体适配目录');
   files.set(`${polyfillRoot}/media-runtime.js`,encode.encode(mediaRuntime));
   files.set(`${polyfillRoot}/image-codec.js`,encode.encode(imageCodecRuntime.replace("from 'fflate'", "from './fflate.js'")));
   files.set(`${polyfillRoot}/fflate.js`,encode.encode(fflateRuntime));
+  files.set(`${polyfillRoot}/storage-runtime.js`,encode.encode(storageRuntime));
+  files.set(`${polyfillRoot}/storage-init.js`,encode.encode(`import wx from 'wx';import {installPreviewStorage} from './storage-runtime.js';installPreviewStorage(wx,${JSON.stringify(current.storage||[])},change=>getApp().postMessage({channel:'aiui-preview-storage',change}));console.info('WORKBENCH_STORAGE_ADAPTER','project-persistent; simulated');`));
   const originalApp=files.has('app.js')?new TextDecoder().decode(files.get('app.js')):'export default {};';
-  files.set('app.js',encode.encode(`import './${polyfillRoot}/media-runtime.js';\n`+originalApp));
+  files.set('app.js',encode.encode(`import './${polyfillRoot}/media-runtime.js';\nimport './${polyfillRoot}/storage-init.js';\n`+originalApp));
   view.openBundle({appId:'workbench.'+project.id,files,initialPage:session.page,hostOptions:{initialTarget:session.target,initialFocus:'focus'}});
   target=session.target;focused=true;view.setTarget(target);view.focus();view.bindDomEvents({canvas});view.startRendering();
   if(!networkOnline)view.dispatchConnectivityEvent('offline');
@@ -166,7 +177,7 @@ async function execute(action,args={}) {
   }
   await publish();return state();
 }
-async function poll(){while(!dead){try{const value=await request('poll');if(value.logGeneration!==logGeneration){logEntries=logEntries.filter(entry=>entry.createdAt>value.logsClearedAt);logGeneration=value.logGeneration;}for(const c of value.commands)pendingCommands=pendingCommands.then(async()=>{commandActive=true;try{await flushLogs();const startedAt=performance.timeOrigin+performance.now(),startedRunId=runId;const result=await execute(c.action,c.args);await flushLogs();await request('ack',{id:c.id,result,startedAt,runId:startedRunId});}catch(e){console.error(e);await flushLogs().catch(()=>{});await request('ack',{id:c.id,error:e.message});}finally{commandActive=false;notifyParent(true);}});}catch(e){if(!dead)notice.textContent='本地服务连接中断';}await wait(90);}}
+async function poll(){while(!dead){try{const value=await request('poll');if(value.logGeneration!==logGeneration){logEntries=logEntries.filter(entry=>entry.createdAt>value.logsClearedAt);logGeneration=value.logGeneration;}for(const c of value.commands)pendingCommands=pendingCommands.then(async()=>{commandActive=true;try{await flushLogs();const startedAt=performance.timeOrigin+performance.now(),startedRunId=runId;const result=await execute(c.action,c.args);await storageQueue;if(storageError)throw storageError;await flushLogs();await request('ack',{id:c.id,result,startedAt,runId:startedRunId});}catch(e){console.error(e);await flushLogs().catch(()=>{});await request('ack',{id:c.id,error:e.message});}finally{commandActive=false;notifyParent(true);}});}catch(e){if(!dead)notice.textContent='本地服务连接中断';}await wait(90);}}
 setInterval(()=>flushLogs().catch(()=>{}),250);
 setInterval(()=>{if(view&&!reloading)publish().catch(()=>{});},1000);
 window.addEventListener('beforeunload',()=>{dead=true;clearInterval(timer);clearTimeout(posePublishTimer);cancelAnimationFrame(poseFrame);mouseInput.destroy();camera.destroy();sensorSessions.clear();view?.destroy();});

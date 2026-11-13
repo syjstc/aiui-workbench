@@ -10,7 +10,7 @@
 
 ## 下载与安装
 
-当前版本 **0.5.8**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest) 下载安装包及 `SHA256SUMS.txt`。
+当前版本 **0.6.0**。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.0) 下载安装包及 `SHA256SUMS.txt`。
 
 | 平台 | 安装方式 | 签名 |
 | --- | --- | --- |
@@ -20,6 +20,12 @@
 客户端自带运行时、npm、官方 CLI、ADB 和 scrcpy，无需安装 Node.js、Android Studio 或另配 PATH。Windows 未签名包可能显示系统信誉提示，请先核对下载来源和 SHA256。当前没有 Intel Mac、Windows ARM64 或 Linux 的正式下载包。
 
 **维护者目前没有 Windows 实体机器，尚未完成完整的 Windows 实机体验验证。** 自动检查与结构验收不能代表每个环境都能完美运行，欢迎协助测试并反馈问题。
+
+## AI 自动制作
+
+在已连接工坊的 AI 工具里描述应用需求。AI 可自动准备项目、编辑源码、运行交互验证、打包，并在眼镜就绪后安装和启动。卡住时返回具体操作步骤，完成后从原任务继续；桌面以“我的项目”为入口，每个项目集中展示预览、可选的想法与 AI 指令、完整流程和记录。详见 [自动制作与故障恢复](docs/automated-development.md)。
+
+![Hello AIUI 项目页：真实预览、想法输入和预置 AI 指令](docs/screenshots/project-zh.png)
 
 ## 可以做什么
 
@@ -41,10 +47,10 @@
 
 ## 第一次使用
 
-1. 打开客户端，导入本仓库的 [`examples/hello-aiui`](examples/hello-aiui) 或新建一个 Page 项目。
-2. 点击项目卡片运行。使用方向键或“交互”面板前后滑动，Enter 确认，Backspace 返回。
-3. 打开“连接 AI 工具”，复制客户端生成的 MCP 配置到你的 AI 工具。无需手动拼接运行时路径。
-4. 在“构建与上传”中检查、打包；连接眼镜时，按“新手指南”准备对应机型的数据调试线，并在手机 Rokid AI App 中开启眼镜 ADB 调试。
+1. 首次打开进入“连接 AI 工具”。可填写想法，点击“复制给 AI”，粘贴到你常用的 AI 工具；AI 准备连接、开发指引和环境。成功读取工坊后，界面自动确认。
+2. 告诉 AI 要做什么；生成的应用出现在“我的项目”。也可导入本仓库的 [`examples/hello-aiui`](examples/hello-aiui) 或新建 Page。
+3. 打开项目查看实时预览，用想法框或继续完善、检查修复、验证打包等预置指令接着制作。需要姿态、相机或重复滑动控制时，点击“打开完整模拟器”。
+4. 让 AI 验证、打包；准备好安装时，按“新手指南 → 装到眼镜”开启调试，用专用线或支持的无线方式连接，再继续原任务。
 
 完整步骤见 [图文使用指南](docs/getting-started.md)。公开示例包括 [菜单与离散输入](examples/hello-aiui) 和 [姿态传感器](examples/motion-lab)。
 
@@ -88,14 +94,14 @@ Web 仅监听 `127.0.0.1`。npm 包暂未发布，请使用源码命令或桌面
 
 ## 连接 AI 工具
 
-在客户端中复制生成的 stdio MCP 配置，工坊会维护稳定启动入口。推荐工作流：
+在“连接 AI 工具”复制完整指令，工坊会维护稳定启动入口；手动 stdio MCP 配置收在高级选项中。推荐工作流：
 
 ```text
-aiui_context_get → 创建或导入项目 → AI 编辑本地源码
-→ aiui_preview_test → aiui_project_build
+aiui_context_get({setup:true}) → aiui_workflow_start
+→ AI 编辑项目源码 → aiui_workflow_continue
 ```
 
-`aiui_preview_test` 一次返回交互回放、行为断言、PNG 和日志；`aiui_project_build` 完成官方静态检查、AIX 和 SHA256。只有返回 `status: running` 时才继续 `aiui_job_wait`。详见 [工具工作流、CLI 和示例参数](docs/ai-tool-workflows.md)。
+`aiui_workflow_continue` 合并交互验证、打包和可选真机安装；卡住时读取恢复步骤，继续同一个 workflowId。源码可用 MCP 的 `aiui_project_files` 读写，诊断会随 AI 工具响应按项目附带，已读与已修复分别记录。`aiui_preview_test`、`aiui_project_build` 等单项工具继续保留。只有返回 `status: running` 时才使用 `aiui_job_wait`。详见 [自动制作与恢复](docs/automated-development.md) 和 [工具参数](docs/ai-tool-workflows.md)。
 
 ## 数据与能力边界
 
@@ -110,6 +116,7 @@ aiui_context_get → 创建或导入项目 → AI 编辑本地源码
 ## 文档与开发
 
 - [图文使用指南](docs/getting-started.md)
+- [一句需求自动制作与故障恢复](docs/automated-development.md)
 - [AI / MCP / CLI 工作流](docs/ai-tool-workflows.md)
 - [官方平台草稿上传与提审](docs/platform-uploads.md)
 - [官方资料库与离线配图](docs/document-library.md)

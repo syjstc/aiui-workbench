@@ -94,7 +94,7 @@ export class Projects {
     // active; initial events are ignored and can coalesce with an atomic save.
     watcher.on('ready', refresh);
     watcher.on('all', refresh);
-    watcher.on('error', error => this.emit('log', { level: 'error', message: error.message }));
+    watcher.on('error', error => this.emit('log', { level: 'error', message: error.message, projectId: p.id, revision: p.revision }));
     this.watchers.set(p.id, { watcher, close: () => { clearTimeout(timer); return watcher.close(); } });
   }
   async bundle(projectId) {
@@ -111,7 +111,11 @@ export class Projects {
     await atomicJson(path.join(target, 'app.json'), { name, agentName: name, version: '0.1.0', engine: '>=0.18.0', pages: ['pages/index/index'], permissions: [], window: { navigationBarTitleText: '', backgroundColor: '#000000' } });
     const cli = { command: process.execPath, args: [path.join(ROOT,'web/cli.mjs')], env: { AIUI_WORKBENCH_HOME:this.home, ...(process.versions.electron?{ELECTRON_RUN_AS_NODE:'1'}:{}) } };
     await fs.writeFile(path.join(target, 'AGENTS.md'), t('# {0}\n\n使用 MCP 工具 aiui_context_get 获取本项目版本对应的官方开发规范。\n开发全屏交互 Page；模拟通过、真机通过与平台发布分别验收。\n', { 0: name }, locale) + t('\n优先使用 aiui_preview_test 一次模拟并返回断言、截图和日志；通过后使用 aiui_project_build 检查并打包。\n没有 MCP 时，使用以下工坊 CLI 入口，保留 env 以共享桌面项目、模拟日志和任务。\n在 args 后追加 tools 查看能力，或追加 call、工具名、--args-file、参数文件路径执行；参数文件仅包含工具参数 JSON。\n直接调用独立 aix 的终端日志不会同步。\n\n```json\n{0}\n```\n', {0:JSON.stringify(cli,null,2)}, locale));
-    await fs.writeFile(path.join(target, '.aixignore'), '.aiui-workbench.json\n.mcp.json\n.mcp.json.backup-*\nAGENTS.md\nnode_modules/\n');
+    await fs.mkdir(path.join(target,'lib'),{recursive:true});
+    await fs.copyFile(path.join(ROOT,'assets/templates/temple-navigation.js'),path.join(target,'lib/temple-navigation.js'));
+    const inputRules=locale==='en'?'\n## Temple input\nUse lib/temple-navigation.js for discrete menus and paging. One physical swipe performs at most one action. Normalize direction aliases and coalesce repeats, including keyup-only firmware. Repeats refresh the quiet window; do not use a fixed cooldown. Clear input on hide/unload/card transitions and consume only owned keys. Canvas rendering must exclude synchronous blocking time with excludeBlockedTime(). Test long swipes, duplicate aliases, a second swipe after a pause, reverse, paging and back. Simulator success does not establish worn gesture acceptance.\n':'\n## 镜腿离散输入\n菜单和翻页使用 lib/temple-navigation.js。一次物理滑动最多执行一次离散操作。归一方向别名、合并重复事件，兼容 keyup-only 固件。重复事件持续刷新静默窗口，不使用固定周期防抖；页面隐藏、销毁或切换卡片时清理，消费接管的按键。Canvas 同步绘制应调用 excludeBlockedTime() 扣除阻塞时间。至少测试长滑、重复别名、停顿后第二滑、反向、翻页与返回。模拟通过不代表佩戴手势已验收。\n';
+    await fs.appendFile(path.join(target,'AGENTS.md'),inputRules);
+    await fs.writeFile(path.join(target, '.aixignore'), '.aiui-workbench.json\n.mcp.json\n.mcp.json.backup-*\nAGENTS.md\nnode_modules/\n.agents/\n.claude/\n.cursor/\n.codex/\n');
     const toolchain = this.getToolchain?.();
     await atomicJson(path.join(target, '.aiui-workbench.json'), { version: 1, knowledgeRevision: source.revision, runtime: toolchain?.runtime, webSdkVersion: toolchain?.versions.ink, template: source.path });
     const p = await this.import(target);

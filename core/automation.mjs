@@ -15,7 +15,7 @@ export function assertions(expect = {}, state, logs) {
 
 export class Automation {
   constructor(workbench) { this.workbench = workbench; this.activeTests = new Set(); }
-  async test(args, actor) {
+  async test(args, actor, metadata = {}) {
     const options = previewTestSchema.parse(args), w = this.workbench;
     const project = await w.projects.refresh(options.projectId);
     const preview = w.previews.open(project.id, w.origin, { ...options, requestedBy: actor });
@@ -25,7 +25,7 @@ export class Automation {
     const job = w.jobs.start('preview-test', project.id, async context => {
       try { return await this.testNow(options, preview.id, revision, toolchainId, context); }
       finally { this.activeTests.delete(preview.id); }
-    });
+    }, { ...metadata, sessionId: preview.id });
     return w.jobs.wait(job.id, options.waitMs);
   }
   async ready(sessionId, revision, { signal, progress }) {
@@ -34,8 +34,8 @@ export class Automation {
     while (Date.now() < end) {
       signal.throwIfAborted();
       const s = w.previews.public(w.previews.get(sessionId));
-      if (s.status === 'ready' && s.state.running && s.revision === revision && !s.stale) return s;
-      if (s.status === 'failed') throw new Error('官方运行时加载失败：' + w.previews.get(sessionId).logs.filter(l=>l.level==='error').slice(-2).map(l=>l.message).join('\n'));
+      if (s.status === 'ready' && s.state.running && s.revision === revision && !s.stale && s.readyAt > s.requestedAt) return s;
+      if (s.status === 'failed' && s.failedAt > s.requestedAt) throw new Error('官方运行时加载失败：' + w.previews.get(sessionId).logs.filter(l=>l.level==='error').slice(-2).map(l=>l.message).join('\n'));
       // The desktop/Web UI normally mounts the requested preview. A tool-only
       // client can use a regular local browser, with no automation dependency.
       if (!opened && ![...w.clients.values()].some(c => ['desktop','web'].includes(c.name) && Date.now()-c.lastSeen < 5000)) {

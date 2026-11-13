@@ -10,7 +10,7 @@ A local workbench for Rokid AIUI development. Manage projects, read official doc
 
 ## Download
 
-Current version: **0.5.8**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/latest).
+Current version: **0.6.0**. Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.0).
 
 | Platform | Install | Signing |
 | --- | --- | --- |
@@ -18,6 +18,12 @@ Current version: **0.5.8**. Download packages and `SHA256SUMS.txt` from [GitHub 
 | Windows 10 / 11, x64 | Extract the entire `win32-x64.zip`, launch `AIUI Workshop.exe` | Unsigned |
 
 The app includes Electron/Node, npm, official CLI, Ink WASM, documentation, ADB and scrcpy. No separate Node.js, Android Studio or PATH setup is needed. Windows may show a reputation warning for the unsigned app; verify the source and checksum before running it. Intel Mac, Windows ARM64 and Linux release downloads are not currently provided.
+
+## Build with AI
+
+Copy one instruction from **Connect AI tools** into your usual AI client. The AI configures MCP, checks the official development skill and environment, then works on your idea. Each project has a live preview, optional idea input and presets for refining, fixing, validating or installing the app. The shared workflow prepares a project, edits its real source, validates behavior and builds an AIX package; installation can continue when glasses are ready. Recovery steps keep the same project and task. See [the complete workflow](docs/automated-development.md).
+
+![Project page with live Hello AIUI preview and optional AI instructions](docs/screenshots/project-en.png)
 
 ## Features
 
@@ -28,6 +34,8 @@ The maintainer has no physical Windows machine and has not completed full Window
 - **Official runtime:** run real `.ink` source, replay temple keys and repeated swipe events, inject orientation with the mouse, 3D head model, sliders or motion loops. Use local photos or an explicitly enabled computer camera.
 - **Offline knowledge:** 468 official documents, 81 diagrams and the public `aiui-dev` skill, with the official navigation hierarchy, full-corpus text/code search, automatic daily updates and expandable offline images. Long articles load automatically. Prepare SDK/CLI upgrades, check compatibility and migrate projects individually.
 - **AI integration:** MCP and the Workshop CLI share previews, assertions, screenshots, silent recordings, build results and logs with desktop/Web.
+- **Shared diagnostics:** AI tool responses include unread problems for the current project and shared environment, with project names, paths and recovery steps. Read history remains available; marking a problem read does not mark it fixed.
+- **Persistent simulator storage:** project-isolated `wx` storage survives preview and app restarts. Computer and glasses data are stored separately.
 - **Official platform drafts and review:** AI prepares materials and calls MCP; Workshop uploads AIX packages, verifies cloud digests and saves review drafts. Submission requires the user's native desktop confirmation. Reuse an OS-encrypted official session after signing in, with an explicit sign-out action.
 - **Read-only cloud catalog:** separate Build & upload and Official apps tabs. One official Agent ID binding drives build, upload and review; show and copy the full ID. Inspect official icons, descriptions, permissions, images, videos and draft/review/published versions. Neither Workshop nor MCP provides cloud deletion.
 - **Glasses tools:** device information, files, real APK names/icons, screenshots, logs, and embedded mirroring with an optional separate window that closes when mirroring ends.
@@ -39,10 +47,10 @@ All documentation screenshots use only this repository's public examples in a fr
 
 ## Quick start
 
-1. Launch Workshop and import [`examples/hello-aiui`](examples/hello-aiui), or create a Page project.
-2. Click its card to preview. Arrow keys navigate, Enter confirms and Backspace returns. Open the interaction panel to send repeated swipe sequences.
-3. Open **Connect AI tools** and copy the generated stdio MCP configuration into your AI tool.
-4. Check and build an AIX package. For physical glasses, follow **Getting started**: use the dedicated debugging cable for your model and enable glasses ADB debugging in the Rokid AI phone app.
+1. A fresh workspace opens **Connect AI tools**. Optionally enter your idea, click **Copy for AI** and paste into your AI client. Workshop confirms the connection after the AI successfully reads its context.
+2. Describe an app. It appears in **My projects**; you can also import [`examples/hello-aiui`](examples/hello-aiui) or create a Page project.
+3. Open the project to see its live preview and continue with an idea or a preset instruction. Select **Open full simulator** for orientation, camera and repeated swipe controls.
+4. Ask AI to validate and build. Follow **Getting started → Install on glasses** when ready to connect through a supported USB or wireless ADB setup, then continue the same task.
 
 [`examples/motion-lab`](examples/motion-lab) demonstrates orientation sensors and lifecycle cleanup. The [illustrated guide](docs/getting-started.md) has more details.
 
@@ -83,14 +91,14 @@ The Web interface binds to `127.0.0.1` only. The npm package is not published ye
 
 ## MCP workflow
 
-Copy the generated configuration from the running app; its stable launcher uses the same local data directory. Tools and schemas are discovered from the active service.
+Copy the complete setup instruction from **Connect AI tools**; manual stdio configuration remains under advanced options. Its stable launcher uses the same local data directory. Tools and schemas are discovered from the active service.
 
 ```text
-aiui_context_get → import/create project → edit local source
-→ aiui_preview_test → aiui_project_build
+aiui_context_get({setup:true}) → aiui_workflow_start
+→ edit project source → aiui_workflow_continue
 ```
 
-`aiui_preview_test` combines replay, behavior assertions, PNG and logs. `aiui_project_build` performs official checks and creates AIX/SHA256. Use `aiui_job_wait` only when the returned status is `running`. See [AI tool workflows](docs/ai-tool-workflows.md).
+`aiui_workflow_continue` combines explicit behavior assertions, packaging and optional installation. Resume the same workflow after following its recovery steps. MCP-only clients can read and write source with `aiui_project_files`. Individual preview and build tools remain available. Use `aiui_job_wait` only when the returned status is `running`. See [automated development](docs/automated-development.md) and [AI tool workflows](docs/ai-tool-workflows.md).
 
 ## Data and limitations
 

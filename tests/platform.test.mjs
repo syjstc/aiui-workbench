@@ -137,8 +137,8 @@ test('session changes stop a mutation and public discovery exposes no confirmati
   const f=await fixture(t),identity=f.platform.identity();f.platform.setSession(token('other-account'));assert.throws(()=>f.platform.current(identity),/已变化/);
   const catalog=toolCatalog();assert.equal(catalog.tools.some(t=>t.name.startsWith('ui_platform_')),false);assert.equal(catalog.tools.some(t=>t.name==='aiui_platform_review_submit'),false);
   const request=catalog.tools.find(t=>t.name==='aiui_platform_review_request');assert.equal(Object.hasOwn(request.inputSchema.properties,'confirm'),false);
-  await assert.rejects(Workbench.prototype.call.call({...f.w,clients:new Map()},'ui_platform_review_submit',{},'MCP'),/桌面用户确认/);
-  await assert.rejects(Workbench.prototype.call.call({...f.w,clients:new Map()},'ui_platform_review_submit',{projectId:f.project.id,draftId:'forged',digest:'forged'},'desktop-confirmation'),/原生确认窗口/);
+  await assert.rejects(Workbench.prototype.dispatch.call({...f.w,clients:new Map()},'ui_platform_review_submit',{},'MCP'),/桌面用户确认/);
+  await assert.rejects(Workbench.prototype.dispatch.call({...f.w,clients:new Map()},'ui_platform_review_submit',{projectId:f.project.id,draftId:'forged',digest:'forged'},'desktop-confirmation'),/原生确认窗口/);
   f.platform.session.syncedAt=Date.now()-46000;assert.equal(f.platform.status().loggedIn,false);assert.throws(()=>f.platform.identity(),/保持工坊运行/);
 });
 test('official timestamp tokens authenticate with their cookie expiry without inventing an exp claim',async t=>{
@@ -154,7 +154,7 @@ test('sign-out revokes approval and running platform jobs, hides account records
 test('all mutations share one account-bound official target and MCP cannot change the binding',async t=>{
   const f=await fixture(t);assert.equal(f.platform.status(f.project.id).binding.agentId,f.remote.agentId);
   const wrong=await f.platform.upload({...uploadArgs,agentId:'another-cloud-agent'});assert.equal(wrong.status,'failed');assert.match(wrong.error,/不一致/);assert.equal(f.requests.some(r=>r.url===PLATFORM_API.sts),false);
-  await assert.rejects(Workbench.prototype.call.call({...f.w,clients:new Map()},'ui_platform_bind',uploadArgs,'MCP'),/只能在工坊/);
+  await assert.rejects(Workbench.prototype.dispatch.call({...f.w,clients:new Map()},'ui_platform_bind',uploadArgs,'MCP'),/只能在工坊/);
 });
 test('legacy verified receipts restore only an unambiguous official binding',async t=>{
   const f=await fixture(t);await f.platform.upload(uploadArgs);f.platform.state.bindings=[];await f.platform.save();

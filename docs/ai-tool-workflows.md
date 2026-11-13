@@ -1,3 +1,5 @@
+> 完整自动制作优先使用 `aiui_workflow_start → 编辑真实源码 → aiui_workflow_continue`；阻塞读共享诊断并继续原任务。详见 [自动制作与故障恢复](automated-development.md)。以下逐项工具仍完整保留。
+
 # AI 工具：MCP 与共享 CLI
 
 AI 用现有编码工具修改真实源码，工坊负责运行、等待、模拟输入和结果核对。MCP、桌面、Web 和工坊 CLI 连接同一个本地服务；使用相同的 `AIUI_WORKBENCH_HOME`，即可共享项目 ID、预览会话、应用/SDK 日志、截图路径、构建任务和结果。

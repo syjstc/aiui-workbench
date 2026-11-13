@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { Projects } from './projects.mjs';
 import { Knowledge } from './knowledge.mjs';
 import { Previews } from './previews.mjs';
@@ -24,6 +25,14 @@ import { toolCatalog } from './tool-catalog.mjs';
 import { installMcpLauncher } from './mcp-launcher.mjs';
 import { ProjectRemoval } from './project-removal.mjs';
 import { Platform } from './platform.mjs';
+import {Diagnostics,readServiceLog} from './diagnostics.mjs';
+import {DevelopmentFlow,DEVELOPMENT_GUIDE} from './development-flow.mjs';
+import {ProjectFiles} from './project-files.mjs';
+import {ensureAgentSkills,workflowSkill} from './agent-skills.mjs';
+import {AiConnection} from './ai-connection.mjs';
+import {diagnosticScope} from './diagnostic-scope.mjs';
+
+const isAi = actor => actor === 'MCP' || actor === 'CLI';
 
 export class Workbench {
   constructor(home) { this.home = home; this.origin = ''; this.events = []; this.sequence = 0; this.clients = new Map(); this.emit = this.emit.bind(this); this.projects = new Projects(home, this.emit); this.knowledge = new Knowledge(home); this.previews = new Previews(this.projects, home, this.emit); this.jobs = new Jobs(this.emit, home); this.adb = new AdbTools(home); this.glasses = new GlassesTools(home, this.adb); this.devices = new DeviceDiscovery((args, options) => this.cli(args, options), (_command, args, options) => this.adb.execute(args, options)); }
@@ -31,13 +40,25 @@ export class Workbench {
     if (type === 'jobs-deleted') this.events = this.events.filter(event => event.type !== 'job' || !value.deletedIds.includes(event.value.id));
     if (type === 'preview-logs-cleared') this.events = this.events.filter(event => event.type !== 'preview-log' || event.value.sessionId !== value.sessionId);
     this.events.push({ sequence: ++this.sequence, type, value, at: new Date().toISOString() }); this.events = this.events.slice(-300); if (type === 'source-changed') this.previews.reload(value.projectId);
+    if(this.diagnostics&&((type==='preview-log'&&value.level==='error')||(type==='log'&&value.level==='error'))){
+      const session=type==='preview-log'?this.previews.sessions.get(value.sessionId):null;
+      const test=this.jobs.items.find(j=>j.type==='preview-test'&&j.sessionId===value.sessionId&&j.status==='running');
+      this.captureDiagnostic(new Error(value.message),{source:type,sessionId:value.sessionId,projectId:value.projectId||session?.projectId,revision:value.revision,runId:value.runId,jobId:test?.id,workflowId:test?.workflowId,stage:test?'preview':undefined}).catch(()=>{});
+    }
   }
   async init() {
+    this.diagnostics=await new Diagnostics(this.home,this.emit).init();
+    this.diagnostics.enrich=context=>diagnosticScope(context,this);
+    try{return await this.initialize();}catch(error){await this.captureDiagnostic(error,{source:'startup'}).catch(()=>{});throw error;}
+  }
+  async initialize() {
     this.aiuiApps = new AiuiApps(this.glasses, (args, options) => this.cli(args, options), this.projects);
     this.mirroring = new Mirroring(this.adb, this.glasses, this.emit);
     await fs.mkdir(this.home, { recursive: true, mode: 0o700 });
     this.mcpConfig = await installMcpLauncher(this.home);
     await Promise.all([this.projects.init(), this.knowledge.init(), this.jobs.init()]);
+    this.aiConnection=await new AiConnection(this.home,toolCatalog()).init();
+    this.jobs.onFailure=async(error,job)=>{const d=await this.captureDiagnostic(error,{source:'job',tool:job.type,jobId:job.id,projectId:job.projectId,workflowId:job.workflowId,stage:job.type==='preview-test'?'preview':job.stage});return d?.id;};
     this.sdk = await new SdkManager(this.home, this.projects, this.emit).init();
     this.projects.getToolchain = () => this.sdk.get();
     this.previews.getToolchain = project => this.sdk.forProject(project);
@@ -45,18 +66,72 @@ export class Workbench {
     this.recordings = await new Recordings(this).init();
     this.projectRemoval = new ProjectRemoval(this);
     this.platform = await new Platform(this).init();
+    this.workflows=await new DevelopmentFlow(this).init();
+    // Backfill legacy records from their recorded jobs/sessions/workflows.
+    // Persist names and paths so removed projects remain identifiable.
+    for(const item of this.diagnostics.items)Object.assign(item,this.diagnostics.enrich(item));
+    if(this.diagnostics.items.length)await this.diagnostics.save();
+    this.projectFiles=new ProjectFiles(this);
     return this;
   }
   async cli(args, options, releaseId) { return run(process.execPath, [this.sdk.cliPath(releaseId), ...args], { ...options, env: { ...process.env, ...options?.env, ...await this.adb.environment() } }); }
   runtimeInfo(project) { const release = project ? this.sdk.forProject(project) : this.sdk.get(); return { runtime: release.runtime, webSdkVersion: release.versions.ink, cliVersion: release.versions.cli, toolchainId: release.id }; }
   config() { return this.mcpConfig; }
-  status() { return { version: APP_VERSION, ...this.runtimeInfo(), sdk: this.sdk.status(), home: this.home, projects: this.projects.list(), knowledge: this.knowledge.status(), previews: this.previews.list(), jobs: this.jobs.list(), recordings:this.recordings?.status().recordings||[], clients: [...this.clients.values()].filter(c => Date.now()-c.lastSeen < 60000), sequence: this.sequence, platform: this.platform?.status() }; }
+  status() { return { version: APP_VERSION, ...this.runtimeInfo(), sdk: this.sdk.status(), home: this.home, projects: this.projects.list(), knowledge: this.knowledge.status(), previews: this.previews.list(), jobs: this.jobs.list(), recordings:this.recordings?.status().recordings||[], clients: [...this.clients.values()].filter(c => Date.now()-c.lastSeen < 60000), sequence: this.sequence, platform: this.platform?.status(),lastAiAt:this.aiConnection?.status().verifiedAt||null,aiConnection:this.aiConnection?.status(),diagnostics:this.diagnostics.summary(),workflows:this.workflows?.list()||[] }; }
+  async captureDiagnostic(error,context={}) {
+    return this.diagnostics.record(error,context);
+  }
+  async deliverDiagnostics(result,args,actor,diagnosticId) {
+    const delivered=[...(result?.diagnostics?.items||[]),...(result?.context?.diagnostics?.items||[])];
+    for(const diagnostic of [result?.diagnostic,result?.result?.diagnostic])if(diagnostic?.id)delivered.push(diagnostic);
+    const failure=diagnosticId?this.diagnostics.get({diagnosticId}).items[0]:null;
+    if(failure)delivered.push(failure);
+    const projectId=failure?.projectId||result?.projectId||result?.workflow?.projectId||result?.result?.workflow?.projectId||result?.project?.id||result?.context?.project?.id||(result?.agentPath?result.id:undefined)||args.projectId;
+    const scope=this.diagnostics.enrich({...args,projectId,context:args});
+    const filters=scope.scope==='project'?[{projectId:scope.projectId},{scope:'workbench'}]:[{scope:'workbench'},{scope:'unassigned'}];
+    const pending=filters.flatMap(filter=>this.diagnostics.get({...filter,status:'open',read:false,limit:20}).items);
+    const items=[...new Map([...delivered,...pending].map(item=>[item.id,item])).values()];
+    await this.diagnostics.markRead(items,actor);
+    // Update only the delivered version; a concurrent new occurrence stays unread.
+    for(const snapshot of [...delivered,...items]){
+      const current=this.diagnostics.items.find(item=>item.id===snapshot.id);
+      if(current?.readAt&&current.occurrences===snapshot.occurrences)Object.assign(snapshot,{readAt:current.readAt,readBy:current.readBy});
+    }
+    const remainingUnread=filters.reduce((sum,filter)=>sum+this.diagnostics.get(filter).unreadCount,0);
+    return {projectId:scope.projectId||null,items,remainingUnread,instruction:'这些诊断已自动交给 AI 并标为已读；已读不表示已修复。严格按每条 projectId、项目目录和 workflowId 处理，不修改其他项目。scope=workbench 是公共环境，scope=unassigned 必须先核实归属。owner=ai 时自行检查并验证；owner=user 时说明具体操作。修复验证后再 resolve；有 remainingUnread 时按相同范围继续读取 aiui_diagnostics_get(read=false)。'};
+  }
   async call(tool, args = {}, actor = 'desktop') {
+    try{const result=await this.dispatch(tool,args,actor);await this.aiConnection?.record(tool,actor,result);
+      if(isAi(actor)&&result&&typeof result==='object'&&!tool.startsWith('aiui_diagnostics_')&&tool!=='aiui_tools_list'){
+        const shared=await this.deliverDiagnostics(result,args,actor);
+        if(shared.items.length||shared.remainingUnread)return {...result,sharedDiagnostics:shared};
+      }
+      return result;
+    }catch(error){
+      if(!error.diagnosticId&&!tool.startsWith('aiui_diagnostics_')){
+        const d=await this.captureDiagnostic(error,{source:'operation',actor,tool,projectId:args?.projectId,sessionId:args?.sessionId,workflowId:args?.workflowId,context:args}).catch(()=>null);
+        if(d)error.diagnosticId=d.id;
+      }
+      if(isAi(actor)&&!tool.startsWith('aiui_diagnostics_'))error.sharedDiagnostics=await this.deliverDiagnostics(error.result,args,actor,error.diagnosticId).catch(()=>undefined);
+      throw error;
+    }
+  }
+  async dispatch(tool,args={},actor='desktop') {
     if (args.projectId && !tool.startsWith('ui_project_removal_') && this.projectRemoval?.locked(args.projectId)) throw new Error('此项目正在移除，请等待操作完成');
     this.clients.set(actor, { name: actor, lastSeen: Date.now() });
     const definition = TOOL_DEFINITIONS.find(([name]) => name === tool);
     if (definition) args = z.object(definition[2]).parse(args);
     switch (tool) {
+      case 'aiui_adb_connect':return this.adb.connect(args);
+      case 'aiui_project_files':return this.projectFiles.operate(args);
+      case 'aiui_workflow_start':return this.workflows.start(args);
+      case 'aiui_workflow_get':return this.workflows.get(args);
+      case 'aiui_workflow_continue':return this.workflows.continue(args);
+      case 'aiui_diagnostics_get':return isAi(actor)?this.diagnostics.read(args,actor):this.diagnostics.get(args);
+      case 'aiui_diagnostics_mark_read':return this.diagnostics.markRead(this.diagnostics.get({limit:200}).items.filter(item=>args.diagnosticIds.includes(item.id)),actor);
+      case 'aiui_diagnostics_resolve':return this.diagnostics.resolve(args);
+      case 'aiui_diagnostics_report':return this.captureDiagnostic(Object.assign(new Error(args.message),{stack:args.stack}),{...args,source:args.source||actor});
+      case 'aiui_service_log_read':return readServiceLog(this.home,args);
       case 'ui_platform_session': {
         if (actor !== 'desktop-session') throw new Error('官方登录会话仅由桌面客户端同步');
         return this.platform.setSession(args.token,args.desktopKey,args.expiresAt);
@@ -113,7 +188,15 @@ export class Workbench {
       case 'aiui_context_get': {
         const project = args.projectId ? this.projects.get(args.projectId) : null;
         let skill = null; try { skill = await this.knowledge.read('skills/aiui-dev/SKILL.md', project?.knowledgeRevision); } catch {}
-        return { project, ...this.runtimeInfo(project), sdkUpdates: this.sdk.status(), officialSkill: skill, knowledge: this.knowledge.status(), instruction: '先读取官方 Skill 及相关 references；所有操作显式传入 projectId / sessionId。源码由现有 AI 编码工具编辑，不复制维护另一套页面。优先用 aiui_preview_test 一次完成打开、等待、批量模拟、断言、截图和日志报告；用 aiui_project_build 一次完成官方检查、AIX 和平台导入清单。两者默认等待 45 秒，status 为 running 时才用 aiui_job_wait 继续。模拟通过不代表佩戴或发布通过；没有应用行为断言时只说明运行与输入正常。完整能力、边界与示例见 aiui_capabilities_get。Skill 文档引用通过 aiui_docs_read 继续读取。', capabilities: capabilities(), simulation: { input: 'keydown/keyup, keyup-only, repeated bursts', orientation: 'host absoluteOrientation capability, Android +Z gravity', camera: 'photo fixtures and opt-in computer webcam; continuous getUserMedia / ImageCapture.grabFrame / takePhoto; runtime Canvas and photo adapters encode preview-frame PNG, not full-resolution camera modes; no audio', bluetooth: 'unsupported', network:'online/offline events only; outbound application requests are not enabled', ai: 'no bundled model' } };
+        let skillSetup={status:'deferred',reason:'A project or setup=true is needed to install skills. Both guides are provided inline without installation.'};
+        if(project||args.setup){
+          try{const target=project||{projectPath:this.skillHome||os.homedir(),agentPath:this.skillHome||os.homedir()};skillSetup={status:'ready',...await ensureAgentSkills(target,this.knowledge,{writeIgnore:!!project,...this.skillOptions,existingSkills:args.existingSkills})};if(skillSetup.skills.some(s=>s.status==='user-modified'))skillSetup.status='user-modified';if(skillSetup.skills.some(s=>s.status==='name-conflict'))skillSetup.status='requires-attention';if(project)await this.projects.refresh(project.id);}
+          catch(error){const diagnostic=await this.captureDiagnostic(error,{source:'skill-setup',projectId:project?.id});skillSetup={status:'requires-attention',error:error.message,diagnosticId:diagnostic?.id,fallback:'Use officialSkill and workflowSkill inline; existing skill files were preserved.'};}
+        }
+        let environment;
+        if(args.setup){try{environment={...await this.devices.check(),adbTool:await this.adb.resolveInfo(),...this.runtimeInfo()};}catch(error){const diagnostic=await this.captureDiagnostic(error,{source:'setup-environment'});environment={error:error.message,diagnosticId:diagnostic?.id};}}
+        const projectInstructions=project?await fs.readFile(path.join(project.projectPath,'AGENTS.md'),'utf8').then(s=>s.slice(0,24000)).catch(()=>''):'';
+        return { project, projectInstructions, serviceVersion:APP_VERSION,connection:this.aiConnection.status(),availableTools:toolCatalog().tools.map(t=>t.name),setup:!!args.setup,skillSetup,workflowSkill:await workflowSkill(),...(environment?{environment}:{}),...(args.setup?{nextAction:'If the user supplied an idea, continue that request with the available workflow tools now. Otherwise ask what app the user wants to make. Do not create a demo project without a request. Missing glasses should not prevent preview and packaging; explain device connection when installation is reached.'}:{}),...this.runtimeInfo(project), sdkUpdates: this.sdk.status(), officialSkill: skill, knowledge: this.knowledge.status(), instruction: '开发规则及验收要求以项目绑定版本的官方 aiui-dev 和 references/checklist.md 为准；工坊 aiui-workshop 只补 MCP 编排和恢复。首次使用项目自动检查并补齐缺失 Skill；setup=true 同时检查用户级 Skill 与环境，无需逐项调用。不覆盖用户修改，不重复安装已有同名 Skill。工具及参数以当前服务清单为准，不要根据 runtime/CLI 版本猜测工坊工具。源码可通过 aiui_project_files 带 expectedRevision 读写，也可使用现有编码工具。优先用 aiui_workflow_start 返回项目上下文，aiui_workflow_continue 一次验证、打包并在就绪时安装；无需重复检查已返回的信息。仅 status=running 时调用 aiui_job_wait。正式提审由用户在工坊确认。', developmentGuide:DEVELOPMENT_GUIDE, diagnostics:this.diagnostics.get({...project?{projectId:project.id}:{scope:'workbench'},status:"open",read:false,limit:10}), capabilities: capabilities(), simulation: { input: 'keydown/keyup, keyup-only, repeated bursts', orientation: 'host absoluteOrientation capability, Android +Z gravity', camera: 'photo fixtures and opt-in computer webcam; continuous getUserMedia / ImageCapture.grabFrame / takePhoto; runtime Canvas and photo adapters encode preview-frame PNG, not full-resolution camera modes; no audio', bluetooth: 'unsupported', network:'online/offline events only; outbound application requests are not enabled', ai: 'no bundled model' } };
       }
       case 'aiui_preview_open': await this.projects.refresh(args.projectId); return this.previews.open(args.projectId, this.origin, { ...args, requestedBy:actor });
       case 'aiui_preview_test': return this.automation.test(args, actor);
@@ -137,14 +220,14 @@ export class Workbench {
       case 'aiui_mcp_install_project': {
         const p = this.projects.get(args.projectId), file = path.join(p.projectPath, '.mcp.json');
         const existing = await readJson(file, {});
-        if (existing.mcpServers?.['aiui-workbench']) return { path: file, status: 'already-configured' };
-        try { await fs.copyFile(file, `${file}.backup-${Date.now()}`); } catch(e) { if (e.code !== 'ENOENT') throw e; }
-        await atomicJson(file, { ...existing, mcpServers: { ...existing.mcpServers, ...this.config().mcpServers } });
+        const configured=!!existing.mcpServers?.['aiui-workbench'];
+        if(!configured){try { await fs.copyFile(file, `${file}.backup-${Date.now()}`); } catch(e) { if (e.code !== 'ENOENT') throw e; }
+        await atomicJson(file, { ...existing, mcpServers: { ...existing.mcpServers, ...this.config().mcpServers } });}
         const ignoreFile=path.join(p.agentPath,'.aixignore'), ignoreText=await fs.readFile(ignoreFile,'utf8').catch(e=>{if(e.code==='ENOENT')return '';throw e;});
         const excluded=['.mcp.json','.mcp.json.backup-*','.aiui-workbench.json'];
         const missing=excluded.filter(rule=>!ignoreText.split(/\r?\n/).includes(rule));
         if(missing.length)await fs.writeFile(ignoreFile,ignoreText+(ignoreText&&!ignoreText.endsWith('\n')?'\n':'')+missing.join('\n')+'\n');
-        return { path: file, status: 'configured', scope: 'project' };
+        return { path: file, status: configured?'already-configured':'configured', scope: 'project',skillSetup:await ensureAgentSkills(p,this.knowledge) };
       }
       case 'aiui_environment_check': return { ...await this.devices.check(), adbTool: await this.adb.resolveInfo(), ...this.runtimeInfo() };
       case 'aiui_adb_configure': return this.adb.configure(args.directory);
@@ -231,5 +314,5 @@ export class Workbench {
     const bytes = await fs.readFile(file), record = { path: file, sha256: sha(bytes), bytes: bytes.length, revision, toolchainId, at: new Date().toISOString() };
     p.lastBuild = record; await this.projects.refresh(p.id); await this.projects.save(); return record;
   }
-  async close() { await this.knowledge.close(); await this.mirroring?.close(); await this.jobs.close(); await this.recordings?.close(); this.previews.close(); await this.sdk?.close(); await this.projects.close(); }
+  async close() { await this.workflows?.close(); await this.knowledge.close(); await this.mirroring?.close(); await this.jobs.close(); await this.recordings?.close(); await this.previews.close(); await this.sdk?.close(); await this.projects.close(); await this.diagnostics?.close(); }
 }

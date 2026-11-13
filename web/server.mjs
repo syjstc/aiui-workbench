@@ -107,7 +107,7 @@ export async function startWeb({ home = homePath(), port = 0, client, open = ope
       res.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.rokidcdn.com https://*.rokid.com https://*.aliyuncs.com; media-src 'self' https://*.rokidcdn.com https://*.rokid.com https://*.aliyuncs.com; frame-src ${client.connection.origin}; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`);
       res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
       res.end(req.method === 'HEAD' ? undefined : await fs.readFile(file));
-    } catch (error) { if (!res.headersSent) send(res, { error: redact(error.message) }, error.code === 'ENOENT' ? 404 : 400); else res.end(); }
+    } catch (error) { if (!res.headersSent) send(res, { error: redact(error.message),diagnosticId:error.diagnosticId }, error.code === 'ENOENT' ? 404 : 400); else res.end(); }
   });
   server.requestTimeout = 600000; // Large local APK/media uploads can take longer than 30 seconds.
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });

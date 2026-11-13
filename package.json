@@ -1,7 +1,7 @@
 {
   "name": "aiui-workbench",
   "productName": "AIUI 工坊",
-  "version": "0.5.8",
+  "version": "0.6.0",
   "type": "module",
   "main": "electron/main.cjs",
   "description": "Local AIUI desktop workbench, official runtime simulator and MCP tools",
@@ -28,7 +28,9 @@
     "README.en.md",
     "LICENSE",
     "NOTICE.md",
-    "THIRD_PARTY_LICENSES.json"
+    "THIRD_PARTY_LICENSES.json",
+    "docs/automated-development.md",
+    "docs/rokid-discrete-input.md"
   ],
   "scripts": {
     "build": "vite build",

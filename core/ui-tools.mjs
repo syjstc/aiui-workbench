@@ -1,5 +1,7 @@
 // The desktop preload and authenticated Web gateway expose the same local tools.
 export const UI_TOOLS = new Set([
+  'aiui_adb_connect',
+  'aiui_workflow_start','aiui_workflow_get','aiui_workflow_continue','aiui_diagnostics_get','aiui_diagnostics_report','aiui_diagnostics_resolve','aiui_diagnostics_mark_read','aiui_service_log_read',
   'ui_platform_bind',
   'ui_project_removal_begin', 'ui_project_removal_commit', 'ui_project_removal_cancel',
   'aiui_record_start','aiui_record_stop','aiui_record_status','aiui_record_clip',
@@ -23,7 +25,7 @@ export const UI_TOOLS = new Set([
 
 export function officialUrl(value) {
   const url = new URL(value);
-  const hosts = ['github.com', 'js.rokid.com', 'yodaos-project.github.io', 'jsar-project.github.io', 'modelcontextprotocol.io', 'developer.android.com', 'global.rokid.com', 'x-docs.rokid.com', 'aiui.rokid.com'];
+  const hosts = ['github.com', 'forum.rokid.com', 'js.rokid.com', 'yodaos-project.github.io', 'jsar-project.github.io', 'modelcontextprotocol.io', 'developer.android.com', 'global.rokid.com', 'x-docs.rokid.com', 'aiui.rokid.com'];
   if (url.protocol !== 'https:' || url.username || url.password || !hosts.includes(url.hostname) || url.port) throw new Error('仅支持打开已知官方资料来源');
   return url.href;
 }

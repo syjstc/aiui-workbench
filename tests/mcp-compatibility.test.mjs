@@ -90,6 +90,8 @@ test('a retained older MCP entry discovers future tools, parameters and restart 
   assert.equal(second.requests.filter(request => request.tool === futureTool.name).length, 1);
   const resource = await client.readResource({ uri: 'aiui://tools' });
   assert.equal(JSON.parse(resource.contents[0].text).serviceVersion, '99.0.0');
+  const prompt=await client.getPrompt({name:'develop-aiui',arguments:{request:'Verify this app'}});
+  assert.match(prompt.messages[0].content.text,/Use live service tools/);assert.doesNotMatch(prompt.messages[0].content.text,/aiui_workflow_start|aiui_project_files/);
 });
 
 test('an older retained MCP entry cold-starts the registered current installation', async t => {
@@ -171,6 +173,12 @@ test('Windows launcher uses a fixed system runtime and discovers the current ins
   assert.match(config.args.at(-1), /installation\.json/);
   assert.ok(!config.args.includes('-ExecutionPolicy'));
   assert.equal(config.env.ELECTRON_RUN_AS_NODE, '1');
+});
+
+test('an older launcher registration never replaces a valid newer installation',async t=>{
+  const f=await fixture(t);await installMcpLauncher(f.home);
+  const file=path.join(f.home,'mcp/installation.json'),previous=JSON.parse(await fs.readFile(file,'utf8'));previous.version='99.0.0';await atomicJson(file,previous);
+  await installMcpLauncher(f.home,{root:path.join(f.home,'obsolete-root')});assert.equal(JSON.parse(await fs.readFile(file,'utf8')).version,'99.0.0');assert.equal(JSON.parse(await fs.readFile(file,'utf8')).root,previous.root);
 });
 
 for (const runtime of ['Node', 'Electron']) test(`Windows saved launcher exchanges UTF-8 MCP and follows relocation using ${runtime}`, async t => {

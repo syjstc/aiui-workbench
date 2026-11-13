@@ -53,7 +53,7 @@ async function launch(executablePath) {
   if (githubToken) await app.evaluate(installDesktopGithubTestAuth, { repository, token: githubToken });
   page = await app.firstWindow({ timeout: 45000 }); page.setDefaultTimeout(45000); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
-  await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
+  await page.getByRole('heading', { name: /^(Projects|My projects)$/, exact: true }).waitFor({ timeout: 45000 });
 }
 try {
   if (githubToken) {

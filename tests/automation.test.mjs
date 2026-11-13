@@ -67,6 +67,20 @@ test('cancelling a preview command removes its queue and pending listener',async
   await assert.rejects(pending);const session=service.previews.get(preview.id);assert.equal(session.pending.size,0);assert.equal(session.queue.length,0);
 });
 
+test('a new AI request waits for a fresh ready report instead of reusing an unmounted runtime state',async t=>{
+  const {service,project}=await fixture(t),preview=service.previews.open(project.id,'http://127.0.0.1:1'),s=service.previews.get(preview.id);
+  service.previews.update(s,{status:'ready',revision:project.revision,state:{running:true,runId:'previous'}});s.readyAt=Date.now()-100;
+  service.previews.open(project.id,'http://127.0.0.1:1',{requestedBy:'MCP'});service.clients.set('desktop',{name:'desktop',lastSeen:Date.now()});
+  const controller=new AbortController();t.after(()=>controller.abort());
+  for(const previousStatus of ['ready','failed']){
+    s.status=previousStatus;s.failedAt=Date.now()-100;s.readyAt=Date.now()-100;
+    service.previews.open(project.id,'http://127.0.0.1:1',{requestedBy:'MCP'});
+    const ready=service.automation.ready(s.id,project.revision,{signal:controller.signal,progress:()=>{}});
+    const timer=setTimeout(()=>service.previews.update(s,{status:'ready',revision:project.revision,state:{running:true,runId:'newly-mounted-'+previousStatus}}),25);t.after(()=>clearTimeout(timer));
+    assert.equal((await ready).state.runId,'newly-mounted-'+previousStatus);
+  }
+});
+
 test('incremental logs paginate with stable cursors, filters and explicit retention gaps',async t=>{
   const {service,project}=await fixture(t),preview=service.previews.open(project.id,'http://127.0.0.1:1'),s=service.previews.get(preview.id);
   for(let i=0;i<505;i++)service.previews.log(s,i%2?'error':'info','message '+i,s.logGeneration,undefined,{runId:'actual-run'});

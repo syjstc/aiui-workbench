@@ -1,3 +1,4 @@
+import {DiagnosticsPanel} from './diagnostics-panel.jsx';
 import { t, getLocale, translateMessage } from './i18n.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { FileText, RefreshCw, Terminal, Trash2 } from 'lucide-react';
@@ -5,7 +6,7 @@ import { JobHistory, jobLabels } from './job-history.jsx';
 
 const size = bytes => bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-export function LogsPage({ projects, previews, jobs, onCancel, onDelete, deleting, onClearPreview, clearingPreview, notify }) {
+export function LogsPage({ projects, previews, jobs, onCancel, onDelete, deleting, onClearPreview, clearingPreview, notify, go, onOpenProject }) {
   const [type, setType] = useState('all'), [serviceLog, setServiceLog] = useState(null), [error, setError] = useState(''), [clearing, setClearing] = useState(false);
   const request = useRef(0), clearingService = useRef(false);
   async function loadServiceLog() {
@@ -23,6 +24,7 @@ export function LogsPage({ projects, previews, jobs, onCancel, onDelete, deletin
   }
   return <>
     <div className="page-heading"><div><h1>{t("日志与记录")}</h1><p>{t("查看运行状态与任务结果，管理本机的日志和记录。")}</p></div></div>
+    <DiagnosticsPanel notify={notify} projects={projects} go={go} onOpenProject={onOpenProject}/>
     <div className="log-overview">
     <section className="panel preview-log-history" aria-label={t("模拟器运行日志")}><div className="section-heading"><h2><Terminal size={17}/>{t("模拟器运行日志")}</h2><span className="subtle">{t("按预览会话清理")}</span></div>
       {previews.length ? previews.map(preview => <div className="log-session-row" key={preview.id}><div><strong>{projects.find(project => project.id === preview.projectId)?.name || t("预览会话")}</strong><small>{preview.page} · {preview.target === '_current' ? t("卡片") : t("全屏")} · {preview.logCount}{t(" 条日志")}</small></div><button className="button" aria-label={t("清空") + (projects.find(project => project.id === preview.projectId)?.name || t("预览会话")) + t("运行日志")} disabled={!!clearingPreview} onClick={() => onClearPreview(preview.id)}><Trash2 size={14}/>{clearingPreview === preview.id ? t("正在清空…") : t("清空日志")}</button></div>) : <p className="no-jobs">{t("打开模拟预览后，可在这里清理应用日志与 SDK 调用记录。")}</p>}

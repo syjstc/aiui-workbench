@@ -70,10 +70,18 @@ spctl --assess --type execute --verbose=4 '/path/AIUI Workshop.app'
 **公证装订会改变 macOS 包的内容，必须在最终 ZIP 生成后重新计算清单和 SHA256。**
 
 ```sh
-npm run release:manifest --   --file darwin:arm64:output/release/AIUI-Workbench-0.3.1-darwin-arm64.zip   --file win32:x64:output/release/AIUI-Workbench-0.3.1-win32-x64.zip   --base-url https://github.com/syjstc/aiui-workbench/releases/download/v0.3.1/   --release-url https://github.com/syjstc/aiui-workbench/releases/tag/v0.3.1   --notes-file CHANGELOG.md   --out output/release/workbench-update.json
+npm run release:manifest -- \
+  --file darwin:arm64:output/release/AIUI-Workbench-0.6.0-darwin-arm64.zip \
+  --file win32:x64:output/release/AIUI-Workbench-0.6.0-win32-x64.zip \
+  --base-url https://github.com/syjstc/aiui-workbench/releases/download/v0.6.0/ \
+  --release-url https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.0 \
+  --notes-file output/release/RELEASE_NOTES.md \
+  --out output/release/workbench-update.json
 ```
 
-创建指向已验证 commit 的 `v0.3.1` tag 和 GitHub Release，上传两个 ZIP、`workbench-update.json`、`SHA256SUMS.txt` 和公开验证结果。校验附件字节数、摘要和 tag/清单版本一致后再完成发布。公开报告不包含本机路径、设备序列号、账号或凭据。
+将本次版本说明保存到 `output/release/RELEASE_NOTES.md`，只包含当前版本内容。创建指向已验证 commit 的 `v0.6.0` tag 和草稿 GitHub Release，上传两个 ZIP、`workbench-update.json`、`SHA256SUMS.txt` 和公开验证结果。Windows 使用 CI 原生验收通过后留存的同一个 ZIP；macOS 包的 build-info 与 CI commit 均须对应 tag。校验附件字节数、摘要和 tag/清单版本一致后再公开发布。公开报告不包含本机路径、设备序列号、账号或凭据。
+
+发布后等待 `Real GitHub upgrade` 的 macOS 和 Windows 验收完成：从上一稳定版发现新版、下载校验、启动、保留项目并连接 MCP。真实 GitHub 升级脚本同时识别旧版“Projects”和新版“My projects”，便携包验收覆盖新版首次连接页和项目内预览。将最终 Actions 链接补入发行说明。
 
 公证完成后运行 `node scripts/create-dmg.mjs --app '/path/AIUI Workshop.app' --out output/release` 生成 DMG。DMG 内包含应用和“应用程序”快捷方式；同一版本的 ZIP 仍用于应用内升级。更新清单每个平台只列一个安装包，DMG 作为额外的手动安装附件提供，不与 ZIP 重复登记同一个平台。
 

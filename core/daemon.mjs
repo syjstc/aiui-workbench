@@ -39,12 +39,13 @@ export async function startDaemon(home = homePath()) {
         return send(res,{error:'Method not allowed'},405);
       }
       if(recording){if(req.method!=='POST')return send(res,{error:'Method not allowed'},405);const session=service.previews.authorize(recording[1],req.headers['x-preview-key']);return send(res,{result:await service.recordings.receive(session,recording[2],req)});}
-      const match = url.pathname.match(/^\/session\/([a-f0-9-]+)\/(bundle|poll|ack|state|log)$/);
+      const match = url.pathname.match(/^\/session\/([a-f0-9-]+)\/(bundle|poll|ack|state|log|storage)$/);
       if (match) {
         const s = service.previews.authorize(match[1], req.headers['x-preview-key']);
-        if (match[2] === 'bundle') return send(res, { ...await service.projects.bundle(s.projectId), session: service.previews.public(s), cameraFixture: s.fixture });
+        if (match[2] === 'bundle') return send(res, { ...await service.projects.bundle(s.projectId), session: service.previews.public(s), cameraFixture: s.fixture, storage:await service.previews.storage.read(s.projectId) });
         if (match[2] === 'poll') { s.lastSeen = new Date().toISOString(); return send(res,{ commands:s.queue.splice(0,30), logGeneration:s.logGeneration, logsClearedAt:s.logsClearedAt || 0 }); }
         const value = await body(req);
+        if (match[2] === 'storage') return send(res,await service.previews.storage.update(s.projectId,value));
         if (match[2] === 'ack') service.previews.acknowledge(s,value);
         if (match[2] === 'state') service.previews.update(s,value);
         if (match[2] === 'log') for (const entry of (value.entries || []).slice(0,80)) service.previews.log(s,entry.level,entry.message,entry.logGeneration ?? null,entry.createdAt,entry);
@@ -57,7 +58,7 @@ export async function startDaemon(home = homePath()) {
       if (url.pathname === '/api/tools' && req.method === 'GET') return send(res,await service.call('aiui_tools_list',{},'MCP-discovery'));
       if (url.pathname === '/api/call' && req.method === 'POST') { const value = await body(req); return send(res,{result:await service.call(value.tool,value.args,value.actor || 'client')}); }
       return send(res,{error:'Not found'},404);
-    } catch(e) { send(res,{error:redact(e.message)},400); }
+    } catch(e) { send(res,{error:redact(e.message),diagnosticId:e.diagnosticId,sharedDiagnostics:e.sharedDiagnostics},400); }
   });
   try { await new Promise((resolve,reject) => { server.once('error',reject); server.listen(0,'127.0.0.1',resolve); }); }
   catch(error) { await service.close(); throw error; }

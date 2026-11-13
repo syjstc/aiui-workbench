@@ -16,6 +16,7 @@ let allowed, updates, upgradeTask, quittingForUpgrade=false;
 let desktopLocale = 'zh-CN';
 let platformLogin;
 const syncPlatformSession=()=>platformLogin.sync();
+function handle(channel,handler){ipcMain.handle(channel,async(event,...args)=>{try{return await handler(event,...args);}catch(error){if(!error.diagnosticId&&event.sender===mainWindow?.webContents)await client?.call('aiui_diagnostics_report',{source:channel,message:error.message,stack:error.stack},'desktop').catch(()=>{});throw error;}});}
 function trusted(event) { if(event.sender!==mainWindow?.webContents || event.senderFrame!==mainWindow?.webContents.mainFrame)throw new Error('无效的桌面调用来源'); }
 async function connectService(){
   // core/client sets Node-only mode on its service child. Setting it on the
@@ -32,12 +33,13 @@ app.whenReady().then(async()=>{
   const {AppUpdates}=await import('../core/updates.mjs');
   updates=await new AppUpdates(home).init();
   mainWindow=new BrowserWindow({width:1440,height:940,minWidth:1080,minHeight:740,title:'AIUI 工坊',backgroundColor:'#ffffff',icon:path.join(ROOT,'assets/icon.png'),...(process.platform==='darwin'?{titleBarStyle:'hiddenInset',trafficLightPosition:{x:21,y:23}}:{titleBarStyle:'default',autoHideMenuBar:true}),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+  mainWindow.webContents.on('render-process-gone',(_event,details)=>{client.call('aiui_diagnostics_report',{source:'renderer-process',message:JSON.stringify(details)},'desktop').catch(()=>{});});
   mainWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   mainWindow.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('file://'))event.preventDefault();});
   require('./media-permissions.cjs').installMediaPermissions(session.defaultSession, { getWebContents:()=>mainWindow?.webContents, origin:client.connection.origin });
-  ipcMain.handle('workbench:call',async(event,tool,args)=>{trusted(event);if(!allowed.has(tool))throw new Error('未知操作');if(tool.startsWith('aiui_platform_'))await syncPlatformSession();const result=await client.call(tool,args,'desktop');if(tool==='aiui_glasses_mirror_embed_stop')mirrorWindowLifecycle.close(args.serial,result?.id);return result;});
+  handle('workbench:call',async(event,tool,args)=>{trusted(event);if(!allowed.has(tool))throw new Error('未知操作');if(tool.startsWith('aiui_platform_'))await syncPlatformSession();const result=await client.call(tool,args,'desktop');if(tool==='aiui_glasses_mirror_embed_stop')mirrorWindowLifecycle.close(args.serial,result?.id);return result;});
   const confirmingReviews=new Set();
-  ipcMain.handle('workbench:review-confirm',async(event,args)=>{
+  handle('workbench:review-confirm',async(event,args)=>{
     trusted(event);await syncPlatformSession();
     const draft=await client.call('ui_platform_review_confirmation',{...args,desktopKey:platformDesktopKey},'desktop-confirmation');
     if(confirmingReviews.has(draft.id))throw new Error('此提审确认窗口已打开');
@@ -49,7 +51,7 @@ app.whenReady().then(async()=>{
       return await client.call('ui_platform_review_submit',{projectId:draft.projectId,draftId:draft.id,digest:draft.digest,approvalId:draft.approvalId,desktopKey:platformDesktopKey},'desktop-confirmation');
     }finally{confirmingReviews.delete(draft.id);}
   });
-  ipcMain.handle('workbench:project-remove',async(event,args)=>{
+  handle('workbench:project-remove',async(event,args)=>{
     trusted(event);
     const intent=await client.call('ui_project_removal_begin',args,'desktop');
     let trashed=false;
@@ -62,8 +64,8 @@ app.whenReady().then(async()=>{
       throw error;
     }
   });
-  ipcMain.handle('workbench:locale',async(event,locale)=>{trusted(event);if(!['zh-CN','en'].includes(locale))throw new Error('Unsupported language');desktopLocale=locale;platformLogin.studio?.setTitle(locale==='en'?'Rokid Official Platform':'Rokid 官方平台');return true;});
-  ipcMain.handle('workbench:updates',async(event,method,args)=>{
+  handle('workbench:locale',async(event,locale)=>{trusted(event);if(!['zh-CN','en'].includes(locale))throw new Error('Unsupported language');desktopLocale=locale;platformLogin.studio?.setTitle(locale==='en'?'Rokid Official Platform':'Rokid 官方平台');return true;});
+  handle('workbench:updates',async(event,method,args)=>{
     trusted(event);
     if(method==='status')return {...updates.status(),canInstall:process.platform==='darwin'&&app.isPackaged,installing:!!upgradeTask};
     if(upgradeTask)throw new Error('正在准备升级，请稍候');
@@ -93,14 +95,14 @@ app.whenReady().then(async()=>{
     if(method==='release'){if(!updates.latest?.releaseUrl)throw new Error('没有可打开的发行页面');await shell.openExternal(updates.latest.releaseUrl);return true;}
     throw new Error('未知更新操作');
   });
-  ipcMain.handle('workbench:choose',async(event,kind)=>{trusted(event);const options=kind==='photo'?{properties:['openFile'],filters:[{name:desktopLocale==='en'?'Photos':'照片',extensions:['png','jpg','jpeg','webp']}]}:{properties:['openDirectory','createDirectory']};const result=await dialog.showOpenDialog(mainWindow,options);return result.canceled?null:result.filePaths[0];});
-  ipcMain.handle('workbench:choose-files',async(event,kind)=>{trusted(event);if(!['apk','files'].includes(kind))throw new Error('无效的文件类型');const result=await dialog.showOpenDialog(mainWindow,{properties:['openFile','multiSelections'],...(kind==='apk'?{filters:[{name:'Android APK',extensions:['apk']}]}:{})});return result.canceled?[]:result.filePaths;});
-  ipcMain.handle('workbench:clipboard',async(event,text)=>{trusted(event);clipboard.writeText(String(text));return true;});
-  ipcMain.handle('workbench:reveal',async(event,file)=>{trusted(event);if(typeof file!=='string'||!path.isAbsolute(file))throw new Error('无效路径');shell.showItemInFolder(file);return true;});
-  ipcMain.handle('workbench:external',async(event,url)=>{trusted(event);if(!/^https:\/\/(?:github\.com|js\.rokid\.com|yodaos-project\.github\.io|jsar-project\.github\.io|modelcontextprotocol\.io|developer\.android\.com|global\.rokid\.com|x-docs\.rokid\.com)\//.test(url))throw new Error('仅支持打开已知官方资料来源');await shell.openExternal(url);});
-  ipcMain.handle('workbench:studio',async event=>{trusted(event);await studioWindow();return true;});
-  ipcMain.handle('workbench:platform-logout',async event=>{trusted(event);return platformLogin.logout();});
-  ipcMain.handle('workbench:mirror-window',async(event,serial)=>{
+  handle('workbench:choose',async(event,kind)=>{trusted(event);const options=kind==='photo'?{properties:['openFile'],filters:[{name:desktopLocale==='en'?'Photos':'照片',extensions:['png','jpg','jpeg','webp']}]}:{properties:['openDirectory','createDirectory']};const result=await dialog.showOpenDialog(mainWindow,options);return result.canceled?null:result.filePaths[0];});
+  handle('workbench:choose-files',async(event,kind)=>{trusted(event);if(!['apk','files'].includes(kind))throw new Error('无效的文件类型');const result=await dialog.showOpenDialog(mainWindow,{properties:['openFile','multiSelections'],...(kind==='apk'?{filters:[{name:'Android APK',extensions:['apk']}]}:{})});return result.canceled?[]:result.filePaths;});
+  handle('workbench:clipboard',async(event,text)=>{trusted(event);clipboard.writeText(String(text));return true;});
+  handle('workbench:reveal',async(event,file)=>{trusted(event);if(typeof file!=='string'||!path.isAbsolute(file))throw new Error('无效路径');shell.showItemInFolder(file);return true;});
+  handle('workbench:external',async(event,url)=>{trusted(event);if(!/^https:\/\/(?:github\.com|forum\.rokid\.com|js\.rokid\.com|yodaos-project\.github\.io|jsar-project\.github\.io|modelcontextprotocol\.io|developer\.android\.com|global\.rokid\.com|x-docs\.rokid\.com)\//.test(url))throw new Error('仅支持打开已知官方资料来源');await shell.openExternal(url);});
+  handle('workbench:studio',async event=>{trusted(event);await studioWindow();return true;});
+  handle('workbench:platform-logout',async event=>{trusted(event);return platformLogin.logout();});
+  handle('workbench:mirror-window',async(event,serial)=>{
     trusted(event);
     const {session}=await client.call('aiui_glasses_mirror_embed_status',{serial},'desktop');
     if(session?.status!=='running')throw new Error('请先连接内嵌真机投屏');

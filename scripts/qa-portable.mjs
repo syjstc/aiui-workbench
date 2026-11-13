@@ -46,7 +46,9 @@ async function launch() {
   page.on('console', message => { if (message.type() === 'error') { (report.rendererErrors ||= []).push(message.text()); console.log('RENDERER', message.text()); } });
   console.log('STAGE desktop window opened', page.url());
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
-  await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor({ timeout: 45000 });
+  // A fresh 0.6+ profile opens the AI connection guide before any project exists.
+  await page.getByRole('button', { name: 'My projects', exact: true }).click();
+  await page.getByRole('heading', { name: 'My projects', exact: true }).waitFor({ timeout: 45000 });
   report.stage = 'desktop UI ready'; console.log('STAGE', report.stage); await atomicJson(path.join(output, 'verification.json'), report);
   const config = (await page.evaluate(() => window.workbench.call('aiui_mcp_config'))).mcpServers['aiui-workbench'];
   const installation = await readJson(path.join(home, 'mcp/installation.json'));
@@ -82,7 +84,9 @@ try {
     const build = await job('aiui_project_pack', { projectId: project.id });
     assert.equal(sha(await fs.readFile(build.path)), build.sha256);
     const preview = await tool('aiui_preview_open', { projectId: project.id });
-    await page.getByText('Preview running', { exact: true }).waitFor({ timeout: 30000 });
+    await page.getByRole('heading', { name: project.name, exact: true }).waitFor({ timeout: 30000 });
+    await page.frameLocator('iframe').locator('#screen').waitFor({ state: 'visible', timeout: 45000 });
+    await page.frameLocator('iframe').locator('#status').waitFor({ state: 'hidden', timeout: 45000 });
     const capture = await mcp.callTool({ name: 'aiui_preview_capture', arguments: { sessionId: preview.id } });
     assert.equal(capture.content[0].type, 'image');
     await fs.writeFile(path.join(output, 'preview.png'), Buffer.from(capture.content[0].data, 'base64'));

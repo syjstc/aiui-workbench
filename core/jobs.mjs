@@ -21,7 +21,7 @@ export class Jobs {
     this.controllers.set(job.id, controller); this.items.unshift(job); this.items = this.items.slice(0,60);
     const progress = message => { job.message = redact(message); job.logs.push({ at: new Date().toISOString(), message: job.message }); job.logs = job.logs.slice(-120); this.emit('job', this.get(job.id)); };
     this.save().catch(() => {});
-    job.promise = (async () => { try { job.result = await work({ signal: controller.signal, progress }); job.status = controller.signal.aborted ? 'cancelled' : 'succeeded'; } catch(e) { job.status = controller.signal.aborted ? 'cancelled' : 'failed'; job.error = redact(e.message); if(e.result)job.result=e.result; } finally { job.finishedAt = new Date().toISOString(); this.controllers.delete(job.id); this.emit('job', this.get(job.id)); await this.save(); } })();
+    job.promise = (async () => { try { job.result = await work({ signal: controller.signal, progress }); job.status = controller.signal.aborted ? 'cancelled' : 'succeeded'; } catch(e) { job.status = controller.signal.aborted ? 'cancelled' : 'failed'; job.error = redact(e.message); job.errorStack=redact(e.stack||e.message); if(e.result)job.result=e.result; job.diagnosticId=e.diagnosticId||await this.onFailure?.(e,job); } finally { job.finishedAt = new Date().toISOString(); this.controllers.delete(job.id); this.emit('job', this.get(job.id)); await this.save(); } })();
     return this.get(job.id);
   }
   cancel(jobId) { this.controllers.get(jobId)?.abort(); return this.get(jobId); }

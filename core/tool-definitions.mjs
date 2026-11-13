@@ -1,8 +1,18 @@
 import { z } from 'zod';
-import { previewTestSchema, buildSchema, jobWaitSchema, recordingSchema,clipSchema } from './automation-contract.mjs';
+import { previewTestSchema, previewStep, buildSchema, jobWaitSchema, recordingSchema,clipSchema } from './automation-contract.mjs';
 import { platformUploadSchema, platformReviewSchema } from './platform-contract.mjs';
 const string=z.string(), project={projectId:string}, session={sessionId:string};
 export const TOOL_DEFINITIONS=[
+ ['aiui_project_files','在项目内列出/读取/写入 UTF-8 应用源码。只有 MCP 的 AI 也可直接制作应用。write 必须传读取时返回的 expectedRevision，版本变化时拒绝覆盖。每次最多 20 个文件/1 MB；禁止项目外路径、符号链接、工具配置、指令和隐藏目录；不能删除文件。',{projectId:string,action:z.enum(['list','read','write']),paths:z.array(z.string().min(1)).min(1).max(20).optional(),files:z.array(z.object({path:z.string().min(1),content:z.string().max(1024*1024)}).strict()).min(1).max(20).optional(),expectedRevision:z.string().regex(/^[a-f0-9]{64}$/).optional()}],
+ ['aiui_adb_connect','使用内置 ADB 连接眼镜显示的无线 IP:端口；需要配对时同时提供六位 pairingCode，不保存配对码。电脑和眼镜需在同一网络，并由用户先开启相应无线调试。',{address:string,pairingCode:z.string().regex(/^\d{6}$/).optional()}],
+ ['aiui_workflow_start','收到一句应用需求后优先调用：自动创建项目和目录，返回官方规范及完整制作流程。通过 aiui_project_files 或自己的编码工具编辑真实源码；通过 continue 自动验证、打包并在设备就绪时安装。requestId 可防止重复创建。',{request:z.string().min(1).max(6000),name:z.string().min(1).max(80).optional(),projectId:string.optional(),directory:string.optional(),target:z.enum(['glasses','package']).default('glasses'),locale:z.enum(['zh-CN','en']).optional(),requestId:string.optional(),existingSkills:z.array(z.enum(['aiui-dev','aiui-workshop'])).max(2).optional()}],
+ ['aiui_workflow_get','读取完整制作进度、源码是否变化、验证证据、阻塞原因和下一步。owner=user 时告诉用户具体操作；完成后继续同一任务。',{workflowId:string.optional(),projectId:string.optional()}],
+ ['aiui_workflow_continue','编辑源码后执行完整验证、检查打包、设备检查、安装启动和真机截图日志。传应用行为 steps；缺少断言时只报告运行健康。模拟器不支持真实模型/语音等能力时可明确选择 verification.mode=device 并说明 reason，改到真机安装和采证，功能验收仍待确认。阻塞返回用户步骤；继续同一 workflowId。仍 running 时用 aiui_job_wait。',{workflowId:string,steps:z.array(previewStep).max(40).optional(),verification:z.discriminatedUnion('mode',[z.object({mode:z.literal('simulator')}).strict(),z.object({mode:z.literal('device'),reason:z.string().min(10).max(1000)}).strict()]).optional(),serial:string.optional(),waitMs:z.number().int().min(0).max(55000).default(45000)}],
+ ['aiui_diagnostics_get','按项目读取共享诊断，含项目名/目录、任务、原始错误与恢复步骤。MCP/CLI 读取后自动标为已读并从界面未读列表隐藏，不代表修复；markRead=false 仅查看。read=false 只读未读；afterSequence 增量读取。常规工具已自动附带当前项目及公共环境的未读问题，用户无需复制日志。',{diagnosticId:string.optional(),projectId:string.optional(),scope:z.enum(['project','workbench','unassigned']).optional(),read:z.boolean().optional(),markRead:z.boolean().optional(),afterSequence:z.number().int().nonnegative().optional(),status:z.enum(['open','resolved']).optional(),limit:z.number().int().min(1).max(100).default(30)}],
+ ['aiui_diagnostics_mark_read','将明确选择的诊断标为已读并收起，保留原始证据和未修复状态；通常由 MCP/CLI 读取自动完成。',{diagnosticIds:z.array(string).min(1).max(100)}],
+ ['aiui_diagnostics_resolve','验证修复后标记指定诊断已处理；不删除证据，不代表应用已验收。',{diagnosticIds:z.array(string).min(1).max(100),note:z.string().max(2000).optional()}],
+ ['aiui_diagnostics_report','记录桌面/浏览器自身异常供外部 AI 排查；自动去重和隐藏凭据。',{message:z.string().min(1).max(12000),stack:z.string().max(24000).optional(),source:z.string().max(80).optional(),projectId:string.optional(),sessionId:string.optional(),workflowId:string.optional()}],
+ ['aiui_service_log_read','读取本地服务日志末尾正文（自动隐藏凭据），供 AI 排查工坊启动或运行问题。',{maxBytes:z.number().int().min(1000).max(64000).default(32000)}],
  ['aiui_tools_list','读取当前运行服务实际支持的工具、参数与能力契约；MCP 连接不要求工坊版本相同',{}],
  ['aiui_record_clip','一次录制 1–30 秒模拟器应用画面或真实眼镜显示屏，等待封装后返回本地 MP4/WebM、SHA256 和来源。真机用内置 scrcpy，无声、只读录屏，不打断已有投屏；模拟画面不是真机佩戴光学实拍。配合操作脚本可用 aiui_preview_test 的 record=true。',clipSchema.shape],
  ['aiui_record_start','开始录制模拟器 canvas 或眼镜屏幕，最长 120 秒自动停止。模拟器传 sessionId 或 projectId，真机传 serial；返回 recordingId，用 status/stop 获取完整文件。',recordingSchema.shape],
@@ -25,7 +35,7 @@ export const TOOL_DEFINITIONS=[
  ['aiui_project_import','注册本机现有 AIUI 项目目录，不复制或修改源码',{directory:string}],
  ['aiui_project_create','使用已同步的官方 Page 模板初始化一个新目录',{directory:string,name:string,locale:z.enum(['zh-CN','en']).optional(),template:z.enum(['page']).optional()}],
  ['aiui_project_refresh','刷新项目源码版本与元数据',project],
- ['aiui_context_get','获取项目上下文、官方 Skill 与模拟支持边界',{projectId:string.optional()}],
+ ['aiui_context_get','首次使用先调用。一次返回真实工具、官方 aiui-dev、工坊流程 Skill 和诊断；使用项目时自动检查并补齐缺失 Skill，不重复安装或覆盖用户修改。setup=true 同时安装缺失用户级 Skill 并检查环境；客户端已加载的插件/云端 Skill 用 existingSkills 告知，避免重复。无想法时主动询问，有想法则继续制作。',{projectId:string.optional(),setup:z.boolean().optional(),existingSkills:z.array(z.enum(['aiui-dev','aiui-workshop'])).max(2).optional()}],
  ['aiui_docs_sync','检查上游并同步官方文档与完整 aiui-dev Skill，返回任务 ID',{}],
  ['aiui_docs_settings','设置文档自动更新：服务启动补查、每天或每周检查，失败保留离线快照并稍后重试',{autoUpdate:z.boolean().optional(),intervalHours:z.union([z.literal(24),z.literal(168)]).optional()}],
  ['aiui_docs_catalog','一次获取完整官方目录树和全部文档元数据，无需逐页加载',{locale:z.enum(['zh-CN','en']).optional(),sort:z.enum(['recommended','title','path']).optional(),revision:string.optional()}],

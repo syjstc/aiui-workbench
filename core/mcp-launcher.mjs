@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import semver from 'semver';
 import { ROOT, atomicJson, id, readJson } from './util.mjs';
 import { APP_VERSION } from './version.mjs';
 
@@ -10,8 +11,10 @@ const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
 export async function installMcpLauncher(home, { root = ROOT, executable = process.execPath, platform = process.platform } = {}) {
   const directory = path.join(home, 'mcp');
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
-  const target = { schemaVersion: 1, version: APP_VERSION, root, executable, entry: path.join(root, 'mcp/server.mjs') };
-  await atomicJson(path.join(directory, 'installation.json'), target);
+  let target = { schemaVersion: 1, version: APP_VERSION, root, executable, entry: path.join(root, 'mcp/server.mjs') };
+  const previous=await mcpInstallation(home).catch(()=>null);
+  if(previous&&semver.valid(previous.version)&&semver.gt(previous.version,APP_VERSION))target=previous;
+  else await atomicJson(path.join(directory, 'installation.json'), target);
   const env = { AIUI_WORKBENCH_HOME: home, ELECTRON_RUN_AS_NODE: '1' };
   if (platform === 'win32') {
     const systemRoot = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows';
@@ -42,7 +45,7 @@ export async function installMcpLauncher(home, { root = ROOT, executable = proce
   }
   const launcher = path.join(directory, 'launch.sh'), temporary = launcher + '.' + id() + '.tmp';
   try {
-    await fs.writeFile(temporary, '#!/bin/sh\nset -eu\nexport ELECTRON_RUN_AS_NODE=1\nexec ' + quote(executable) + ' ' + quote(target.entry) + '\n', { mode: 0o700 });
+    await fs.writeFile(temporary, '#!/bin/sh\nset -eu\nexport ELECTRON_RUN_AS_NODE=1\nexec ' + quote(target.executable) + ' ' + quote(target.entry) + '\n', { mode: 0o700 });
     await fs.rename(temporary, launcher);
   } finally { await fs.rm(temporary, { force: true }); }
   return { mcpServers: { 'aiui-workbench': { command: '/bin/sh', args: [launcher], env } } };
