@@ -87,15 +87,24 @@ export class Projects {
   }
   watch(p) {
     if (this.watchers.has(p.id)) return;
-    let timer;
+    let timer, closing = false, pending = Promise.resolve();
     const watcher = watch(projectIconWatchPaths(p), { ignoreInitial: true, followSymlinks: false, ignored: entry => path.relative(p.projectPath, entry).split(path.sep).some(part => SKIP.has(part) || part.startsWith('.mcp.json.backup-')), awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 } });
-    const refresh = () => { clearTimeout(timer); timer = setTimeout(async () => { try { await this.refresh(p.id); } catch(e) { p.error = e.message; await this.save(); } }, 250); };
+    const refresh = () => {
+      if (closing) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        pending = pending.then(async () => {
+          if (closing) return;
+          try { await this.refresh(p.id); } catch(e) { p.error = e.message; await this.save(); }
+        });
+      }, 250);
+    };
     // Reconcile the gap between reading metadata and the native watch becoming
     // active; initial events are ignored and can coalesce with an atomic save.
     watcher.on('ready', refresh);
     watcher.on('all', refresh);
     watcher.on('error', error => this.emit('log', { level: 'error', message: error.message, projectId: p.id, revision: p.revision }));
-    this.watchers.set(p.id, { watcher, close: () => { clearTimeout(timer); return watcher.close(); } });
+    this.watchers.set(p.id, { watcher, close: async () => { closing = true; clearTimeout(timer); await watcher.close(); await pending; } });
   }
   async bundle(projectId) {
     const p = this.get(projectId), files = await collectFiles(p.agentPath);
@@ -131,5 +140,5 @@ export class Projects {
     catch (error) { this.items.splice(index, 0, project); if (await fs.access(project.agentPath).then(() => true, () => false)) this.watch(project); throw error; }
     return project;
   }
-  async close() { await Promise.all([...this.watchers.values()].map(w => w.close())); }
+  async close() { await Promise.all([...this.watchers.values()].map(w => w.close())); this.watchers.clear(); await this.saveQueue; }
 }
