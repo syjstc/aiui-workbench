@@ -9,11 +9,15 @@ async function fixture(t){const home=await fs.realpath(await fs.mkdtemp(path.joi
 test('an MCP-only AI can read instructions, list and edit real source with a revision precondition',async t=>{
  const {w,p}=await fixture(t);const context=await w.call('aiui_context_get',{projectId:p.id});assert.match(context.projectInstructions,/一次物理滑动/);
  await fs.chmod(path.join(p.agentPath,'pages/index/index.ink'),0o600);
+ // Windows exposes writable files as 0666; preserve the mode the filesystem
+ // actually supports rather than requiring POSIX owner/group permissions.
+ const originalMode=(await fs.stat(path.join(p.agentPath,'pages/index/index.ink'))).mode&0o777;
+ if(process.platform!=='win32')assert.equal(originalMode,0o600);
  const list=await w.call('aiui_project_files',{projectId:p.id,action:'list'});assert.ok(list.files.some(f=>f.path==='pages/index/index.ink'));assert.ok(!list.files.some(f=>f.path.startsWith('.')));
  const read=await w.call('aiui_project_files',{projectId:p.id,action:'read',paths:['pages/index/index.ink','AGENTS.md']});assert.match(read.files[1].content,/一次物理滑动/);
  const content=read.files[0].content+'\n<!-- MCP source edit -->';
  const written=await w.call('aiui_project_files',{projectId:p.id,action:'write',expectedRevision:read.revision,files:[{path:'pages/index/index.ink',content},{path:'lib/new-module.js',content:'export const value=1;'}]});
- assert.equal(written.written.length,2);assert.notEqual(written.revision,read.revision);assert.equal(await fs.readFile(path.join(p.agentPath,'pages/index/index.ink'),'utf8'),content);assert.equal(w.projects.get(p.id).revision,written.revision);assert.equal((await fs.stat(path.join(p.agentPath,'pages/index/index.ink'))).mode&0o777,0o600);
+ assert.equal(written.written.length,2);assert.notEqual(written.revision,read.revision);assert.equal(await fs.readFile(path.join(p.agentPath,'pages/index/index.ink'),'utf8'),content);assert.equal(w.projects.get(p.id).revision,written.revision);assert.equal((await fs.stat(path.join(p.agentPath,'pages/index/index.ink'))).mode&0o777,originalMode);
 });
 
 test('a stale AI write preserves newer user edits and reports the actual revision',async t=>{
