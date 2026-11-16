@@ -5,7 +5,8 @@ export function parseDevices(output) {
     const match = line.match(/^(\S+)\s+(device|unauthorized|offline)\b(.*)$/);
     if (!match) return [];
     const [, serial, status, details] = match;
-    return [{ serial, status, name: details.match(/\bmodel:(\S+)/)?.[1].replaceAll('_', ' ') || 'USB 设备', transport: details.match(/\btransport_id:(\S+)/)?.[1] || '', description: line }];
+    const connection = /_adb(?:-tls-connect)?\._tcp\.?$/.test(serial) || /^(?:\[[a-f\d:.]+(?:%[a-z\d_.-]+)?\]|[\d.]+):\d+$/i.test(serial) ? 'wireless' : serial.startsWith('emulator-') ? 'emulator' : 'usb';
+    return [{ serial, status, connection, name: details.match(/\bmodel:(\S+)/)?.[1].replaceAll('_', ' ') || (connection === 'wireless' ? '无线设备' : 'USB 设备'), transport: details.match(/\btransport_id:(\S+)/)?.[1] || '', description: line }];
   });
 }
 
@@ -17,7 +18,7 @@ export function parseInspection(output) {
   };
 }
 
-// Poll USB every time, but avoid launching the CLI for every UI refresh.
+// Poll all ADB transports, but avoid launching the CLI for every UI refresh.
 // Cache only while a device stays connected with the same transport identity.
 export class DeviceDiscovery {
   constructor(cli, execute = run, now = Date.now) {
@@ -66,7 +67,7 @@ export class DeviceDiscovery {
       aix: cli.code === 0, adb: adb.code === 0, devices,
       checkedAt: new Date(this.now()).toISOString(),
       diagnostics: { adb: adb.code ? adb.output : '', aix: cli.code ? cli.output : '' },
-      message: devices.length ? '眼镜连接状态已自动更新' : '请用数据线连接眼镜，连接后会自动识别。',
+      message: devices.length ? '眼镜连接状态已自动更新' : '请开启无线调试或用数据线连接眼镜，连接后会自动识别。',
     };
   }
 }

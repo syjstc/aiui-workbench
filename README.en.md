@@ -10,11 +10,11 @@ A local workbench for Rokid AIUI development. Manage projects, read official doc
 
 ## Download
 
-Current version: **0.6.1**; see the [changelog (Chinese)](CHANGELOG.md). Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.1).
+Current version: **0.6.11**; see the [changelog (Chinese)](CHANGELOG.md). Download packages and `SHA256SUMS.txt` from [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.11).
 
 | Platform | Install | Signing |
 | --- | --- | --- |
-| macOS, Apple Silicon | Open the `darwin-arm64.dmg` and drag `AIUI Workshop.app` to Applications; ZIP is also available | Developer ID; see release notes for notarization verification |
+| macOS, Apple Silicon | Open the `darwin-arm64.dmg` and drag `AIUI Workshop.app` to Applications; ZIP is also available | Developer ID signed and Apple notarized |
 | Windows 10 / 11, x64 | Extract the entire `win32-x64.zip`, launch `AIUI Workshop.exe` | Unsigned |
 
 The app includes Electron/Node, npm, official CLI, Ink WASM, documentation, ADB and scrcpy. No separate Node.js, Android Studio or PATH setup is needed. Windows may show a reputation warning for the unsigned app; verify the source and checksum before running it. Intel Mac, Windows ARM64 and Linux release downloads are not currently provided.
@@ -40,6 +40,7 @@ Copy one instruction from **Connect AI tools** into your usual AI client. The AI
 - **Official platform drafts and review:** AI prepares materials and calls MCP; Workshop uploads AIX packages, verifies cloud digests and saves review drafts. Submission requires the user's native desktop confirmation. Reuse an OS-encrypted official session after signing in, with an explicit sign-out action.
 - **Read-only cloud catalog:** separate Build & upload and Official apps tabs. One official Agent ID binding drives build, upload and review; show and copy the full ID. Inspect official icons, descriptions, permissions, images, videos and draft/review/published versions. Neither Workshop nor MCP provides cloud deletion.
 - **Glasses tools:** device information, files, real APK names/icons, screenshots, logs, and embedded mirroring with an optional separate window that closes when mirroring ends.
+- **Wireless debugging.** Open **Connect glasses → Connect over Wi-Fi**. Workshop finds devices on the current network, guides first-time authorization, six-digit or glasses QR pairing, and reconnects saved glasses. If your glasses have no Settings entry, a helper is available through the phone Toolbox. Its download page follows the Workshop language, with APK installation and phone remote steps. AI tools can return setup screenshots. [Wireless setup guide](docs/wireless-debugging.md)
 - **Read-only AIUI catalogs:** separate development, store, and system-provided apps. Store and system-provided apps have no delete, uninstall, or clear-data controls. Restricted store inventories are reported as unavailable, with an unknown count.
 - **Update notice:** a persistent bottom-left notice offers download and restart on macOS. Windows offers package download and manual installation.
 - **Language and appearance:** persistent 中文 / EN buttons, light/dark/system themes.

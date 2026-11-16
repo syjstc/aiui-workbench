@@ -11,6 +11,8 @@ import { prepareWindowsIcon } from './prepare-icon.mjs';
 import { zipDirectory } from './archive.mjs';
 import { signMac } from './sign-mac.mjs';
 import { generateLicenses } from './third-party-licenses.mjs';
+import { prepareAdbTrust } from './prepare-adb-trust.mjs';
+import { prepareWirelessHelper } from './prepare-wireless-helper.mjs';
 
 const { values } = parseArgs({ options: { platform: { type: 'string' }, arch: { type: 'string' }, out: { type: 'string' }, sign: { type: 'boolean', default: false } } });
 const platform = values.platform || process.platform;
@@ -20,6 +22,8 @@ const tmpdir = path.join(ROOT, '.local', 'packager-' + process.pid);
 if (platform === 'darwin' && process.platform !== 'darwin') throw new Error('Build the macOS package on macOS.');
 if (values.sign && (platform !== 'darwin' || !process.env.MACOS_SIGN_IDENTITY?.startsWith('Developer ID Application:'))) throw new Error('--sign requires macOS and MACOS_SIGN_IDENTITY with a Developer ID Application certificate.');
 await generateLicenses();
+await prepareAdbTrust();
+await prepareWirelessHelper();
 await prepareAdb(platform, arch);
 await prepareScrcpy(platform, arch);
 const icon = platform === 'win32' ? await prepareWindowsIcon() : path.join(ROOT, 'assets/app.icns');
@@ -33,7 +37,7 @@ try {
     platform, arch, icon, overwrite: true, asar: false, prune: true,
     win32metadata: { ProductName: 'AIUI Workshop', FileDescription: 'AIUI Workshop', CompanyName: 'AIUI Workbench' },
     ignore: [/^\/(?:\.local|output|tests|scripts|renderer|preview|mirror|examples|\.git|\.github|\.agents|\.codex)(?:\/|$)/, /(?:^|\/)\.env(?:\.|$)/, /\.(?:p8|p12|pfx|keychain-db)$/, /(?:^|\/)\.DS_Store$/, /\.log$/, /package-lock\.json$/, /vite\.config\.mjs$/, /^\/docs\/screenshots(?:\/|$)/, /^\/assets\/branding\/previous-icon\.png$/, ...['darwin', 'linux', 'win32'].filter(p => p !== platform).map(p => new RegExp(`^/vendor/adb/${p}(?:/|$)`)), ...['darwin-arm64','darwin-x64','linux-x64','win32-x64'].filter(key => key !== `${platform}-${arch}`).map(key => new RegExp(`^/vendor/scrcpy/${key}(?:/|$)`))],
-    extendInfo: { CFBundleDisplayName: 'AIUI 工坊', NSCameraUsageDescription: '在模拟器中使用电脑摄像头，测试 AIUI 应用的实时取景与拍照。', NSHumanReadableCopyright: 'AIUI Workbench. Includes official AIUI and Ink components with their original notices.' },
+    extendInfo: { CFBundleDisplayName: 'AIUI 工坊', NSCameraUsageDescription: '在模拟器中使用电脑摄像头，测试 AIUI 应用的实时取景与拍照。', NSLocalNetworkUsageDescription: '查找并无线连接同一网络的 Rokid 眼镜，用于安装应用、调试、文件管理和投屏。', NSBonjourServices: ['_adb._tcp', '_adb-tls-pairing._tcp', '_adb-tls-connect._tcp'], NSHumanReadableCopyright: 'AIUI Workbench. Includes official AIUI and Ink components with their original notices.' },
   });
   for (const directory of paths) {
     console.log(directory);

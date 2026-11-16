@@ -1,0 +1,8 @@
+{
+  "sourceSha256": "91b9e363d566838634275f34f9fcb639108e389e1b8ec436a673fb482b84a027",
+  "sha256": "c20a41d0e1728c779f5e23734312ad4f9e6d55c3f196337530135b7f1aab99b8",
+  "certificateSha256": "c1a62c1535dfafed8f2ff57528ef2607572425a2411e3f4ce1b5be9a45687fcb",
+  "bytes": 33250,
+  "packageName": "com.aiui.workbench.wireless",
+  "version": "1.7"
+}

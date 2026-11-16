@@ -464,6 +464,105 @@ html[lang=en] .simulation-controls .control-tabs button{font-size:11px;gap:4px}
 .environment-checks>div{background:var(--surface);color:var(--secondary);border-color:var(--border);flex-wrap:wrap}
 .environment-checks strong{font-size:12px;color:var(--secondary)}
 .device-details .job-output{margin-bottom:14px}
+.wireless-connection{border:1px solid var(--border);border-radius:10px;padding:22px;margin:0 0 28px;background:var(--surface);min-width:0}
+.connection-method-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:1200px;margin:0 0 14px;padding:5px;background:var(--soft);border:1px solid var(--border);border-radius:9px}
+.connection-method-tabs [role=tab]{display:flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:10px 14px;border:1px solid transparent;border-radius:6px;color:var(--secondary);font-size:14px}
+.connection-method-tabs [role=tab][aria-selected=true]{background:var(--surface);border-color:var(--border-strong);color:var(--ink);font-weight:600;box-shadow:0 1px 3px var(--shadow-small)}
+.connection-method-tabs small{display:inline-flex;align-items:center;gap:4px;color:var(--success);font-size:10px;font-weight:400}
+.wired-connection{border:1px solid var(--border);border-radius:10px;padding:22px;margin:0 0 28px;background:var(--surface)}
+.wired-steps{margin-top:18px;max-width:760px}
+@media(max-width:650px){.connection-method-tabs small{font-size:0;gap:0}.connection-method-tabs [role=tab]{padding:10px 8px;font-size:13px}.wired-connection{padding:16px}}
+.wireless-progress{list-style:none;display:flex;gap:12px;margin:0 0 22px;padding:0}
+.wireless-progress li{display:flex;align-items:center;gap:8px;flex:1;font-size:12px;color:var(--secondary);padding-bottom:13px;border-bottom:2px solid var(--border)}
+.wireless-progress li>span{width:23px;height:23px;border-radius:50%;display:grid;place-items:center;background:var(--soft);font-size:11px;flex-shrink:0}
+.wireless-progress li.current{border-color:var(--ink);color:var(--ink);font-weight:600}.wireless-progress li.current>span{background:var(--ink);color:var(--surface)}
+.wireless-progress li.complete{color:var(--accent);border-color:var(--accent)}
+.wireless-already-ready{margin-top:18px;font-size:12px;color:var(--secondary)}.wireless-already-ready summary{cursor:pointer;line-height:1.8}
+.wireless-pair-options{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 18px}
+.wireless-pair-options button{display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--secondary);font:inherit;font-size:13px;padding:10px 15px;cursor:pointer}
+.wireless-pair-options button.active{border-color:var(--ink);background:var(--ink);color:var(--surface)}
+.wireless-pair-options button:focus-visible,.wireless-already-ready summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wireless-phone-layout{display:flex;align-items:flex-start;gap:26px;margin:18px 0 20px}
+.wireless-download-card{flex-shrink:0;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px;width:239px;max-width:100%;margin:14px 0}
+.wireless-phone-layout .wireless-download-card{margin:0}
+.wireless-download-card p{font-size:11px;line-height:1.65;margin:6px 0 0;display:flex;align-items:center;gap:6px}
+.wireless-location{display:flex;align-items:center;gap:6px;color:var(--ink);font-size:12px;font-weight:600;margin:0 0 10px}
+.wireless-after-connect{font-size:13px;line-height:1.9;color:var(--secondary);margin:0 0 24px}
+.device-usage-guide{border:1px solid var(--border);border-radius:9px;padding:22px;margin:0 0 24px}.device-usage-guide h3{font-size:15px;margin:0 0 16px}
+.device-usage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}.device-usage-grid strong{font-size:13px}.device-usage-grid p{font-size:12px;line-height:1.9;color:var(--secondary);margin:8px 0 0}
+.wireless-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}
+.wireless-heading h3{display:flex;align-items:center;gap:8px;font-size:16px;margin:0 0 9px}
+.wireless-heading p,.wireless-content>p,.wireless-help li{font-size:13px;color:var(--secondary);line-height:1.85}
+.wireless-heading .button{flex-shrink:0}
+.wireless-heading-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;flex-shrink:0;gap:12px;max-width:50%}
+.wireless-heading-actions .text-button{font-size:12px}
+.wireless-next-action{display:flex;gap:15px;padding:20px;background:var(--soft);border:1px solid var(--border);border-radius:8px}
+.wireless-next-icon{width:40px;height:40px;display:grid;place-items:center;flex-shrink:0;border-radius:10px;background:var(--surface);color:var(--ink);border:1px solid var(--border)}
+.wireless-next-copy{min-width:0;flex:1}
+.wireless-next-copy h3{font-size:17px;line-height:1.6;margin:0 0 8px;color:var(--ink)}
+.wireless-next-copy p{font-size:13px;line-height:1.9;color:var(--secondary);margin:0 0 14px;max-width:750px}
+.wireless-next-copy .button{min-height:38px}
+.wireless-next-copy .wireless-wait-hint{font-size:12px;margin:10px 0 0}
+.wireless-action-row{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.wireless-guided-pair{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.wireless-guided-pair label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--secondary)}
+.wireless-guided-pair input{width:180px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);font-size:16px;letter-spacing:5px}
+.wireless-guided-pair .wireless-guided-address{width:220px;max-width:100%;letter-spacing:normal;font-size:14px}
+.wireless-install-steps{display:grid;gap:18px;margin:2px 0 0;list-style:none;padding:0;flex:1;min-width:0}
+.wireless-install-steps li{display:flex;gap:11px;align-items:flex-start}.wireless-install-steps li>span{display:grid;place-items:center;flex-shrink:0;width:24px;height:24px;font-size:11px;color:var(--ink);border:1px solid var(--border);border-radius:50%;background:var(--surface)}
+.wireless-install-steps p{margin:0}
+.wireless-install-steps strong{display:block;color:var(--ink);font-size:13px}
+.wireless-install-steps li p{font-size:12px;margin:4px 0 0;line-height:1.85}
+.wireless-qr{display:block;width:205px;max-width:100%;height:auto;image-rendering:pixelated;background:white;border:1px solid var(--border);border-radius:5px;margin:2px 0 14px}
+.wireless-adapter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;font-size:12px}
+.wireless-next-copy>.text-button,.wireless-next-copy>.wireless-guided-pair+.text-button{margin-top:12px}
+.wireless-next-copy .wireless-action-row+p{margin-top:14px}
+.wireless-advanced{margin-top:20px;border-top:1px solid var(--border);padding-top:15px}
+.wireless-advanced>summary{font-size:12px;color:var(--secondary);cursor:pointer;line-height:1.8}
+.wireless-reset-tools{border-top:1px solid var(--border);padding-top:16px;margin-top:18px}
+.wireless-reset-tools h4{font-size:13px;margin:0}
+.wireless-reset-tools .button{margin-top:12px}
+.wireless-reset-tools .wireless-reset-options{margin-top:10px}
+.wireless-advanced>summary:focus-visible,.wireless-guided-pair input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(max-width:850px){.wireless-next-action{padding:16px;gap:10px}.wireless-next-icon{display:none}.wireless-next-copy h3{font-size:16px}.wireless-phone-layout{flex-direction:column;gap:20px}.device-usage-grid{grid-template-columns:1fr;gap:16px}.wireless-progress{gap:8px}.wireless-progress li{font-size:11px;gap:5px}}
+.wireless-reset-options{margin-top:12px;font-size:12px;color:var(--secondary);line-height:1.8}
+.wireless-reset-options label{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.wireless-reset-options input{width:auto;flex-shrink:0;margin:4px 0 0}
+.wireless-reset-options p{margin:6px 0 0 22px;color:var(--secondary)}
+.wireless-methods{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0}
+.wireless-methods button{border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:12px;color:var(--secondary);background:transparent;cursor:pointer}
+.wireless-methods button.active{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.wireless-methods button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wireless-instructions{padding-left:21px;font-size:13px;color:var(--secondary);line-height:1.85;margin:0 0 16px}
+.wireless-instructions li+li{margin-top:6px}
+.wireless-empty{background:var(--soft);border-radius:6px;padding:13px 15px;margin:14px 0 0}
+.wireless-content label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--secondary);min-width:0}
+.wireless-fields{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(150px,1fr);gap:14px;margin:16px 0}
+.wireless-content input{width:100%;min-width:0;font-size:14px;padding:10px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)}
+.wireless-content input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wireless-optional{margin:0 0 18px;font-size:12px;color:var(--secondary)}
+.wireless-optional summary,.wireless-help summary{cursor:pointer;line-height:1.8}
+.wireless-optional label{max-width:420px;margin-top:12px}
+.wireless-optional p{font-size:12px;line-height:1.8;margin-top:8px}
+.wireless-note{font-size:12px;color:var(--secondary);line-height:1.8;margin:12px 0 0}
+span.wireless-note{display:inline-block;margin:0 0 0 12px}
+.wireless-direct{display:flex;align-items:flex-end;gap:12px;margin-top:16px}
+.wireless-direct label{flex:1;max-width:480px}
+.wireless-result{padding:13px 15px;background:var(--soft);border:1px solid var(--border);border-radius:6px;font-size:13px;line-height:1.9;margin-top:18px;overflow-wrap:anywhere;white-space:pre-wrap}
+.wireless-result.warning{color:var(--warning)}
+.wireless-saved{border-top:1px solid var(--border);margin-top:20px;padding-top:16px}
+.wireless-saved h4{font-size:13px;margin:0 0 6px}
+.wireless-device{display:flex;align-items:center;gap:12px;padding:14px 0}
+.wireless-device+.wireless-device{border-top:1px solid var(--border)}
+.wireless-device>svg{color:var(--secondary);flex-shrink:0}
+.wireless-device>div{flex:1;min-width:0}
+.wireless-device strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.wireless-device span,.wireless-device p{display:block;font-size:12px;color:var(--secondary);line-height:1.8;overflow-wrap:anywhere;margin:4px 0 0}
+.wireless-device .button,.wireless-device .text-button{flex-shrink:0}
+.wireless-help{margin-top:18px;font-size:12px;color:var(--secondary)}
+.wireless-help ul{padding-left:20px;margin:10px 0}
+.wireless-help .text-button{font-size:12px}
+@media(max-width:850px){.wireless-connection{padding:16px}.wireless-heading{gap:12px}.wireless-heading .button{padding:8px}.wireless-fields{grid-template-columns:1fr}.wireless-device{flex-wrap:wrap}.wireless-device>div{flex-basis:65%}.wireless-direct{align-items:stretch;flex-direction:column}.wireless-direct label{max-width:none}}
 .view-devices>.panel:last-child{max-width:1200px}
 @media(max-width:1230px){.content{padding:24px}.knowledge-layout{grid-template-columns:240px minmax(0,1fr)}.doc-body{padding:28px 26px 50px}.doc-reader-top{padding:13px 20px}.reader-actions{gap:10px}.doc-revision{display:none}.device-panel{padding:24px}.connection-steps{padding:18px;gap:12px}.device-workflow{gap:24px}.device-install{padding-left:24px}.auto-detection{font-size:11px}.overview>div{padding:0 16px}}
 @media(max-height:800px){.view-knowledge{padding-top:20px;padding-bottom:16px}.view-knowledge .page-heading{margin-bottom:10px}.knowledge-meta{margin-bottom:14px}.workspace-tag{margin-bottom:18px}.sidebar-divider{margin:12px 10px}.sidebar-bottom{padding-bottom:10px}}

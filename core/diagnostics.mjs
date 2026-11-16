@@ -13,6 +13,7 @@ export function diagnosticValue(value, depth = 0) {
 
 export function recoveryFor(message = '', source = '') {
   if(source==='startup')return {category:'startup',owner:'user',title:'请重新打开工坊并检查启动环境',steps:['确认使用完整客户端，重新打开工坊。','AI 可先读取服务日志与诊断；修复环境后调用 aiui_environment_check 重试，继续原任务。'],view:'logs'};
+  if (/无线|配对|Wi-Fi|IP:端口/i.test(message)) return {category:'device-connection',owner:'user',title:'请检查眼镜无线连接',steps:[message,'打开工坊“连接眼镜”查看自动发现、配对和已记住设备的状态。','恢复连接后继续原任务，无需重新创建项目。'],view:'devices'};
   if (/unauthorized|允许.*调试|调试.*授权/i.test(message)) return {category:'authorization',owner:'user',title:'请在眼镜上允许连接',steps:['戴上眼镜，确认“允许 USB 调试”。','没有看到提示时，重新连接数据线。','完成后点击“重新检查并继续”，或告诉 AI 继续。'],view:'devices'};
   if (/developer mode|开发者模式/i.test(message)) return {category:'device-mode',owner:'user',title:'请开启眼镜开发者模式',steps:['打开工坊的“连接眼镜”页面。','点击“开启 AIUI 开发者模式”，等待眼镜准备完成。','完成后让 AI 继续原来的制作任务。'],view:'devices'};
   if (/ADB|眼镜.*(?:断开|离线|连接)|未发现眼镜|数据线/i.test(message)) return {category:'device-connection',owner:'user',title:'请连接眼镜并开启调试',steps:['在手机 Rokid AI App 的眼镜设置中打开“眼镜 ADB 调试”。','用支持数据传输的开发线连接电脑和眼镜，或按官方无线连接指南操作。','在眼镜上确认调试授权，然后重新检查并继续。'],view:'devices'};

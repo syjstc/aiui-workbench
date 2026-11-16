@@ -42,14 +42,18 @@ export function normalizeEnvironment(env, platform = process.platform) {
   }
   return result;
 }
-export async function run(command, args, { cwd = ROOT, signal, onOutput, timeout = 120000, env = process.env } = {}) {
+export async function run(command, args, { cwd = ROOT, signal, onOutput, input, timeout = 120000, env = process.env } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, signal, shell: false, windowsHide: true, env: normalizeEnvironment({ ...env, FORCE_COLOR: '0' }), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, args, { cwd, signal, shell: false, windowsHide: true, env: normalizeEnvironment({ ...env, FORCE_COLOR: '0' }), stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
     let output = '', settled = false;
     const timer = setTimeout(() => { child.kill('SIGTERM'); finish(new Error('操作超时')); }, timeout);
     const finish = (error, code) => { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve({ code, output }); };
     for (const stream of [child.stdout, child.stderr]) stream.on('data', chunk => { const text = redact(chunk.toString()); output = (output + text).slice(-64000); onOutput?.(text); });
     child.on('error', error => finish(error));
     child.on('close', code => finish(null, code));
+    if (child.stdin) {
+      child.stdin.on('error', error => { if (error.code !== 'EPIPE') finish(error); });
+      child.stdin.end(input);
+    }
   });
 }

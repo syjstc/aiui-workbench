@@ -1,6 +1,7 @@
 import { ACTION_HELP } from './automation-contract.mjs';
 // Shared by the connection page, MCP discovery resource, and context tool.
 export const CAPABILITIES = [
+  {id:'connection',title:'无线连接与操作引导',description:'检查眼镜连接，提供六位码或眼镜扫码配对、同语言手机下载页和操作截图，说明 APK 安装及手机遥控步骤。',status:'available',tool:'aiui_connection_guide',relatedTools:['aiui_adb_discover','aiui_adb_connect','aiui_adb_pair_qr','aiui_adb_wireless_enable','aiui_adb_saved'],example:{step:'overview',locale:'zh-CN'}},
   {id:'development',title:'一句需求，继续完整制作',description:'自动准备项目并串联预览、验证、打包和设备安装；遇到阻塞返回具体操作，完成后从原任务继续。',status:'available',tool:'aiui_workflow_start',relatedTools:['aiui_project_files','aiui_workflow_get','aiui_workflow_continue'],example:{request:'做一个滑动选择、单击勾选的清单',target:'glasses'}},
   {id:'diagnostics',title:'AI 共享诊断与恢复',description:'界面、任务、预览和启动异常统一记录，AI 可读取原因、调用栈、版本和下一步，修复后重新验证。',status:'available',tool:'aiui_diagnostics_get',relatedTools:['aiui_diagnostics_resolve','aiui_service_log_read'],example:{status:'open',afterSequence:0}},
   {id:'simulator-ai',title:'AI 自动化验证接管',description:'仅在 AI 自己验证时临时领取文字/图片请求并回填；本地阻塞等待、限制输入输出和次数。图片必须由支持多模态的 AI 处理，普通用户及不支持的能力请在真机测试。无 AI 常驻进程。',status:'available',tool:'aiui_ai_configure',relatedTools:['aiui_ai_wait','aiui_ai_reply','aiui_skill_read'],example:{sessionId:'<sessionId>',enabled:true,supportsImages:false}},

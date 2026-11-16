@@ -35,7 +35,7 @@ export class Mirroring {
   }
   async startNow({ serial, maxFps = 30, rotation = 0, readOnly = false }) {
     if (![15, 30, 60].includes(maxFps) || ![0, 90, 180, 270].includes(rotation) || typeof readOnly !== 'boolean') throw new Error('投屏选项无效');
-    await this.glasses.ready(serial);
+    const device = await this.glasses.ready(serial);
     const previous = this.sessions.get(serial);
     if (previous?.starting) return previous.starting;
     if (previous?.status === 'running') return this.public(previous);
@@ -52,7 +52,7 @@ export class Mirroring {
     session.completion = new Promise(resolve => { finish = resolve; });
     session.starting = new Promise((resolve, reject) => { ready = resolve; failed = reject; });
     session.starting.catch(() => {});
-    let timer;
+    let timer, releaseFocus;
     const publish = () => this.emit('glasses-mirror', this.public(session));
     const fail = error => { if (session.status === 'starting') { session.status = 'failed'; session.error = error.message; failed(error); } };
     try {
@@ -60,12 +60,17 @@ export class Mirroring {
       session.pid = session.child.pid;
       const output = chunk => {
         session.output = (session.output + redact(chunk.toString('utf8'))).slice(-20000);
-        if (session.status === 'starting' && /(?:Texture(?:\s*\([^)]*\))?:|Video size:)/i.test(session.output)) { session.status = 'running'; clearTimeout(timer); ready(this.public(session)); }
+        if (session.status === 'starting' && /(?:Texture(?:\s*\([^)]*\))?:|Video size:)/i.test(session.output)) {
+          session.status = 'running'; clearTimeout(timer);
+          if (!readOnly) releaseFocus = this.glasses.settingsFocus?.acquire(device);
+          ready(this.public(session));
+        }
         publish();
       };
       session.child.stdout.on('data', output); session.child.stderr.on('data', output);
       session.child.once('error', error => { fail(error); clearTimeout(timer); session.status = 'failed'; session.error = error.message; finish(); publish(); });
       session.child.once('close', code => {
+        releaseFocus?.();
         clearTimeout(timer); session.exitCode = code; session.finishedAt = new Date().toISOString();
         fail(new Error(session.output.trim() || '投屏未能启动，请检查眼镜连接'));
         if (session.status !== 'failed') session.status = session.stopping || code === 0 ? 'stopped' : 'failed';

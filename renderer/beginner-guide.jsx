@@ -1,5 +1,6 @@
 import { t, getLocale } from './i18n.jsx';
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { ConnectionMethodTabs, useConnectionMethod } from './connection-methods.jsx';
 import { ArrowLeft, ArrowRight, ArrowUpRight, Cable, CheckCircle2, ChevronRight, Download, FolderOpen, Glasses, Laptop, Monitor, Plug, Settings, Smartphone } from 'lucide-react';
 
 const api = window.workbench;
@@ -12,6 +13,8 @@ export const guideSources = {
 
 export function ConnectionGuide({ environment, notify, go }) {
   const [step, setStep] = useState(0), [selecting, setSelecting] = useState(false);
+  const id = useId(), [connection, setConnection] = useConnectionMethod();
+  const methodTabs = <ConnectionMethodTabs method={connection} onChange={setConnection} id={id}/>;
   const stepNavigation = useRef(), previousStep = useRef(0);
   useEffect(() => { if (previousStep.current !== step) stepNavigation.current?.scrollIntoView({ block: 'start' }); previousStep.current = step; }, [step]);
   const steps = [[t("准备专用线"), Cable], [t("开启眼镜 ADB"), Smartphone], [t("检查电脑工具"), Laptop], [t("连接并安装"), Glasses]];
@@ -25,7 +28,17 @@ export function ConnectionGuide({ environment, notify, go }) {
     } catch (error) { notify(error.message, true); }
     finally { setSelecting(false); }
   }
-  return <section className="connection-guide panel">
+  if (connection === 'wireless') return <>{methodTabs}<section className="connection-guide panel" role="tabpanel" id={id + '-panel-wireless'} aria-labelledby={id + '-tab-wireless'}>
+    <div className="guide-intro"><div><span className="guide-kicker">{t('第一次连接 · 选择连接方式')}</span><h2>{t('通过 Wi-Fi 把应用装到眼镜上')}</h2><p>{t('工坊已自带 ADB，无需安装 Android Studio、驱动或配置环境变量。连接后，安装、日志、文件和投屏使用同一套工具。')}</p></div></div>
+    <ol className="phone-steps">
+      <li><span>1</span><div><strong>{t('电脑和眼镜连接同一 Wi-Fi 或热点')}</strong><p>{t('眼镜需要自己连接 Wi-Fi。手机有网络、手机和眼镜蓝牙已连接，都不能替代这一步。')}</p></div></li>
+      <li><span>2</span><div><strong>{t('点击「一键连接眼镜」')}</strong><p>{t('找到设备后按提示授权。首次配对可输入六位码，或用眼镜的无线调试扫码入口扫描工坊配对二维码。')}</p></div></li>
+      <li><span>3</span><div><strong>{t('看到连接确认后开始使用')}</strong><p>{t('选择项目，先「安装到眼镜」，再「在眼镜上打开」。Rokid AI → 工具箱 → 遥控器可以操作眼镜；下次工坊会尝试自动重连。')}</p></div></li>
+    </ol>
+    <div className="button-row"><button className="button primary" onClick={() => go('devices')}><Glasses size={16}/>{t('前往无线连接')}<ArrowRight size={15}/></button></div>
+    <div className="setup-callout"><strong>{t('需要你完成的只有设备端开关和授权')}</strong><p>{t('在「连接眼镜」点「用手机安装无线助手」。手机与电脑连同一 Wi-Fi 后，手机扫码下载 APK，再用 Rokid AI 的工具箱把它安装到眼镜。')}</p><button className="text-button" onClick={() => api.openOfficial('https://developer.android.com/studio/run/device#wireless').catch(error => notify(error.message, true))}>{t('查看 Android 无线配对说明')}<ArrowUpRight size={14}/></button></div>
+  </section></>;
+  return <>{methodTabs}<section className="connection-guide panel" role="tabpanel" id={id + '-panel-usb'} aria-labelledby={id + '-tab-usb'}>
     <div className="guide-intro"><div><span className="guide-kicker">{t("第一次连接 · 跟着这 4 步做")}</span><h2>{t("把应用装到眼镜上")}</h2><p>{t("先准备专用线和手机，电脑上的连接状态会自动更新。")}</p></div><span className="guide-live-status"><span className="dot"/>{connected ? t("已识别到眼镜") : t("正在等待眼镜连接")}</span></div>
     <nav ref={stepNavigation} className="setup-steps" aria-label={t("眼镜连接步骤")}>{steps.map(([title, Icon], i) => <button key={title} aria-current={step === i ? 'step' : undefined} onClick={() => setStep(i)}><span>{i + 1}</span><Icon size={17}/>{title}</button>)}</nav>
     <div className="setup-content" key={step}>
@@ -34,7 +47,6 @@ export function ConnectionGuide({ environment, notify, go }) {
       {step === 2 && <><div className="setup-caption">{t("03 / 在电脑上操作")}</div><h3>{environment?.adb ? environment?.adbTool?.source === 'bundled' ? t("工坊已自带 ADB，无需另外安装") : t("电脑连接工具已准备好") : t("检查电脑连接工具")}</h3>{environment?.adb ? <div className="setup-callout ready"><CheckCircle2 size={21}/><div><strong>{environment?.adbTool?.source === 'bundled' ? t("内置连接工具已就绪，可以直接下一步。") : t("工坊已经找到 ADB，可以直接下一步。")}</strong><p>{t("不需要安装 Android Studio，也不用配置环境变量。工坊会自动使用连接工具。")}</p></div></div> : <><p>{t("桌面安装包已经自带 ADB。若这里仍提示缺少工具，请重新解压完整的工坊安装包；也可以按下面的方法选择外部工具作为备用。")}</p><p>{t("备用工具请使用 Android 官方的 ")}<strong>SDK Platform-Tools</strong>{t("，不需要安装完整 Android Studio。")}</p><ol className="phone-steps"><li><span>1</span><div><strong>{t("打开官方下载页，选择你的电脑系统")}</strong><p>{t("Windows、Mac 和 Linux 对应不同下载按钮。阅读下载页的条款后，由你确认下载。")}</p><button className="button" onClick={() => openSource('tools')}><Download size={15}/>{t("打开 Android 官方下载页")}<ArrowUpRight size={14}/></button></div></li><li><span>2</span><div><strong>{t("解压下载的 ZIP 文件")}</strong><p>{t("得到 platform-tools 文件夹，里面应包含 adb（Windows 为 adb.exe）。不要直接选择 ZIP 压缩包。")}</p></div></li><li><span>3</span><div><strong>{t("让工坊记住这个文件夹")}</strong><p>{t("点击下面的按钮选择 platform-tools，工坊会自动检查和使用它，不用手动设置 PATH。")}</p><button className="button primary" disabled={selecting} onClick={chooseTools}><FolderOpen size={15}/>{selecting ? t("正在检查…") : t("选择已解压的工具文件夹")}</button></div></li></ol></>}<details className="guide-faq"><summary>{t("高级选项：使用其他 ADB")}</summary><p>{t("一般使用工坊内置版本即可。需要使用其他版本时，选择包含 adb 或 adb.exe 的文件夹；工坊会记住这个选择。")}</p><button className="button" disabled={selecting} onClick={chooseTools}><FolderOpen size={15}/>{t("选择工具文件夹")}</button></details></>}
       {step === 3 && <><div className="setup-caption">{t("04 / 回到工坊")}</div><h3>{t("看到“眼镜已就绪”，就可以安装")}</h3><p>{t("打开“连接眼镜”页面，工坊会自动检查 USB 连接、授权和眼镜运行环境。")}</p><ol className="phone-steps"><li><span>1</span><div><strong>{t("在“项目库”添加你的应用")}</strong><p>{t("选择“导入项目”，找到已有应用的文件夹；也可以新建项目，再连接 AI 工具帮你制作。")}</p></div></li><li><span>2</span><div><strong>{t("在“连接眼镜”里选择应用")}</strong><p>{t("只有一台设备时会自动选中。连接多台设备时，请按名称和设备尾号确认目标。")}</p></div></li><li><span>3</span><div><strong>{t("点击“安装到眼镜”")}</strong><p>{t("等待下方任务记录显示完成，再点击“在眼镜上打开”，戴上眼镜检查画面。")}</p></div></li></ol><div className="setup-callout"><strong>{t("ADB 调试和 AIUI 开发者模式是两个检查项")}</strong><p>{t("若连接页提示“还需要开启开发者模式”，可使用页面上的“开启 AIUI 开发者模式”。开启时眼镜上的小组件会重新加载。")}</p></div><button className="button primary" onClick={() => go('devices')}><Glasses size={16}/>{t("前往连接眼镜")}<ArrowRight size={16}/></button></>}
     </div>
-    <div className="setup-callout"><strong>{t("也可以使用无线连接")}</strong><p>{t("官方无线方案可减少对专用线的依赖。先按官方说明准备眼镜，再在连接页使用内置 ADB 连接。")}</p><button className="text-button" onClick={()=>api.openOfficial("https://forum.rokid.com/post/detail/3585").catch(e=>notify(e.message,true))}>{t("查看官方无线连接指南")}<ArrowUpRight size={14}/></button></div>
     <div className="setup-footer"><span>{t("第 ")}{step + 1}{t(" 步，共 4 步")}</span><div><button className="button" disabled={step === 0} onClick={() => setStep(value => value - 1)}><ArrowLeft size={14}/>{t("上一步")}</button>{step < 3 && <button className="button primary" onClick={() => setStep(value => value + 1)}>{t("下一步")}<ArrowRight size={14}/></button>}</div></div>
     <div className="guide-troubleshooting"><h3>{t("卡住时，先看这里")}</h3>{[
       [t("眼镜能充电，但工坊一直找不到"), t("先确认使用 Rokid 专用数据调试线，而不是普通充电线。再检查手机 App 中的“眼镜 ADB 调试”开关，重新插紧接口，并尝试直接连接电脑的另一个 USB 端口。")],
@@ -43,7 +55,7 @@ export function ConnectionGuide({ environment, notify, go }) {
       [t("Windows 上仍然识别不到设备"), t("在 Windows 设备管理器里查看是否有带黄色感叹号的眼镜设备。若有，按 Rokid 官方驱动说明处理；完成后重新连接。")],
       [t("暂时没有专用调试线"), t("可以先使用模拟器，也可以查看官方无线 ADB 方案。无线连接需要对应机型和固件支持、眼镜端准备及同一网络；完成后可在连接页输入无线地址。")],
     ].map(([title, body]) => <details className="guide-faq" key={title}><summary>{title}<ChevronRight size={15}/></summary><p>{body}</p>{title.startsWith('Windows') && <button className="text-button" onClick={() => api.openOfficial('https://x-docs.rokid.com/docs/en/faq/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98.html').catch(e => notify(e.message, true))}>{t("查看官方驱动说明")}<ArrowUpRight size={14}/></button>}</details>)}</div>
-  </section>;
+  </section></>;
 }
 
 export function BeginnerGuide({ environment, notify, go, importProject }) {

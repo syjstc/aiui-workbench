@@ -1,3 +1,4 @@
+import { deviceConnectionPrompt } from './ai-connection.mjs';
 export const PROMPT_INTENTS=['refine','recover','validate','install'];
 const requests={
   'zh-CN':{create:'请把下面的想法做成眼镜应用。',refine:'请继续完善这个眼镜应用。',recover:'请检查并修复这个项目当前的问题，然后重新验证。',validate:'请验证这个项目的关键功能，检查源码并生成安装包。',install:'请检查眼镜连接、授权和运行环境，将这个项目安装并打开，采集画面和日志。'},
@@ -24,7 +25,8 @@ export function buildAiPrompt({idea='',intent,project,flow,features,locale='zh-C
   if(purpose==='validate')lines.push(en?'Use aiui_preview_test with explicit application-behavior assertions and inspect its real screenshot, then use aiui_project_build. This request covers verification and packaging; stop after returning the evidence and package location. Read aiui_diagnostics_get if blocked.':'本次用 aiui_preview_test 验证实际应用行为断言并检查真实截图，再用 aiui_project_build 检查打包。完成验证和打包后，返回证据与文件位置即可。遇到阻塞读取 aiui_diagnostics_get。');
   else if(purpose==='install'&&current?.target==='package')lines.push(en?'Check that source, previous verification and package refer to the current revision. Reverify and rebuild if stale, then complete the device steps above. Read aiui_diagnostics_get if blocked.':'核对源码、已有验证和安装包是否对应当前版本，证据失效时重新验证打包，再完成上述真机步骤。遇到阻塞读取 aiui_diagnostics_get。');
   else lines.push(en?'Read and edit actual source through aiui_project_files with expectedRevision, or use your coding tools. Verify explicit application behaviors and inspect real screenshots before building. Continue the same workflow with aiui_workflow_continue; read aiui_diagnostics_get when blocked.':'通过 aiui_project_files 读取并按 expectedRevision 修改真实源码，也可用自己的编码工具。用实际应用行为断言验证并检查真实截图，然后检查打包；通过 aiui_workflow_continue 继续同一任务。遇到阻塞读取 aiui_diagnostics_get。');
-  lines.push(en?'Explain any connection, authorization or network action I need to take in plain language, then continue the same task after I finish. Distinguish simulator, device and worn acceptance. Publishing and formal submission require my confirmation.':'需要我连接眼镜、授权或检查网络时，请用简短语言说明卡点、具体操作和继续方法，完成后继续原任务。区分模拟、真机和佩戴验收；发布和正式提审需由我确认。');
+  lines.push(deviceConnectionPrompt(language));
+  lines.push(en?'Distinguish simulator, device and worn acceptance. Publishing and formal submission require my confirmation.':'区分模拟、真机和佩戴验收；发布和正式提审需由我确认。');
   return lines.join('\n\n');
 }
 

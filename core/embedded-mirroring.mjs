@@ -13,7 +13,7 @@ export class EmbeddedMirroring {
   start(args){if(this.starts.has(args.serial))return this.starts.get(args.serial);const task=this.startNow(args).finally(()=>this.starts.delete(args.serial));this.starts.set(args.serial,task);return task;}
   async startNow({serial,maxFps=30,rotation=0,readOnly=false}){
     if(![15,30,60].includes(maxFps)||![0,90,180,270].includes(rotation)||typeof readOnly!=='boolean')throw new Error('投屏选项无效');
-    await this.glasses.ready(serial);
+    const device=await this.glasses.ready(serial);
     const previous=this.sessions.get(serial);if(previous?.status==='running')return this.public(previous);
     const component=await this.bundled();if(component.version!=='5.0.1')throw new Error('内嵌投屏需要匹配的 scrcpy 5.0.1 组件');
     const scid=(randomBytes(4).readUInt32BE()&0x7fffffff).toString(16).padStart(8,'0');
@@ -41,6 +41,7 @@ export class EmbeddedMirroring {
       s.control=await this.connect(s.port);s.control.on('data',()=>{});s.control.on('error',error=>{if(!s.stopping)this.fail(s,error);});s.video.resume();
       const timer=setTimeout(()=>this.fail(s,new Error(s.output.trim()||'等待投屏首帧超时')),12000);
       try{await ready;}finally{clearTimeout(timer);}
+      if(!readOnly)s.releaseFocus=this.glasses.settingsFocus?.acquire(device);
       this.idle(s,10000);return this.public(s);
     }catch(error){await this.stop({serial});s.status='failed';s.error=error.message;throw error;}
   }
@@ -70,6 +71,7 @@ export class EmbeddedMirroring {
   fail(s,error){if(s.stopping||s.status==='failed')return;s.status='failed';s.error=error.message;s.rejectReady(error);this.emit('glasses-mirror',this.public(s));this.stop({serial:s.serial,preserveError:true}).catch(()=>{});}
   async stop({serial,preserveError=false}){
     const s=this.sessions.get(serial);if(!s||s.stopping)return this.public(s);s.stopping=true;clearTimeout(s.idleTimer);s.rejectReady(new Error('投屏已停止'));
+    s.releaseFocus?.();
     s.video?.destroy();s.control?.destroy();s.child?.kill('SIGTERM');for(const client of s.clients)client.response.end();s.clients.clear();
     if(s.port)await this.glasses.adbCommand(serial,['forward','--remove',`tcp:${s.port}`],{timeout:5000}).catch(()=>{});
     if(!preserveError)s.status='stopped';return this.public(s);

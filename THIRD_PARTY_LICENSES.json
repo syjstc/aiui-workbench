@@ -4283,6 +4283,16 @@
       ]
     },
     {
+      "name": "qrcode-generator",
+      "version": "1.4.4",
+      "license": "MIT",
+      "repository": {
+        "type": "git",
+        "url": "https://github.com/kazuhikoarase/qrcode-generator.git"
+      },
+      "notices": []
+    },
+    {
       "name": "qrcode-terminal",
       "version": "0.12.0",
       "license": "See upstream package",

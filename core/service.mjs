@@ -8,6 +8,11 @@ import { Jobs } from './jobs.mjs';
 import { serviceLogStatus, clearServiceLog } from './logs.mjs';
 import { DeviceDiscovery } from './devices.mjs';
 import { AdbTools } from './adb.mjs';
+import { WirelessDebugging } from './wireless.mjs';
+import { WirelessSetup } from './wireless-setup.mjs';
+import { WirelessHelperShare } from './wireless-helper-share.mjs';
+import { WirelessPairQr } from './wireless-pair-qr.mjs';
+import { connectionGuide } from './connection-guide.mjs';
 import { GlassesTools } from './glasses.mjs';
 import { AiuiApps } from './aiui-apps.mjs';
 import { Mirroring } from './mirroring.mjs';
@@ -37,7 +42,7 @@ import {diagnosticScope} from './diagnostic-scope.mjs';
 const isAi = actor => actor === 'MCP' || actor === 'CLI';
 
 export class Workbench {
-  constructor(home) { this.home = home; this.origin = ''; this.events = []; this.sequence = 0; this.clients = new Map(); this.emit = this.emit.bind(this); this.projects = new Projects(home, this.emit); this.knowledge = new Knowledge(home); this.previews = new Previews(this.projects, home, this.emit); this.jobs = new Jobs(this.emit, home); this.adb = new AdbTools(home); this.glasses = new GlassesTools(home, this.adb); this.devices = new DeviceDiscovery((args, options) => this.cli(args, options), (_command, args, options) => this.adb.execute(args, options)); }
+  constructor(home) { this.home = home; this.origin = ''; this.events = []; this.sequence = 0; this.clients = new Map(); this.emit = this.emit.bind(this); this.projects = new Projects(home, this.emit); this.knowledge = new Knowledge(home); this.previews = new Previews(this.projects, home, this.emit); this.jobs = new Jobs(this.emit, home); this.adb = new AdbTools(home); this.wireless = new WirelessDebugging(home, this.adb); this.glasses = new GlassesTools(home, this.adb); this.devices = new DeviceDiscovery((args, options) => this.cli(args, options), (_command, args, options) => this.adb.execute(args, options)); }
   emit(type, value) {
     if (type === 'jobs-deleted') this.events = this.events.filter(event => event.type !== 'job' || !value.deletedIds.includes(event.value.id));
     if (type === 'preview-logs-cleared') this.events = this.events.filter(event => event.type !== 'preview-log' || event.value.sessionId !== value.sessionId);
@@ -54,6 +59,9 @@ export class Workbench {
     try{return await this.initialize();}catch(error){await this.captureDiagnostic(error,{source:'startup'}).catch(()=>{});throw error;}
   }
   async initialize() {
+    this.wirelessSetup = new WirelessSetup(this.wireless);
+    this.wirelessHelper = new WirelessHelperShare();
+    this.wirelessQr = new WirelessPairQr(this.wireless);
     this.skillHome=process.env.AIUI_SKILL_HOME||os.homedir();
     if(this.skillHome!==os.homedir())this.skillOptions={globalRoots:['.agents','.codex','.claude','.cursor'].map(name=>path.join(this.skillHome,name,'skills'))};
     this.skillTargets=await readJson(path.join(this.home,'skill-targets.json'),{user:false,projects:[]});
@@ -156,7 +164,58 @@ export class Workbench {
         return this.simulatorAi[tool==='aiui_ai_configure'?'configure':tool==='aiui_ai_wait'?'wait':'reply'](args);
       }
       case 'aiui_skill_read': {const files=await workflowSkillFiles();return {path:args.path,version:APP_VERSION,content:files[args.path]};}
-      case 'aiui_adb_connect':return this.adb.connect(args);
+      case 'aiui_adb_connect':return this.wireless.connect(args);
+      case 'aiui_adb_discover':return this.wireless.status(args);
+      case 'aiui_adb_wireless_enable':return this.wireless.enable(args);
+      case 'aiui_adb_saved':return this.wireless.saved(args);
+      case 'aiui_connection_guide': return connectionGuide(this, args);
+      case 'aiui_adb_pair_qr': {
+        if (args.action === 'start') return this.wirelessQr.start();
+        if (!args.id) throw new Error('请使用刚生成的二维码会话 ID。');
+        return args.action === 'cancel' ? this.wirelessQr.cancel(args.id) : this.wirelessQr.status(args.id);
+      }
+      case 'ui_wireless_setup': {
+        if (!['desktop', 'web'].includes(actor)) throw new Error('请在工坊的连接眼镜页面开始配对。');
+        const { action, id, address, locale } = z.object({
+          action: z.enum(['candidates', 'start', 'poll', 'cancel', 'helper', 'helperStatus', 'stopHelper']),
+          id: z.string().uuid().optional(), address: z.string().max(128).optional(),
+          locale: z.enum(['zh-CN', 'en']).optional(),
+        }).strict().parse(args);
+        switch (action) {
+          case 'candidates': return this.wirelessSetup.candidates();
+          case 'start': return this.wirelessSetup.start({ address });
+          case 'poll': return this.wirelessSetup.poll(id);
+          case 'cancel': return id ? this.wirelessSetup.cancel(id) : { stage: 'cancelled' };
+          case 'helper': return this.wirelessHelper.start({ locale });
+          case 'helperStatus': return this.wirelessHelper.status(id, locale);
+          case 'stopHelper': if (id) this.wirelessHelper.stop(id); return {};
+        }
+        break;
+      }
+      case 'aiui_adb_reset': {
+        await this.wireless.init();
+        const serials = new Set(this.wireless.records.flatMap(record => [record.address, record.serviceName, record.identity]).filter(Boolean));
+        if (args.serial) serials.add(args.serial);
+        const active = item => ['running', 'starting', 'recording', 'finalizing'].includes(item.status);
+        const mirrors = [...(this.mirroring?.sessions.values() || []), ...(this.mirroring?.embedded.sessions.values() || [])];
+        if (this.jobs.list().some(job => active(job) && (serials.has(job.serial) || ['deploy', 'launch', 'device-setup'].includes(job.type))) ||
+          mirrors.some(session => active(session) && serials.has(session.serial)) ||
+          this.recordings?.status().recordings.some(record => active(record) && serials.has(record.serial))) throw new Error('请先结束这些眼镜的安装、传输、投屏和录制，再清空连接记录。');
+        this.wirelessSetup?.cancel();
+        this.wirelessHelper?.stop();
+        this.wirelessQr?.cancel();
+        const result = await this.wireless.reset(args);
+        this.devices.inspections.clear();
+        return result;
+      }
+      case 'aiui_adb_restart': {
+        const mirrors = [...(this.mirroring?.sessions.values() || []), ...(this.mirroring?.embedded.sessions.values() || [])];
+        if (this.jobs.list().some(job => job.status === 'running') || mirrors.some(session => ['running', 'starting'].includes(session.status)) ||
+          this.recordings?.status().recordings.some(record => ['recording', 'starting', 'finalizing'].includes(record.status))) throw new Error('请先结束工坊中的运行任务、投屏和录制，再重启连接工具。');
+        const result = await this.wireless.restart();
+        this.devices.inspections.clear();
+        return result;
+      }
       case 'aiui_project_files':return this.projectFiles.operate(args);
       case 'aiui_workflow_start':return this.workflows.start(args);
       case 'aiui_workflow_get':return this.workflows.get(args);
@@ -228,7 +287,7 @@ export class Workbench {
           catch(error){const diagnostic=await this.captureDiagnostic(error,{source:'skill-setup',projectId:project?.id});skillSetup={status:'requires-attention',error:error.message,diagnosticId:diagnostic?.id,fallback:'Use officialSkill and workflowSkill inline; existing skill files were preserved.'};}
         }
         let environment;
-        if(args.setup){try{environment={...await this.devices.check(),adbTool:await this.adb.resolveInfo(),...this.runtimeInfo()};}catch(error){const diagnostic=await this.captureDiagnostic(error,{source:'setup-environment'});environment={error:error.message,diagnosticId:diagnostic?.id};}}
+        if(args.setup){try{environment=await this.environmentCheck();}catch(error){const diagnostic=await this.captureDiagnostic(error,{source:'setup-environment'});environment={error:error.message,diagnosticId:diagnostic?.id};}}
         const projectInstructions=project?await fs.readFile(path.join(project.projectPath,'AGENTS.md'),'utf8').then(s=>s.slice(0,24000)).catch(()=>''):'';
         return { project, projectInstructions, serviceVersion:APP_VERSION,connection:this.aiConnection.status(),availableTools:toolCatalog().tools.map(t=>t.name),setup:!!args.setup,skillSetup,workflowSkill:await workflowSkill(),...(environment?{environment}:{}),...(args.setup?{nextAction:'If the user supplied an idea, continue that request with the available workflow tools now. Otherwise ask what app the user wants to make. Do not create a demo project without a request. Missing glasses should not prevent preview and packaging; explain device connection when installation is reached.'}:{}),...this.runtimeInfo(project), sdkUpdates: this.sdk.status(), officialSkill: skill, knowledge: this.knowledge.status(), instruction: '开发规则及验收要求以项目绑定版本的官方 aiui-dev 和 references/checklist.md 为准；工坊 aiui-workshop 只补 MCP 编排和恢复。首次使用项目自动检查并补齐缺失 Skill；setup=true 同时检查用户级 Skill 与环境，无需逐项调用。自动更新未修改的工坊管理全局/继承 Skill（含参考文件），existingSkills 不跳过版本检查；保留用户修改，不重复安装。当前聊天使用最新内联规范，客户端技能缓存可能需要重载。工具及参数以当前服务清单为准，不要根据 runtime/CLI 版本猜测工坊工具。源码可通过 aiui_project_files 带 expectedRevision 读写，也可使用现有编码工具。优先用 aiui_workflow_start 返回项目上下文，aiui_workflow_continue 一次验证、打包并在就绪时安装；无需重复检查已返回的信息。仅 status=running 时调用 aiui_job_wait。正式提审由用户在工坊确认。', developmentGuide:DEVELOPMENT_GUIDE, diagnostics:this.diagnostics.get({...project?{projectId:project.id}:{scope:'workbench'},status:"open",read:false,limit:10}), capabilities: capabilities(), simulation: { input: 'keydown/keyup, keyup-only, repeated bursts', orientation: 'host absoluteOrientation capability, Android +Z gravity', camera: 'photo fixtures and opt-in computer webcam; continuous getUserMedia / ImageCapture.grabFrame / takePhoto; runtime Canvas and photo adapters encode preview-frame PNG, not full-resolution camera modes; no audio', bluetooth: 'unsupported', network:'online/offline events only; outbound application requests are not enabled', ai: {default:'device-test-required',hint:AI_DEVICE_HINT,automation:{configure:'aiui_ai_configure',wait:'aiui_ai_wait',reply:'aiui_ai_reply',guide:'references/simulator-ai.md',requiresImageCapabilityDeclaration:true,processStarted:false}} } };
       }
@@ -263,7 +322,7 @@ export class Workbench {
         if(missing.length)await fs.writeFile(ignoreFile,ignoreText+(ignoreText&&!ignoreText.endsWith('\n')?'\n':'')+missing.join('\n')+'\n');
         return { path: file, status: configured?'already-configured':'configured', scope: 'project',skillSetup:await ensureAgentSkills(p,this.knowledge,this.skillOptions) };
       }
-      case 'aiui_environment_check': return { ...await this.devices.check(), adbTool: await this.adb.resolveInfo(), ...this.runtimeInfo() };
+      case 'aiui_environment_check': return this.environmentCheck();
       case 'aiui_adb_configure': return this.adb.configure(args.directory);
       case 'aiui_glasses_info': return this.glasses.info(args);
       case 'aiui_glasses_files': return this.glasses.files(args);
@@ -348,5 +407,14 @@ export class Workbench {
     const bytes = await fs.readFile(file), record = { path: file, sha256: sha(bytes), bytes: bytes.length, revision, toolchainId, at: new Date().toISOString() };
     p.lastBuild = record; await this.projects.refresh(p.id); await this.projects.save(); return record;
   }
-  async close() { await this.feedback?.close();await this.skillRefresh;await this.workflows?.close(); await this.knowledge.close(); await this.mirroring?.close(); await this.jobs.close(); await this.recordings?.close(); await this.previews.close(); await this.sdk?.close(); await this.projects.close(); await this.diagnostics?.close(); }
+  async environmentCheck() {
+    const environment = await this.devices.check();
+    const wireless = environment.adb ? await this.wireless.check(environment.devices) : this.wireless.snapshot(environment.devices);
+    const usbDevices = environment.devices.filter(device => device.connection === 'usb');
+    // During handoff, prefer the verified Wi-Fi transport for the same glasses.
+    const devices = environment.devices.filter(device => device.connection !== 'usb' || !wireless.saved.some(record =>
+      record.identity === device.serial && this.wireless.deviceFor(record, environment.devices)?.status === 'device'));
+    return { ...environment, devices, usbDevices, wireless, connection: { connected: devices.some(d => d.status === 'device'), message: devices.some(d => d.status === 'device') ? '眼镜已连接，可以继续检查运行环境。' : '眼镜尚未连接或尚未授权，请主动告诉用户；可先继续制作和打包，安装前用 aiui_connection_guide 展示连接步骤。', guideTool: 'aiui_connection_guide' }, adbTool: await this.adb.resolveInfo(), ...this.runtimeInfo() };
+  }
+  async close() { this.wirelessSetup?.cancel(); this.wirelessHelper?.stop(); this.wirelessQr?.cancel(); await this.wireless.close();await this.feedback?.close();await this.skillRefresh;await this.workflows?.close(); await this.knowledge.close(); await this.mirroring?.close(); await this.glasses.settingsFocus.close(); await this.jobs.close(); await this.recordings?.close(); await this.previews.close(); await this.sdk?.close(); await this.projects.close(); await this.diagnostics?.close(); }
 }

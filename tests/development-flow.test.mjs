@@ -78,7 +78,7 @@ test('one request creates a project without a supplied path and repeated request
 test('device blocker returns concrete user steps and resuming preserves preview and build evidence',async t=>{
   const {w}=await fixture(t),f=runtimeFixture(w),{workflow}=await w.call('aiui_workflow_start',{request:'做清单'});
   const blocked=await w.call('aiui_workflow_continue',{workflowId:workflow.id,steps});
-  assert.equal(blocked.status,'succeeded');assert.equal(blocked.result.workflow.state,'waiting-user');assert.equal(blocked.result.workflow.nextAction.code,'no-device');assert.match(blocked.result.workflow.nextAction.steps.join(' '),/ADB/);
+  assert.equal(blocked.status,'succeeded');assert.equal(blocked.result.workflow.state,'waiting-user');assert.equal(blocked.result.workflow.nextAction.code,'no-device');assert.equal(blocked.result.workflow.nextAction.owner,'user');assert.equal(blocked.result.workflow.nextAction.view,'devices');assert.ok(blocked.result.workflow.nextAction.steps.every(step=>typeof step==='string'&&step.length>0));
   assert.equal(f.counts.preview,1);assert.equal(f.counts.build,1);assert.equal(f.counts.install,0);
   f.unauthorized();const unauthorized=await w.call('aiui_workflow_continue',{workflowId:workflow.id});assert.equal(unauthorized.result.workflow.nextAction.code,'unauthorized');
   f.connect();const complete=await w.call('aiui_workflow_continue',{workflowId:workflow.id});assert.equal(complete.result.workflow.state,'completed');assert.equal(complete.result.deviceVerified,false);assert.equal(f.counts.preview,1);assert.equal(f.counts.build,1);assert.equal(f.counts.install,1);

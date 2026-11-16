@@ -1,7 +1,9 @@
 // The desktop preload and authenticated Web gateway expose the same local tools.
 export const UI_TOOLS = new Set([
+  'ui_wireless_setup',
+  'aiui_adb_pair_qr','aiui_connection_guide',
   'aiui_feedback_status','aiui_feedback_prepare',
-  'aiui_adb_connect',
+  'aiui_adb_connect','aiui_adb_discover','aiui_adb_wireless_enable','aiui_adb_saved','aiui_adb_restart','aiui_adb_reset',
   'aiui_workflow_start','aiui_workflow_get','aiui_workflow_continue','aiui_diagnostics_get','aiui_diagnostics_report','aiui_diagnostics_resolve','aiui_diagnostics_mark_read','aiui_service_log_read',
   'ui_platform_bind',
   'ui_project_removal_begin', 'ui_project_removal_commit', 'ui_project_removal_cancel',

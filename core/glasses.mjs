@@ -3,6 +3,7 @@ import path from 'node:path';
 import { id } from './util.mjs';
 import { parseDevices } from './devices.mjs';
 import { AndroidAppInfo } from './android-app-info.mjs';
+import { SettingsFocus } from './settings-focus.mjs';
 
 const MiB = 1024 * 1024;
 export const KEY_CODES = { home: 3, back: 4, up: 19, down: 20, left: 21, right: 22, enter: 23, volumeUp: 24, volumeDown: 25, wake: 224, sleep: 223 };
@@ -48,7 +49,7 @@ export function parseFileList(output, directory) {
 }
 
 export class GlassesTools {
-  constructor(home, adb) { this.home = home; this.adb = adb; this.mutations = new Set(); this.appInfo = new AndroidAppInfo(this); }
+  constructor(home, adb) { this.home = home; this.adb = adb; this.mutations = new Set(); this.appInfo = new AndroidAppInfo(this); this.settingsFocus = new SettingsFocus(adb); }
   async adbCommand(serial, args, options) {
     const result = await this.adb.capture(['-s', serial, ...args], options);
     if (result.code !== 0) throw new Error((result.stderr || result.stdout.toString('utf8')).trim() || '眼镜操作失败，请检查连接与授权');
@@ -63,14 +64,14 @@ export class GlassesTools {
     if (result.code) throw new Error(result.stderr || '无法读取眼镜连接状态');
     const device = parseDevices(result.stdout.toString('utf8')).find(item => item.serial === serial);
     if (!device) throw new Error('目标眼镜已断开，请重新连接');
-    if (device.status === 'unauthorized') throw new Error('请先在眼镜上允许 USB 调试');
-    if (device.status !== 'device') throw new Error('目标眼镜离线，请检查数据线');
+    if (device.status === 'unauthorized') throw new Error(device.connection === 'wireless' ? '请先在眼镜上允许无线调试连接，或完成无线配对' : '请先在眼镜上允许 USB 调试');
+    if (device.status !== 'device') throw new Error(device.connection === 'wireless' ? '目标眼镜离线，请检查 Wi-Fi 和无线调试开关' : '目标眼镜离线，请检查数据线');
     return device;
   }
   async exclusive(serial, work) {
     if (this.mutations.has(serial)) throw new Error('这台眼镜仍有操作进行中，请等待完成');
     this.mutations.add(serial);
-    try { await this.ready(serial); return await work(); } finally { this.mutations.delete(serial); }
+    try { return await work(await this.ready(serial)); } finally { this.mutations.delete(serial); }
   }
   async info({ serial }) {
     await this.ready(serial);
@@ -191,7 +192,7 @@ export class GlassesTools {
     packageName(name);
     if (!['launch', 'stop', 'uninstall', 'clear'].includes(action)) throw new Error('不支持的应用操作');
     if (['uninstall', 'clear'].includes(action) && confirmPackage !== name) throw new Error('请确认目标应用及数据删除操作');
-    return this.exclusive(serial, async () => {
+    return this.exclusive(serial, async device => {
       const installed = (await this.apps({ serial, appearance:false })).packages.find(item => item.packageName === name);
       if (!installed) throw new Error('应用已不在眼镜中，请刷新列表');
       if (installed.system && action !== 'launch') throw new Error('系统应用仅支持查看与打开');
@@ -204,6 +205,7 @@ export class GlassesTools {
       } else if (action === 'uninstall') output = (await this.adbCommand(serial, ['uninstall', '--user', '0', name], { signal, timeout: 120000 })).stdout.toString('utf8');
       else output = await this.shell(serial, action === 'clear' ? ['pm', 'clear', '--user', '0', name] : ['am', 'force-stop', '--user', '0', name], { signal });
       if (/Failure|Error:|Exception/i.test(output) || (['clear', 'uninstall'].includes(action) && !/^Success\s*$/m.test(output))) throw new Error(output.trim() || '应用操作未成功');
+      if (action === 'launch' && ['com.android.settings', 'com.aiui.workbench.wireless'].includes(name)) this.settingsFocus.acquire(device, { temporary: true });
       this.appInfo.invalidate(serial);
       return { serial, packageName: name, action, output: output.trim() };
     });
@@ -245,9 +247,10 @@ export class GlassesTools {
   async control({ serial, action, confirmSerial }) {
     if (!Object.hasOwn(KEY_CODES, action) && !['settings', 'reboot'].includes(action)) throw new Error('不支持的快捷操作');
     if (action === 'reboot' && confirmSerial !== serial) throw new Error('请确认重启这台眼镜');
-    return this.exclusive(serial, async () => {
+    return this.exclusive(serial, async device => {
       const output = action === 'reboot' ? (await this.adbCommand(serial, ['reboot'])).stdout.toString('utf8') : await this.shell(serial, action === 'settings' ? ['am', 'start', '--user', '0', '-a', 'android.settings.SETTINGS'] : ['input', 'keyevent', String(KEY_CODES[action])]);
       if (/Error:|Exception/.test(output)) throw new Error(output.trim());
+      if (action === 'settings') this.settingsFocus.acquire(device, { temporary: true });
       return { serial, action, output: output.trim() };
     });
   }

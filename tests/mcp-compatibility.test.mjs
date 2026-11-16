@@ -223,3 +223,32 @@ test('real service discovery stays authenticated and validates arguments at the 
   assert.equal(result.isError, true);
   assert.equal(daemon.service.recordings.status().recordings.length, 0);
 });
+
+test('MCP connection guidance and QR pairing return native images with localized steps and cancellable sessions', async t => {
+  const f = await fixture(t), daemon = await startDaemon(f.home);
+  f.closers.push(() => daemon.close());
+  daemon.service.environmentCheck = async () => ({ devices: [] });
+  daemon.service.wirelessHelper.interfaces = () => [{ address: '127.0.0.1' }];
+  const client = await mcp(f);
+  const guidance = await client.callTool({ name: 'aiui_connection_guide', arguments: { step: 'install', locale: 'en', shareHelper: true } });
+  assert.equal(guidance.isError, undefined);
+  const images = guidance.content.filter(item => item.type === 'image');
+  assert.equal(images.length, 2);
+  assert.equal(images[0].mimeType, 'image/gif');
+  assert.equal(Buffer.from(images[0].data, 'base64').subarray(0, 3).toString(), 'GIF');
+  assert.equal(images[1].mimeType, 'image/png');
+  assert.equal(Buffer.from(images[1].data, 'base64').subarray(1, 4).toString(), 'PNG');
+  const text = guidance.content.find(item => item.type === 'text').text;
+  assert.doesNotMatch(text, /[\u3400-\u9fff]|data:image|base64/);
+  const meta = JSON.parse(text);
+  assert.equal(meta.connected, false); assert.equal(meta.images.length, 2);
+  const html = await (await fetch(meta.helper.urls[0], { headers: { 'Accept-Language': 'zh-CN' } })).text();
+  assert.match(html, /lang="en"/);
+  const qr = await client.callTool({ name: 'aiui_adb_pair_qr', arguments: { action: 'start' } });
+  assert.equal(qr.content[0].type, 'image');
+  const session = JSON.parse(qr.content.find(item => item.type === 'text').text);
+  assert.equal(session.stage, 'waiting'); assert.equal(session.qrDataUrl, undefined);
+  const cancelled = await client.callTool({ name: 'aiui_adb_pair_qr', arguments: { action: 'cancel', id: session.id } });
+  assert.equal(JSON.parse(cancelled.content.find(item => item.type === 'text').text).stage, 'cancelled');
+  assert.equal(daemon.service.wirelessQr.sessions.size, 0);
+});

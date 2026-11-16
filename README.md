@@ -10,11 +10,11 @@
 
 ## 下载与安装
 
-当前版本 **0.6.1**，新增内容见 [更新记录](CHANGELOG.md)。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.1) 下载安装包及 `SHA256SUMS.txt`。
+当前版本 **0.6.11**，新增内容见 [更新记录](CHANGELOG.md)。在 [GitHub Releases](https://github.com/syjstc/aiui-workbench/releases/tag/v0.6.11) 下载安装包及 `SHA256SUMS.txt`。
 
 | 平台 | 安装方式 | 签名 |
 | --- | --- | --- |
-| macOS · Apple Silicon | 打开 `darwin-arm64.dmg`，将 `AIUI Workshop.app` 拖入“应用程序”；也保留 ZIP | Developer ID；公证核验结果见发行说明 |
+| macOS · Apple Silicon | 打开 `darwin-arm64.dmg`，将 `AIUI Workshop.app` 拖入“应用程序”；也保留 ZIP | Developer ID 签名与 Apple 公证 |
 | Windows 10 / 11 · x64 | 完整解压 `win32-x64.zip`，双击 `AIUI Workshop.exe` | 未签名 |
 
 客户端自带运行时、npm、官方 CLI、ADB 和 scrcpy，无需安装 Node.js、Android Studio 或另配 PATH。Windows 未签名包可能显示系统信誉提示，请先核对下载来源和 SHA256。当前没有 Intel Mac、Windows ARM64 或 Linux 的正式下载包。
@@ -38,6 +38,7 @@
 - **官方平台草稿与提审**：AI 准备材料并调用 MCP，工坊上传 AIX、核对云端摘要、保存提审资料；正式提审必须由用户在桌面原生窗口确认。一次登录后复用系统加密会话，支持明确退出。
 - **官网应用只读列表**：“打包与上传”和“官网应用”分为两个标签页。统一绑定一个官网 Agent ID，完整显示并支持复制；查看官方图标、介绍、权限、图片、视频及草稿／审核／已上架版本。工坊和 MCP 不提供云端删除。
 - **眼镜工具**：设备诊断、文件与 APK 管理、真实名称与图标、截图、日志和默认内嵌的实时投屏。小窗口可单独打开或召回，结束投屏时同步关闭。
+- **无线调试**：在「连接眼镜」点「一键连接眼镜」。工坊会发现当前网络里的设备，支持首次授权、六位码及眼镜系统扫码配对。设置入口隐藏时，用手机扫码下载无线助手，再通过 Rokid AI 工具箱安装到眼镜。下载页跟随工坊语言，安装及手机遥控步骤都有引导；AI 可提供操作截图。工坊会记住眼镜自动重连。安装、日志、文件和投屏沿用同一套工具，无需另装 ADB 或配置 PATH。首次开关及网络准备见 [无线连接指南](docs/wireless-debugging.md)。
 - **AIUI 分类查看**：开发版、商店正式版与系统内置信息分开显示。正式版和内置版仅供查看，工坊不提供删除、卸载或清空数据。部分固件未开放商店清单权限，会明确显示不可读取，不会把未知数量显示成零。
 - **升级提醒**：启动与回到应用时自动检查，左下角提示新版本；macOS 支持下载、校验并重启升级，Windows 提供下载和手动安装入口。更新源可修改、可恢复默认。
 - **中英文与外观**：右上角随时切换中文 / EN，支持浅色、深色和跟随系统。

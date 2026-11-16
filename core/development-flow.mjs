@@ -7,13 +7,13 @@ export const DEVELOPMENT_GUIDE = `用户只需描述想法。官方 aiui-dev 负
 2. start 已返回项目上下文、自动检测及补齐的 Skill 和规范，不必再次读取；缺少上下文或切换项目时再调用 aiui_context_get。按需读取官方 references/checklist.md 及相关领域文档；项目 AGENTS.md 包含镜腿输入要求。aiui_project_files(action=list/read) 批量读取源码，然后 action=write 携带 expectedRevision 批量写入真实应用；也可使用自己的编码工具。按用户想法实现，加入可验证的应用行为日志。源码版本变化时重新读取并合并，不覆盖用户的新改动。
 3. aiui_workflow_continue(workflowId, steps) 一次执行真实预览、应用行为断言、截图、静态检查和打包；眼镜就绪时安装、启动并采集画面和日志。steps 必须含应用行为断言，不能把运行健康当成功能验收。
 4. 每次工具调用自动附带当前项目与公共环境的未读 sharedDiagnostics，直接读取并处理，无需用户复制。按每条 projectId、项目目录和 workflowId 匹配，不能混用其他项目；归属不明时先核实。读取会自动标记已读并收起，已读不代表修复；失败时按 projectId/diagnosticId 调用 aiui_diagnostics_get 补充证据，read=false 继续读未读。owner=ai 的问题自行修复并继续；owner=user 时用简短语言告诉用户卡在哪一步、具体操作和继续方法。不要甩日志，不要无限重复失败操作。用户说完成后调用同一 workflowId 继续，不重建项目。
-5. 通过 aiui_workflow_get 展示真实阶段和证据；代码或 SDK 变化会使旧结果失效。检查截图，不冒充佩戴体验或真实模型服务。没有设备时先完成模拟和打包，再清楚告知连接步骤。模拟器未配置真实模型/语音等服务时，可明确传 verification={mode:"device",reason:"具体的能力限制及真机验收计划"} 改走真机，保留未模拟验证的说明，不伪造通过；只有 target=glasses 才可使用。
+5. 通过 aiui_workflow_get 展示真实阶段和证据；代码或 SDK 变化会使旧结果失效。检查截图，不冒充佩戴体验或真实模型服务。发现设备未连接时主动告知用户，先继续模拟和打包；用 aiui_connection_guide 展示当前步骤和操作截图，连接后继续原任务。模拟器未配置真实模型/语音等服务时，可明确传 verification={mode:"device",reason:"具体的能力限制及真机验收计划"} 改走真机，保留未模拟验证的说明，不伪造通过；只有 target=glasses 才可使用。
 6. 发布是后续可选步骤，使用已有平台草稿和材料工具；正式提审继续由用户在工坊确认。`;
 
 export function deviceBlocker(environment, serial) {
   const e=environment;
   if(!e?.adb||!e?.aix)return {code:'tools-unavailable',message:'连接工具暂时不可用，请检查完整客户端',owner:'user',title:'请检查工坊安装',steps:['确认使用完整桌面安装包，重新打开工坊。','连接工具仍不可用时，打开新手指南选择备用工具。'],view:'guide'};
-  if(!e.devices?.length)return {code:'no-device',message:'尚未发现眼镜，请检查数据线和手机 ADB 开关',owner:'user',title:'连接眼镜后就可以继续',steps:['在手机 Rokid AI App 的眼镜设置中打开“眼镜 ADB 调试”。','连接支持数据传输的开发线，或按官方无线连接指南操作。','在眼镜上允许调试后，点击“重新检查并继续”或告诉 AI 继续。'],view:'devices'};
+  if(!e.devices?.length)return {code:'no-device',message:'尚未发现眼镜，请检查无线连接或数据线',owner:'user',title:'连接眼镜后就可以继续',steps:['打开工坊“连接眼镜”，按你的选择使用“无线连接”或“有线连接”Tab。无线使用同一 Wi-Fi；有线使用适配眼镜的数据调试线。','首次使用可点“用手机安装无线助手”：手机下载 APK 后，在 Rokid AI → 工具箱 → 眼镜应用管理 → 安装新应用中安装。工具箱的遥控器可操作眼镜。','开启无线调试，使用六位码或眼镜扫码配对；等工坊显示已连接，再告诉 AI 继续。'],view:'devices'};
   const d=serial?e.devices.find(d=>d.serial===serial):e.devices.length===1?e.devices[0]:null;
   if(!d)return {code:'select-device',message:'请选择明确的目标眼镜',owner:'user',title:'请选择这次使用的眼镜',steps:['打开“连接眼镜”，按设备名称和尾号选择目标。','让 AI 使用该设备继续原任务。'],view:'devices'};
   if(d.status==='unauthorized')return {code:'unauthorized',message:'请在眼镜上允许 USB 调试',owner:'user',title:'请在眼镜上允许连接',steps:['戴上眼镜，确认“允许 USB 调试”。','没有出现提示时重新连接，然后继续。'],view:'devices'};

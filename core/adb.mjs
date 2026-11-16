@@ -6,6 +6,18 @@ import {isIP} from 'node:net';
 import { spawn } from 'node:child_process';
 import { ROOT, atomicJson, readJson, run, normalizeEnvironment } from './util.mjs';
 
+export const LEGACY_ADB_PORT = 5555;
+
+export function adbAddress(value) {
+  const address = typeof value === 'string' ? value.trim() : '';
+  const match = address.match(/^(\[[a-f\d:.]+(?:%[a-z\d_.-]+)?\]|[\d.]+):(\d{1,5})$/i);
+  const raw = match?.[1].replace(/^\[|\]$/g, '') || '';
+  const [ip, scope] = raw.split('%'), family = isIP(ip), port = Number(match?.[2]);
+  if (!match || !family || (scope && family !== 6) || port < 1 || port > 65535) throw new Error('请输入眼镜显示的 IP:端口，例如 192.168.1.20:5555');
+  const host = ip.toLowerCase() + (scope ? '%' + scope : '');
+  return { address: (family === 6 ? '[' + host + ']' : host) + ':' + port, host, port };
+}
+
 export class AdbTools {
   constructor(home, { root = ROOT, platform = process.platform, arch = process.arch, env = process.env, userHome = os.homedir() } = {}) {
     this.file = path.join(home, 'connection-tools.json');
@@ -48,12 +60,25 @@ export class AdbTools {
   }
   async execute(args, options) { return run(await this.resolve(), args, { env: this.env, ...options }); }
   async connect({address,pairingCode}) {
-    const match=typeof address==='string'&&address.match(/^(\[[a-f\d:]+\]|[\d.]+):(\d{1,5})$/i);
-    if(!match||!isIP(match[1].replace(/^\[|\]$/g,''))||Number(match[2])<1||Number(match[2])>65535)throw new Error('请输入眼镜显示的 IP:端口，例如 192.168.1.20:5555');
-    if(pairingCode!==undefined&&!/^\d{6}$/.test(pairingCode))throw new Error('请输入眼镜显示的六位配对码');
-    const result=await this.execute(pairingCode?['pair',address,pairingCode]:['connect',address],{timeout:15000});
-    if(result.code||/failed|unable|cannot|error/i.test(result.output))throw new Error('无线 ADB 连接失败：'+result.output);
-    return {address,paired:pairingCode!==undefined,output:result.output};
+    address = adbAddress(address).address;
+    if (pairingCode !== undefined && !/^\d{6}$/.test(pairingCode)) throw new Error('请输入眼镜显示的六位配对码');
+    const result = await this.execute(pairingCode ? ['pair', address, pairingCode] : ['connect', address], { timeout: 15000 });
+    // Some ADB versions return exit code 0 for connection failures. A completed
+    // command is not a successful pairing/connection without its receipt.
+    const success = pairingCode ? /successfully paired to /i : /(?:already )?connected to /i;
+    if(result.code || !success.test(result.output) || /failed|unable|cannot|error/i.test(result.output)) {
+      const output = pairingCode ? result.output.replaceAll(pairingCode, '[hidden]') : result.output;
+      throw new Error('无线 ADB 连接失败：' + output);
+    }
+    return {address,paired:pairingCode !== undefined,output:result.output};
+  }
+  async pairQr(address, password) {
+    address = adbAddress(address).address;
+    if (!/^\d{10}$/.test(password)) throw new Error('二维码配对凭据无效，请重新生成。');
+    // Keep the one-use secret out of the process argument list and error logs.
+    const result = await this.execute(['pair', address], { input: password + '\n', timeout: 15000 });
+    if (result.code || !/successfully paired to /i.test(result.output) || /failed|unable|cannot|error/i.test(result.output)) throw new Error('二维码配对未完成，请重新生成后再扫描，或改用六位配对码。');
+    return { paired: true };
   }
   // Keep stdout separate and byte-for-byte intact for screenshots, NUL-delimited
   // filenames and log exports. The ordinary CLI runner redacts/truncates text.
