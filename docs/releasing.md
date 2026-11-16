@@ -87,6 +87,6 @@ npm run release:manifest -- \
 
 公证完成后运行 `node scripts/create-dmg.mjs --app '/path/AIUI Workshop.app' --out output/release` 生成 DMG。DMG 内包含应用和“应用程序”快捷方式；同一版本的 ZIP 仍用于应用内升级。更新清单每个平台只列一个安装包，DMG 作为额外的手动安装附件提供，不与 ZIP 重复登记同一个平台。
 
-桌面内置 GitHub 更新源为 `syjstc/aiui-workbench`，用户可修改并恢复默认。0.4.0 起左下角提供持续提醒；macOS 由用户点击发起下载、校验、替换和重启，失败时恢复原应用。Windows 下载后手动安装。用户的自动检查偏好保持不变。
+桌面提供自动选择官方源及可编辑的手动源；GitHub 默认仓库为 `syjstc/aiui-workbench`。正式 Release 发布后，通过 [CNB 最新版分发](cnb-releases.md) 同步国内下载仓库，仅保留最新一套安装包，固定链接和应用内更新清单同时更新。0.4.0 起左下角提供持续提醒；macOS 由用户点击发起下载、校验、替换和重启，失败时恢复原应用。Windows 下载后手动安装。用户的自动检查偏好保持不变。
 
 参考：[Electron 代码签名](https://www.electronjs.org/docs/latest/tutorial/code-signing)、[Apple 公证流程](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)、[electron/osx-sign](https://github.com/electron/osx-sign)。

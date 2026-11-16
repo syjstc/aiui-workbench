@@ -12,7 +12,7 @@ const manifest = (version = '0.3.0') => ({ schemaVersion: 1, version, notes: '�
 const json = value => new Response(JSON.stringify(value));
 async function manager(t, fetcher, options = {}) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-updates-')); t.after(() => fs.rm(home, { recursive: true, force: true }));
-  const updates = await new AppUpdates(home, { fetcher, version: '0.2.0', platform: 'darwin', arch: 'arm64', ...options }).init(); t.after(() => updates.close());
+  const updates = await new AppUpdates(home, { fetcher, version: '0.2.0', platform: 'darwin', arch: 'arm64', defaults: { source: 'github' }, ...options }).init(); t.after(() => updates.close());
   return updates;
 }
 const custom = updates => updates.settings({ source: 'custom', sources: { custom: { manifestUrl: 'https://release.example/workbench-update.json' } } });
@@ -90,4 +90,93 @@ test('automatic startup checking respects disabled preferences and serialized re
   const value = await createManifest({ version: '0.3.0', files: [{ platform: 'darwin', arch: 'arm64', file }] });
   assert.equal(validateManifest(value, 'https://release.example/workbench-update.json', 'darwin', 'arm64').file.sha256, sha(bytes));
   assert.equal(value.files[0].url, './AIUI%20App.zip');
+});
+
+const automaticDefaults = { source: 'auto', sources: { cnb: { manifestUrl: 'https://cnb.example/stable/workbench-update.json' }, github: { repository: 'official/workbench' } } };
+const githubRelease = version => ({ tag_name: `v${version}`, assets: [{ name: 'workbench-update.json', browser_download_url: 'https://github.example/workbench-update.json' }] });
+const automaticFetcher = ({ cnbVersion = '0.3.0', githubVersion = '0.3.0', download = () => new Response(bytes) } = {}) => async (url, options) => {
+  if (url.endsWith('/releases/latest')) return json(githubRelease(githubVersion));
+  if (url.endsWith('.json')) return json(manifest(url.includes('cnb.example') ? cnbVersion : githubVersion));
+  return download(url, options);
+};
+
+test('fresh installs default to automatic official sources, while an existing manual choice and disabled checks survive', async t => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-updates-migrate-')); t.after(() => fs.rm(home, { recursive: true, force: true }));
+  const fresh = await new AppUpdates(home).init(); t.after(() => fresh.close());
+  assert.equal(fresh.status().source, 'auto');
+  await atomicJson(fresh.file, { source: 'cnb', autoCheck: false, intervalHours: 168, sources: { cnb: { manifestUrl: 'https://example.test/my-feed.json' } } });
+  const existing = await new AppUpdates(home).init(); t.after(() => existing.close());
+  assert.equal(existing.status().source, 'cnb'); assert.equal(existing.status().autoCheck, false); assert.equal(existing.status().intervalHours, 168);
+  assert.equal(existing.status().sources.cnb.manifestUrl, 'https://example.test/my-feed.json');
+});
+
+test('automatic checks prefer CNB for equal versions but never hide a newer stable GitHub release behind a lagging mirror', async t => {
+  const updates = await manager(t, automaticFetcher(), { defaults: automaticDefaults });
+  await updates.check(); assert.equal(updates.status().activeSource, 'cnb');
+  updates.fetcher = automaticFetcher({ githubVersion: '0.4.0' });
+  await updates.check(); assert.equal(updates.latest.version, '0.4.0'); assert.equal(updates.status().activeSource, 'github');
+  assert.equal(updates.status().source, 'auto');
+});
+
+test('automatic download switches to identical backup bytes after a partial network failure and remembers the actual download source', async t => {
+  const requested = [];
+  const updates = await manager(t, automaticFetcher({ download: url => {
+    requested.push(url);
+    if (url.includes('cnb.example')) return new Response(new ReadableStream({ start(controller) { controller.enqueue(bytes.subarray(0, 4)); controller.error(new Error('connection lost')); } }));
+    return new Response(bytes);
+  } }), { defaults: automaticDefaults });
+  await updates.check(); const downloaded = await updates.download();
+  assert.equal(requested.length, 2); assert.equal(downloaded.source, 'github'); assert.equal(updates.status().activeSource, 'github');
+  assert.equal(updates.status().source, 'auto'); assert.deepEqual(await fs.readFile(downloaded.path), bytes);
+  assert.equal((await fs.readdir(path.dirname(downloaded.path))).some(file => file.endsWith('.part')), false);
+  const reopened = await new AppUpdates(updates.home, { defaults: automaticDefaults, fetcher: automaticFetcher() }).init(); t.after(() => reopened.close());
+  assert.equal(reopened.status().lastDownloadSource, 'github'); assert.equal(reopened.status().lastDownloadVersion, '0.3.0');
+  await reopened.check(); assert.equal(reopened.status().activeSource, 'github');
+});
+
+test('an unavailable metadata source and a stalled package do not prevent using the healthy official source', async t => {
+  const hold = setTimeout(() => {}, 5000); t.after(() => clearTimeout(hold));
+  const pending = (_url, { signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+  const healthy = automaticFetcher();
+  const updates = await manager(t, (url, options) => url.includes('cnb.example') ? pending(url, options) : healthy(url, options), { defaults: automaticDefaults, checkTimeout: 15, downloadIdleTimeout: 15 });
+  await updates.check(); assert.equal(updates.status().activeSource, 'github'); assert.ok(updates.status().sourceResults.find(result => result.source === 'cnb').error);
+  updates.fetcher = automaticFetcher({ download: (url, options) => url.includes('cnb.example') ? pending(url, options) : new Response(bytes) });
+  await updates.check(); assert.equal(updates.status().activeSource, 'cnb');
+  assert.equal((await updates.download()).source, 'github');
+});
+
+test('automatic failover never substitutes an older version or different package hash', async t => {
+  const requested = [];
+  const fallback = automaticFetcher({ download: url => { requested.push(url); return new Response(null, { status: 503 }); } });
+  const updates = await manager(t, async (url, options) => {
+    if (url === 'https://github.example/workbench-update.json') { const value = manifest(); value.files[0].sha256 = 'a'.repeat(64); return json(value); }
+    return fallback(url, options);
+  }, { defaults: automaticDefaults });
+  await updates.check(); await assert.rejects(updates.download(), /503/); assert.equal(requested.length, 1); assert.equal(updates.downloaded, null);
+  requested.length = 0; updates.fetcher = automaticFetcher({ githubVersion: '0.2.9', download: url => { requested.push(url); return new Response(null, { status: 404 }); } });
+  await updates.check(); await assert.rejects(updates.download(), /404/); assert.equal(requested.length, 1);
+});
+
+test('manual source selection never fails over and automatic mode does not mix in user-edited repositories', async t => {
+  const requested = [], healthy = automaticFetcher();
+  const updates = await manager(t, (url, options) => { requested.push(url); return healthy(url, options); }, { defaults: automaticDefaults });
+  await updates.settings({ sources: { github: { repository: 'another/project' }, cnb: { manifestUrl: 'https://another.test/feed.json' } } });
+  await updates.check(); assert.ok(requested.includes('https://api.github.com/repos/official/workbench/releases/latest'));
+  assert.equal(requested.some(url => url.includes('another')), false);
+  await updates.settings({ source: 'cnb', sources: { cnb: automaticDefaults.sources.cnb } });
+  requested.length = 0; updates.fetcher = async url => { requested.push(url); return url.endsWith('.json') ? json(manifest()) : new Response(null, { status: 503 }); };
+  await updates.check(); await assert.rejects(updates.download(), /503/);
+  assert.equal(requested.some(url => url.includes('github')), false); assert.equal(updates.status().source, 'cnb');
+});
+
+test('unavailable official sources clear stale results while manual errors keep their translatable message', async t => {
+  const updates = await manager(t, automaticFetcher(), { defaults: automaticDefaults });
+  await updates.check(); assert.equal(updates.status().updateAvailable, true);
+  updates.fetcher = async () => new Response(null, { status: 503 });
+  const failed = await updates.check();
+  assert.equal(failed.latest, null); assert.equal(failed.updateAvailable, false);
+  assert.equal(failed.error, '官方更新源暂时不可用，请稍后重试或手动选择更新源');
+  assert.ok(failed.sourceResults.every(result => result.error.includes('HTTP 503')));
+  await updates.settings({ source: 'cnb' });
+  assert.equal((await updates.check()).error, '更新源请求失败：HTTP 503');
 });

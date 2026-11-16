@@ -2058,5 +2058,11 @@
   "使用期间保持数据线连接，工坊会自动检测断开和恢复。": "Keep the cable plugged in while using the app. Workshop detects disconnection and reconnection automatically.",
   "第一次连接 · 选择连接方式": "First connection · Choose a connection method",
   "在工坊「连接眼镜」选择「有线连接」Tab。": "In Workshop → Connect glasses, select the Wired connection tab.",
-  "已连接": "Connected"
+  "已连接": "Connected",
+  "自动选择官方源": "Choose an official source automatically",
+  "自动检查官方 CNB 和 GitHub，提供较新的稳定版本。同版本优先国内源或上次成功下载的来源，失败时尝试内容一致的备用源。": "Checks official CNB and GitHub for the newer stable version. For the same version, prefers CNB or the last successful download source and retries an identical package from the other source on failure.",
+  "上次更新下载源": "Last update download source",
+  "安装包下载长时间无响应": "The update download stopped responding",
+  "已检查的来源暂无更新": "No update in the sources checked",
+  "官方更新源暂时不可用，请稍后重试或手动选择更新源": "The official update sources are unavailable. Try again later or choose a source manually."
 }
