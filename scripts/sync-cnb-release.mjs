@@ -50,6 +50,20 @@ async function digest(file) {
   return { sha256: hash.digest('hex'), size: (await fs.stat(file)).size };
 }
 
+export function mirrorIsCurrent(plan, release, manifest) {
+  if (!release || release.draft || release.prerelease || release.name !== `AIUI 工坊 ${plan.version}` || release.body !== (plan.manifest.notes || '') || JSON.stringify(manifest) !== JSON.stringify(plan.manifest)) return false;
+  if (!plan.files.every(file => /^[a-f\d]{64}$/i.test(file.sha256 || ''))) return false;
+  const expected = new Map();
+  for (const file of plan.files) for (const name of [file.name, file.alias]) expected.set(name, { size: file.size, sha256: file.sha256.toLowerCase() });
+  const sums = plan.files.flatMap(file => [file.name, file.alias].map(name => `${file.sha256.toLowerCase()}  ${name}`)).join('\n') + '\n';
+  for (const [name, text] of [[MANIFEST_NAME, JSON.stringify(plan.manifest, null, 2) + '\n'], ['SHA256SUMS.txt', sums]]) expected.set(name, { size: Buffer.byteLength(text), sha256: createHash('sha256').update(text).digest('hex') });
+  const assets = (release.assets || []).filter(asset => ownedAsset(asset.name));
+  return assets.length === expected.size && new Set(assets.map(asset => asset.name)).size === expected.size && assets.every(asset => {
+    const file = expected.get(asset.name);
+    return file && asset.size === file.size && String(asset.hash_algo).toLowerCase().replace('-', '') === 'sha256' && String(asset.hash_value).toLowerCase() === file.sha256;
+  });
+}
+
 export async function syncCnbRelease({ repository, token, githubToken = '', localDirectory, dryRun = false, fetcher = fetch, log = console.log }) {
   const urls = cnbUrls(repository);
   if (!dryRun && !token) throw new Error('需要 CNB_TOKEN（仅目标下载仓库的 Release 读写权限）');
@@ -86,6 +100,21 @@ export async function syncCnbRelease({ repository, token, githubToken = '', loca
   if (!sourceManifestAsset) throw new Error(`GitHub Release 缺少 ${MANIFEST_NAME}`);
   const sourceManifest = await (await publicRequest(githubToken ? sourceManifestAsset.url : sourceManifestAsset.browser_download_url, { headers: { Accept: 'application/octet-stream' } })).json();
   const plan = mirrorPlan(release, sourceManifest, repository);
+  const result = { version: plan.version, manifestUrl: urls.manifest, releaseUrl: urls.root, downloads: plan.files.map(file => ({ name: file.alias, url: urls.base + encodeURIComponent(file.alias) })) };
+  let target;
+  if (!dryRun) {
+    // CNB exposes server-side SHA256 metadata for each attachment. Check the
+    // fixed feed and every current package/alias before doing any large transfer.
+    const releases = await api('?page_size=100');
+    if (!Array.isArray(releases) || releases.some(item => item.tag_name !== TAG)) throw new Error('请使用只维护 stable Release 的独立 CNB 下载仓库');
+    target = await api(`/tags/${TAG}`, 'GET', undefined, { missing: true });
+    if (target?.assets?.some(asset => asset.name === MANIFEST_NAME)) {
+      const previous = await (await publicRequest(urls.manifest)).json();
+      if (!semver.valid(previous.version) || semver.gt(previous.version, plan.version)) throw new Error('CNB 已有更新的版本，拒绝覆盖或降级');
+      if (semver.eq(previous.version, plan.version) && JSON.stringify(previous.files.map(file => [file.platform, file.arch, file.sha256, file.size]).sort()) !== JSON.stringify(plan.manifest.files.map(file => [file.platform, file.arch, file.sha256, file.size]).sort())) throw new Error('同版本安装包摘要已变化，拒绝覆盖');
+      if (mirrorIsCurrent(plan, target, previous)) { const current = { ...result, unchanged: true }; log(JSON.stringify(current, null, 2)); return current; }
+    }
+  }
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-cnb-release-'));
   try {
     for (const file of plan.files) {
@@ -102,19 +131,7 @@ export async function syncCnbRelease({ repository, token, githubToken = '', loca
       if (actual.size !== file.size || file.sha256 && actual.sha256 !== file.sha256) throw new Error(`安装包校验失败：${file.name}`);
       file.sha256 = actual.sha256;
     }
-    const result = { version: plan.version, manifestUrl: urls.manifest, releaseUrl: urls.root, downloads: plan.files.map(file => ({ name: file.alias, url: urls.base + encodeURIComponent(file.alias) })) };
     if (dryRun) { log(JSON.stringify({ ...result, dryRun: true }, null, 2)); return result; }
-
-    // This is a dedicated download repository. Do not delete somebody else's
-    // releases to enforce the one-release policy.
-    const releases = await api('?page_size=100');
-    if (!Array.isArray(releases) || releases.some(item => item.tag_name !== TAG)) throw new Error('请使用只维护 stable Release 的独立 CNB 下载仓库');
-    let target = await api(`/tags/${TAG}`, 'GET', undefined, { missing: true });
-    if (target?.assets?.some(asset => asset.name === MANIFEST_NAME)) {
-      const previous = await (await publicRequest(urls.manifest)).json();
-      if (!semver.valid(previous.version) || semver.gt(previous.version, plan.version)) throw new Error('CNB 已有更新的版本，拒绝覆盖或降级');
-      if (semver.eq(previous.version, plan.version) && JSON.stringify(previous.files.map(file => [file.platform, file.arch, file.sha256, file.size]).sort()) !== JSON.stringify(plan.manifest.files.map(file => [file.platform, file.arch, file.sha256, file.size]).sort())) throw new Error('同版本安装包摘要已变化，拒绝覆盖');
-    }
     if (!target) {
       await api('', 'POST', { tag_name: TAG, target_commitish: 'main', name: `AIUI 工坊 ${plan.version}`, body: sourceManifest.notes || '', draft: false, prerelease: false, make_latest: 'true' });
       target = await api(`/tags/${TAG}`);

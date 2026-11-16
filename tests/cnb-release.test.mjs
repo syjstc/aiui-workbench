@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { mirrorPlan, syncCnbRelease, cnbUrls } from '../scripts/sync-cnb-release.mjs';
+import { mirrorPlan, mirrorIsCurrent, syncCnbRelease, cnbUrls } from '../scripts/sync-cnb-release.mjs';
 import { sha } from '../core/util.mjs';
 
 const repository = 'official/aiui-downloads', base = `https://api.cnb.cool/${repository}/-/releases`;
@@ -19,9 +19,9 @@ async function fixture(t, { failUpload, previousVersion = '0.2.0' } = {}) {
   const manifest = { schemaVersion: 1, version: '0.3.0', notes: 'A concise release note', files: packages.filter(file => file.ext === 'zip').map(file => ({ platform: file.platform, arch: file.arch, url: `https://github.example/${file.name}`, sha256: sha(file.bytes), size: file.bytes.length })) };
   const release = { id: 30, tag_name: 'v0.3.0', draft: false, prerelease: false, assets: [{ name: 'workbench-update.json', url: 'https://api.github.com/repos/syjstc/aiui-workbench/releases/assets/31', browser_download_url: 'https://github.example/workbench-update.json' }, ...packages.map(file => ({ name: file.name, size: file.bytes.length, digest: 'sha256:' + sha(file.bytes) }))] };
   const storage = new Map([['workbench-update.json', Buffer.from(JSON.stringify({ ...manifest, version: previousVersion }))], ['AIUI-Workbench-0.2.0-win32-x64.zip', Buffer.from('old package')], ['notes.txt', Buffer.from('unrelated user file')]]);
-  const target = { id: 7, tag_name: 'stable', assets: [] }, operations = [], requests = [], uploads = new Map();
+  const target = { id: 7, tag_name: 'stable', name: `AIUI 工坊 ${previousVersion}`, body: manifest.notes, assets: [] }, operations = [], requests = [], uploads = new Map();
   let nextId = 50;
-  const assets = () => [...storage].map(([name, bytes]) => ({ id: name, name, size: bytes.length }));
+  const assets = () => [...storage].map(([name, bytes]) => ({ id: name, name, size: bytes.length, hash_algo: 'sha256', hash_value: sha(bytes) }));
   const fetcher = async (url, options = {}) => {
     requests.push({ url, authorization: options.headers?.Authorization });
     const method = options.method || 'GET';
@@ -50,11 +50,11 @@ async function fixture(t, { failUpload, previousVersion = '0.2.0' } = {}) {
     if (url.includes('/7/asset-upload-confirmation/')) {
       const name = decodeURIComponent(new URL(url).pathname.split('/').pop()); storage.set(name, uploads.get(name)); operations.push('confirm:' + name); return json({});
     }
-    if (url === base + '/7' && method === 'PATCH') { operations.push('publish'); return json({}); }
+    if (url === base + '/7' && method === 'PATCH') { Object.assign(target, JSON.parse(options.body)); operations.push('publish'); return json({}); }
     if (method === 'DELETE') { const name = url.slice((base + '/7/assets/').length); storage.delete(name); operations.push('delete:' + name); return new Response(null, { status: 204 }); }
     assert.fail(url);
   };
-  return { directory, packages, manifest, release, storage, operations, requests, fetcher };
+  return { directory, packages, manifest, release, storage, target, assets, operations, requests, fetcher };
 }
 
 test('the mirror keeps immutable update filenames and adds fixed public download aliases without changing package bytes', async t => {
@@ -87,9 +87,27 @@ test('corrupt local packages, prereleases and attempts to overwrite a newer CNB 
   f.release.prerelease = true;
   await assert.rejects(syncCnbRelease({ repository, token: 'scoped-cnb-test-token', localDirectory: f.directory, fetcher: f.fetcher, log() {} }), /正式稳定/);
   f.release.prerelease = false;
+  f.storage.set('workbench-update.json', Buffer.from(JSON.stringify({ ...f.manifest, version: '0.2.0' })));
   await fs.writeFile(path.join(f.directory, f.packages[0].name), Buffer.from('broken'));
   await assert.rejects(syncCnbRelease({ repository, token: 'scoped-cnb-test-token', localDirectory: f.directory, fetcher: f.fetcher, log() {} }), /校验失败/);
   assert.deepEqual(f.operations, []);
+});
+
+test('an identical repeated sync checks all server-side SHA256 values without transferring packages again', async t => {
+  const f = await fixture(t);
+  const options = { repository, token: 'scoped-cnb-test-token', localDirectory: f.directory, fetcher: f.fetcher, log() {} };
+  await syncCnbRelease(options);
+  f.operations.length = 0; f.requests.length = 0;
+  const current = await syncCnbRelease({ ...options, localDirectory: path.join(f.directory, 'missing-directory') });
+  assert.equal(current.unchanged, true); assert.deepEqual(f.operations, []);
+  assert.equal(f.requests.some(request => request.url.startsWith('https://upload.example/')), false);
+  const plan = mirrorPlan(f.release, f.manifest, repository), published = JSON.parse(f.storage.get('workbench-update.json'));
+  const target = { ...f.target, assets: f.assets() };
+  assert.equal(mirrorIsCurrent(plan, target, published), true);
+  for (const change of [{ hash_value: 'a'.repeat(64) }, { hash_algo: 'md5' }, { size: 1 }]) {
+    assert.equal(mirrorIsCurrent(plan, { ...target, assets: [{ ...target.assets[0], ...change }, ...target.assets.slice(1)] }, published), false);
+  }
+  assert.equal(mirrorIsCurrent(plan, { ...target, assets: [...target.assets, { name: 'AIUI-Workbench-0.1.0-win32-x64.zip' }] }, published), false);
 });
 
 test('the public mirror plan rejects an unsafe repository, duplicate platforms and a mismatched source version', async t => {
