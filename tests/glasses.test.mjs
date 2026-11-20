@@ -155,7 +155,13 @@ test('screenshot files retain PNG bytes; invalid images are never reported as su
   const { tools } = await fixture(t, () => response(image));
   const result = await tools.screenshot({ serial });
   assert.equal(result.width, 480); assert.equal(result.height, 640); assert.deepEqual(await fs.readFile(result.path), png);
-  image = Buffer.from('Permission denied'); await assert.rejects(tools.screenshot({ serial }), /有效截图/);
+  image = Buffer.from('Permission denied'); await assert.rejects(tools.screenshot({ serial }), error => {
+    assert.match(error.message, /有效截图/);
+    assert.equal(error.deviceDiagnostic.state, 'restricted');
+    assert.equal(error.deviceDiagnostic.phoneAdbSwitch, 'unknown');
+    assert.match(error.deviceDiagnostic.evidence, /Permission denied/);
+    return true;
+  });
 });
 test('file previews preserve text and image bytes, reject binary data and refuse oversized reads before transfer', async t => {
   let bytes = Buffer.from('你好\npassword=literal-text\n'), length = bytes.length;

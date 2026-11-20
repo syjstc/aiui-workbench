@@ -6,6 +6,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { Mirroring } from '../core/mirroring.mjs';
+import { parseRokidAdbGate, withAdbRecovery } from '../core/adb-access.mjs';
 import { ROOT, run, readJson, sha } from '../core/util.mjs';
 
 async function fixture(t, onSpawn) {
@@ -64,6 +65,17 @@ test('unauthorized devices and unsupported options cannot launch a process; star
   assert.equal(calls.length, 0);
   await assert.rejects(manager.start({ serial: 'glasses-1' }), /Cannot connect/);
   assert.equal((await manager.status({ serial: 'glasses-1' })).session.status, 'failed');
+});
+test('failed mirror status exposes the separate Rokid App gate and recovery to AI', async t => {
+  const { manager } = await fixture(t, child => { child.stderr.write('ERROR: error: closed\n'); child.emit('close', 1); });
+  const rokidAppAdb = parseRokidAdbGate('[ro.product.brand]: [Rokid]\n[persist.vendor.adb]: [false]');
+  manager.glasses.diagnoseFailure = async (serial, error) => withAdbRecovery(error, { serial, rokidAppAdb });
+  await assert.rejects(manager.start({ serial: 'glasses-1' }), /closed/);
+  const { session } = await manager.status({ serial: 'glasses-1' });
+  assert.equal(session.status, 'failed');
+  assert.equal(session.deviceDiagnostic.state, 'rokid-adb-disabled');
+  assert.equal(session.deviceDiagnostic.phoneAdbSwitch, 'off');
+  assert.match(session.recovery.steps.join(' '), /Rokid AI.*眼镜 ADB 调试/);
 });
 test('bundled static releases match their recorded files and run with an empty system PATH', async () => {
   const directory = path.join(ROOT, 'vendor/scrcpy', `${process.platform}-${process.arch}`);

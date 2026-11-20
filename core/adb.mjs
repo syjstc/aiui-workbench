@@ -72,11 +72,11 @@ export class AdbTools {
     }
     return {address,paired:pairingCode !== undefined,output:result.output};
   }
-  async pairQr(address, password) {
+  async pairQr(address, password, signal) {
     address = adbAddress(address).address;
     if (!/^\d{10}$/.test(password)) throw new Error('二维码配对凭据无效，请重新生成。');
     // Keep the one-use secret out of the process argument list and error logs.
-    const result = await this.execute(['pair', address], { input: password + '\n', timeout: 15000 });
+    const result = await this.execute(['pair', address], { input: password + '\n', timeout: 15000, signal });
     if (result.code || !/successfully paired to /i.test(result.output) || /failed|unable|cannot|error/i.test(result.output)) throw new Error('二维码配对未完成，请重新生成后再扫描，或改用六位配对码。');
     return { paired: true };
   }

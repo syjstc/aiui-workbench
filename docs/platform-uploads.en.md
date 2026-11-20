@@ -9,7 +9,7 @@ AI prepares code, store text, icons and preview media, then calls Workshop throu
 ## First complete workflow
 
 1. On desktop, open **Build & upload → Sign in to Rokid** and complete the official sign-in flow. The main window updates immediately and the sign-in window closes automatically. Valid encrypted sessions are reused after restart. Keep desktop Workshop running when using Web, CLI or MCP; signing in through an ordinary browser does not authorize Workshop.
-2. In the build/upload tab, select one local app and set its official binding. Verify the formal name and full highlighted **Official Agent ID**. Existing apps use their existing official identity; create a new identity on the website first when needed. All stages share this binding, and MCP cannot change it.
+2. In the build/upload tab, select one local app and set its official binding. Verify the formal name and full highlighted **Official Agent ID**. Existing apps use their existing official identity; use **Create official agent** for a new identity. All stages share this binding, and MCP cannot change it.
 3. Check/build the AIX, then upload it as a cloud draft. Workshop reports success after reading back and verifying the official target, version and package/code digests. Local and cloud version numbers are separate; official draft/material saves may increment the cloud version.
 4. Use `aiui_platform_review_prepare` to prepare text, icon, previews and permission purposes. The desktop form also supports text and preview-file paths; icon replacement and permission purposes use MCP parameters. Saving materials does not submit a review.
 5. AI requests confirmation with `aiui_platform_review_request`, or you use the desktop confirmation button. Check the target, version, package hash, text, permissions and media, then confirm in the native dialog. Cancelling does not submit.
@@ -24,7 +24,7 @@ The official-apps tab displays the official icon, description, intent, greeting,
 | Operation | User action | MCP capability |
 | --- | --- | --- |
 | Official sign-in / sign-out | Desktop official window and account buttons | Read login status; no password or cookie input |
-| Change the official binding | Workshop UI after checking name and Agent ID | Read the binding; cannot change it |
+| Change the official binding | Workshop UI after checking name and Agent ID | Use `aiui_platform_bind` for the initial link or `aiui_platform_create` to create and link a new agent |
 | Check/build | Desktop/Web or AI | `aiui_project_build`, local output only |
 | Upload a new draft | Upload action or AI | `aiui_platform_upload`, no review submission |
 | Save review materials | Form or AI | `aiui_platform_review_prepare`, no review submission |
@@ -59,7 +59,7 @@ Use absolute file paths on the computer running Workshop. Omit `iconFile` to kee
 
 ## MCP and CLI calls
 
-First read `aiui_platform_status`, list official apps with `aiui_platform_agents` and ask the user to set the binding in Workshop. Build with `aiui_project_build`, then upload:
+First read `aiui_platform_status`, list official apps with `aiui_platform_agents` and link the selected Agent ID with `aiui_platform_bind`, or create a new identity with `aiui_platform_create`. Build with `aiui_project_build`, then upload:
 
 ```json
 {"name":"aiui_platform_upload","arguments":{"projectId":"<projectId>","agentId":"<cloudAgentId>","waitMs":45000}}

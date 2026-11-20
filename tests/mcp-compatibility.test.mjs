@@ -224,6 +224,49 @@ test('real service discovery stays authenticated and validates arguments at the 
   assert.equal(daemon.service.recordings.status().recordings.length, 0);
 });
 
+test('ADB refusal and asynchronous device failures reach MCP with actionable phone debugging recovery', async t => {
+  const f = await fixture(t), daemon = await startDaemon(f.home);
+  f.closers.push(() => daemon.close());
+  const serial = 'test-glasses';
+  let enabled = false;
+  const properties = () => '[ro.product.brand]: [Rokid]\n[persist.vendor.adb]: [' + enabled + ']\n';
+  daemon.service.adb.execute = async () => ({ code: 0, output: properties() });
+  daemon.service.adb.capture = async args => args.at(-1) === 'getprop'
+    ? { code: 0, stdout: Buffer.from(properties()), stderr: '' }
+    : args[0] === 'devices'
+    ? { code: 0, stdout: Buffer.from(serial + ' device\n'), stderr: '' }
+    : { code: 1, stdout: Buffer.alloc(0), stderr: 'error: closed' };
+  daemon.service.cli = async () => ({ code: 1, output: 'Permission denied' });
+  const client = await mcp(f);
+  const failed = await client.callTool({ name: 'aiui_glasses_screenshot', arguments: { serial } });
+  assert.equal(failed.isError, true);
+  const failure = JSON.parse(failed.content.find(item => item.type === 'text').text);
+  assert.equal(failure.deviceDiagnostic.state, 'rokid-adb-disabled');
+  assert.equal(failure.deviceDiagnostic.phoneAdbSwitch, 'off');
+  assert.equal(failure.recovery.owner, 'user');
+  assert.match(failure.recovery.steps.join(' '), /Rokid AI.*眼镜 ADB 调试/);
+  assert.equal(failure.sharedDiagnostics.items.find(item => item.id === failure.diagnosticId).recovery.code, 'rokid-adb-disabled');
+  const control = await client.callTool({ name: 'aiui_glasses_control', arguments: { serial, action: 'home' } });
+  assert.equal(control.isError, true);
+  assert.equal(JSON.parse(control.content.find(item => item.type === 'text').text).deviceDiagnostic.phoneAdbSwitch, 'off');
+
+  enabled = true;
+  const project = await daemon.service.projects.create({ directory: path.join(f.home, 'project'), name: 'ADB recovery test' }, daemon.service.knowledge);
+  const started = JSON.parse((await client.callTool({ name: 'aiui_device_deploy', arguments: { serial, projectId: project.id } })).content.find(item => item.type === 'text').text);
+  assert.ok(started.id);
+  const result = await client.callTool({ name: 'aiui_job_wait', arguments: { jobId: started.id, waitMs: 5000 } });
+  assert.equal(result.isError, true);
+  const job = JSON.parse(result.content.find(item => item.type === 'text').text);
+  assert.equal(job.status, 'failed');
+  assert.equal(job.deviceDiagnostic.state, 'restricted');
+  assert.equal(job.recovery.owner, 'user');
+  assert.equal(job.recovery.recheck.tool, 'aiui_environment_check');
+  assert.match(job.error, /眼镜 ADB 调试/);
+  const diagnostic = daemon.service.diagnostics.get({ diagnosticId: job.diagnosticId }).items[0];
+  assert.equal(diagnostic.recovery.code, 'adb-restricted');
+  assert.equal(diagnostic.deviceDiagnostic.phoneAdbSwitch, 'on');
+});
+
 test('MCP connection guidance and QR pairing return native images with localized steps and cancellable sessions', async t => {
   const f = await fixture(t), daemon = await startDaemon(f.home);
   f.closers.push(() => daemon.close());

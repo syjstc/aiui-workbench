@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CloudUpload, ExternalLink, RefreshCw, FolderOpen, CheckCircle2, AlertCircle, LogOut } from 'lucide-react';
 import { t, getLocale } from './i18n.jsx';
+import {platformCategories} from '../core/platform-categories.mjs';
 import {OfficialRecords} from './platform-records.jsx';
 import {OfficialAgentId} from './platform-agent-id.jsx';
 
@@ -10,6 +11,7 @@ export function PlatformWorkspace({api,project,projects,onSelect,ready,working,s
   const [tab,setTab]=useState('upload');
   const [status,setStatus]=useState(null),[agents,setAgents]=useState([]),[loading,setLoading]=useState(false),[error,setError]=useState(''),[fetchedAt,setFetchedAt]=useState(null);
   const [bindingOpen,setBindingOpen]=useState(false),[bindingChoice,setBindingChoice]=useState(''),[bindingBusy,setBindingBusy]=useState(false);
+  const [creating,setCreating]=useState(false),[newName,setNewName]=useState(''),[newCategory,setNewCategory]=useState(''),[newDescription,setNewDescription]=useState('');
   const [description,setDescription]=useState(''),[version,setVersion]=useState(''),[category,setCategory]=useState(''),[prologue,setPrologue]=useState(''),[versionLog,setVersionLog]=useState(''),[files,setFiles]=useState('');
   const [confirming,setConfirming]=useState(false),[loggingOut,setLoggingOut]=useState(false),request=useRef(0);
   const binding=status?.binding,agent=agents.find(item=>item.agentId===binding?.agentId);
@@ -22,14 +24,16 @@ export function PlatformWorkspace({api,project,projects,onSelect,ready,working,s
     const current=++request.current;setLoading(true);setError('');
     try{
       const next=await api.call('aiui_platform_status',{projectId:project?.id,reconcile});
+      if(current!==request.current)return;
+      setStatus(next);
       const list=next.loggedIn?(await api.call('aiui_platform_agents')).agents:[];
       if(current!==request.current)return;
-      setStatus(next);setAgents(list);setFetchedAt(next.loggedIn?new Date():null);
+      setAgents(list);setFetchedAt(next.loggedIn?new Date():null);
     }catch(e){if(current===request.current)setError(e.message);}
     finally{if(current===request.current)setLoading(false);}
   }
   useEffect(()=>{
-    let live=true;setStatus(null);setAgents([]);setBindingOpen(false);setBindingChoice('');setFiles('');setVersionLog('');refresh();
+    let live=true;setStatus(null);setAgents([]);setBindingOpen(false);setBindingChoice('');setCreating(false);setNewName(project?.name||'');setNewDescription(project?.description||'');setNewCategory('');setFiles('');setVersionLog('');refresh();
     const timer=setInterval(()=>{const current=request.current;api.call('aiui_platform_status',{projectId:project?.id}).then(value=>{if(live&&current===request.current){setStatus(value);if(!value.loggedIn)setAgents([]);}}).catch(()=>{});},2500);
     const unsubscribe=api.onPlatformSession?.(()=>refresh());
     return()=>{live=false;request.current++;clearInterval(timer);unsubscribe?.();};
@@ -50,6 +54,16 @@ export function PlatformWorkspace({api,project,projects,onSelect,ready,working,s
     setBindingBusy(true);
     await action(async()=>{await api.call('ui_platform_bind',{projectId:project.id,agentId:bindingChoice});setBindingOpen(false);notify(t('官方智能体绑定已保存'));});
     setBindingBusy(false);
+  }
+  async function createAgent(){
+    setBindingBusy(true);
+    try{
+      await api.call('aiui_platform_create',{projectId:project.id,agentName:newName,category:newCategory,description:newDescription,retryUnconfirmed:!!status?.pendingCreation});
+      setCreating(false);setBindingOpen(false);
+      notify(t('官方智能体绑定已保存'));
+      await refresh();
+    }catch(e){await refresh();setError(e.message);}
+    finally{setBindingBusy(false);}
   }
   async function confirm(){
     if(!draft||!project)return;setConfirming(true);
@@ -74,7 +88,15 @@ export function PlatformWorkspace({api,project,projects,onSelect,ready,working,s
         <div className="platform-binding"><strong>{t('共用官方目标')}</strong><span>{binding?.agentName||t('尚未绑定官方智能体')}</span>{binding&&<OfficialAgentId agentId={binding.agentId} onCopy={copyAgentId}/>} {status?.loggedIn&&project&&<button className="text-button" disabled={uploading} onClick={()=>{setBindingChoice(binding?.agentId||'');setBindingOpen(!bindingOpen);}}>{t('设置官方绑定')}</button>}</div>
       </div>
       <p className="publish-version-note">{t('本地构建、上传和提审共用所选应用及官方绑定，不能在各板块另选目标。')}</p>
-      {bindingOpen&&<div className="platform-binding-setup"><label className="field">{t('绑定官方智能体')}<select aria-label={t('绑定官方智能体')} value={bindingChoice} disabled={bindingBusy} onChange={event=>setBindingChoice(event.target.value)}><option value="">{t('请选择目标，核对名称和 Agent ID')}</option>{agents.map(item=><option key={item.agentId} value={item.agentId}>{item.agentName} · {item.agentId}</option>)}</select></label><p className="publish-version-note">{t('绑定会保存到当前账号与本地应用。更改绑定后，原目标的提审确认失效。')}</p><button className="button" disabled={!bindingChoice||bindingBusy} onClick={bind}>{t('保存官方绑定')}</button></div>}
+      {status?.loggedIn&&project&&!binding&&<button className="text-button" disabled={uploading} onClick={()=>setCreating(!creating)}>{t('新建官方智能体')}</button>}
+      {creating&&status?.loggedIn&&!binding&&<form className="platform-form" onSubmit={e=>{e.preventDefault();createAgent();}}>
+        <label className="field">{t('智能体名称')}<input aria-label={t('智能体名称')} required maxLength={50} value={newName} onChange={e=>setNewName(e.target.value)}/></label>
+        <label className="field">{t('应用分类')}<select aria-label={t('应用分类')} required value={newCategory} onChange={e=>setNewCategory(e.target.value)}><option value="">{t('选择分类')}</option>{Object.entries(platformCategories).map(([key,label])=><option key={key} value={key}>{t(label)}</option>)}</select></label>
+        <label className="field">{t('功能介绍')}<textarea aria-label={t('功能介绍')} required maxLength={500} value={newDescription} onChange={e=>setNewDescription(e.target.value)}/></label>
+        {status?.pendingCreation&&<p role="status">{t('请先刷新官方列表。已出现的智能体可直接绑定，列表仍为空时再重试。')}</p>}
+        <button className="button primary" disabled={uploading||!newName.trim()||!newCategory||!newDescription.trim()}>{status?.pendingCreation?t('核对后重试创建与关联'):t('创建并关联到当前应用')}</button>
+      </form>}
+      {bindingOpen&&status?.loggedIn&&<div className="platform-binding-setup"><label className="field">{t('绑定官方智能体')}<select aria-label={t('绑定官方智能体')} value={bindingChoice} disabled={bindingBusy} onChange={event=>setBindingChoice(event.target.value)}><option value="">{t('请选择目标，核对名称和 Agent ID')}</option>{agents.map(item=><option key={item.agentId} value={item.agentId}>{item.agentName} · {item.agentId}</option>)}</select></label><p className="publish-version-note">{t('绑定会保存到当前账号与本地应用。更改绑定后，原目标的提审确认失效。')}</p><button className="button" disabled={!bindingChoice||bindingBusy} onClick={bind}>{t('保存官方绑定')}</button></div>}
     </section>
     {progress}
     <div className="publish-workflow">{children}<section className="panel publish-official" aria-label={t('官方上传与提审引导')}>

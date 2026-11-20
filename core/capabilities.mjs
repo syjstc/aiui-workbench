@@ -15,7 +15,7 @@ export const CAPABILITIES = [
   { id: 'docs', title: '版本对应的官方资料', description: '完整官方目录、全部正文与代码检索、离线配图及定期自动更新；保留项目绑定的资料版本。', status: 'available', tool: 'aiui_context_get', relatedTools: ['aiui_docs_catalog', 'aiui_docs_search', 'aiui_docs_read', 'aiui_docs_image', 'aiui_docs_settings', 'aiui_docs_sync'], example: { projectId: '<projectId>' } },
   { id: 'jobs', title: '等待结果与取消任务', description: '一次等待获取长任务最终结果；超时返回任务 ID，继续等待或取消。', status: 'available', tool: 'aiui_job_wait', relatedTools: ['aiui_job_get', 'aiui_job_cancel'], example: { jobId: '<jobId>', waitMs: 45000 } },
   { id: 'cli', title: 'CLI 与 MCP 共享工作进度', description: '工坊 CLI 调用同一个本地服务，项目、模拟日志、截图和任务结果同步到桌面与 MCP。', status: 'available', tool: 'aiui_cli_info', example: { projectId: '<projectId>' } },
-  { id: 'platform', title: '官方平台上传与提审', description: '上传 AIX、图标和预览材料并保存草稿；回读云端摘要，用户在工坊确认后才能提交审核。', status: 'available', tool: 'aiui_platform_upload', relatedTools: ['aiui_platform_status','aiui_platform_agents','aiui_platform_review_prepare','aiui_platform_review_request'], example: { projectId: '<projectId>', agentId: '<cloudAgentId>' } },
+  { id: 'platform', title: '官方平台上传与提审', description: '上传 AIX、图标和预览材料并保存草稿；回读云端摘要，用户在工坊确认后才能提交审核。', status: 'available', tool: 'aiui_platform_upload', relatedTools: ['aiui_platform_status','aiui_platform_agents','aiui_platform_bind','aiui_platform_create','aiui_platform_review_prepare','aiui_platform_review_request'], example: { projectId: '<projectId>', agentId: '<cloudAgentId>' } },
 ];
 
 export function capabilities() {

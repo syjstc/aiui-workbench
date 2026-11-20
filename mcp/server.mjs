@@ -68,7 +68,7 @@ server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
       try { content.unshift({ type: 'image', data: (await fs.readFile(result.result.capture.path)).toString('base64'), mimeType: 'image/png' }); } catch {}
     }
     return { ...(['aiui_preview_test', 'aiui_project_build', 'aiui_job_wait', 'aiui_record_clip', 'aiui_record_stop', 'aiui_platform_upload', 'aiui_platform_review_prepare','aiui_workflow_continue'].includes(params.name) && ['failed', 'cancelled', 'interrupted'].includes(result.status) ? { isError: true } : {}), content };
-  } catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({error:error.message,diagnosticId:error.diagnosticId,sharedDiagnostics:error.sharedDiagnostics,recovery:error.diagnosticId?{tool:'aiui_diagnostics_get',arguments:{diagnosticId:error.diagnosticId}}:undefined}) }] }; }
+  } catch (error) { return { isError: true, content: [{ type: 'text', text: JSON.stringify({error:error.message,diagnosticId:error.diagnosticId,sharedDiagnostics:error.sharedDiagnostics,deviceDiagnostic:error.deviceDiagnostic,recovery:error.recovery||(error.diagnosticId?{tool:'aiui_diagnostics_get',arguments:{diagnosticId:error.diagnosticId}}:undefined)}) }] }; }
 });
 function resources() {
   const names = new Set(catalog.tools.map(tool => tool.name));

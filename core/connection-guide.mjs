@@ -3,6 +3,7 @@ import path from 'node:path';
 import qrcode from 'qrcode-generator';
 import { ROOT } from './util.mjs';
 import { t } from '../shared/i18n.mjs';
+import { connectionAdbDiagnostic, ROKID_ADB_STEP } from './adb-access.mjs';
 
 export async function connectionGuide(workbench, { step = 'overview', method, locale = 'zh-CN', shareHelper = false, includeImages = true } = {}) {
   const environment = await workbench.environmentCheck();
@@ -11,6 +12,8 @@ export async function connectionGuide(workbench, { step = 'overview', method, lo
   const allOnline = allDevices.filter(d => d.status === 'device');
   method ||= allOnline.length && allOnline.every(d => d.connection === 'usb') ? 'usb' : 'wireless';
   const devices = allDevices.filter(d => d.connection === (method === 'usb' ? 'usb' : 'wireless')), online = devices.filter(d => d.status === 'device');
+  const diagnostic = connectionAdbDiagnostic(environment, devices);
+  const recovery = diagnostic?.recovery && { ...diagnostic.recovery, title: translate(diagnostic.recovery.title), message: translate(diagnostic.recovery.message), steps: diagnostic.recovery.steps.map(translate) };
   const steps = {
     overview: ['让电脑和眼镜连接同一 Wi-Fi 或热点。', '在工坊打开「连接眼镜」，点击「一键连接眼镜」。', '没有找到眼镜时，点击「用手机安装无线助手」，按下载页操作。'],
     install: ['手机和电脑连接同一个 Wi-Fi，用手机相机扫描工坊的手机下载码，点「下载 APK」。', '打开 Rokid AI → 工具箱 → 眼镜应用管理 → 安装新应用，选择刚下载的无线助手 APK。', '打开 Rokid AI → 工具箱 → 遥控器：滑动移动焦点，点击确认，返回键回到上一页。', '在眼镜应用列表打开「AIUI 无线助手」，按按钮进入「无线调试」。'],
@@ -19,12 +22,16 @@ export async function connectionGuide(workbench, { step = 'overview', method, lo
   };
   const result = {
     step, method, locale, availableMethods: ['wireless', 'usb'], connected: online.length > 0,
+    adbUsable: diagnostic?.state === 'available',
+    diagnostic: diagnostic && { ...diagnostic, message: translate(diagnostic.message), ...(recovery ? { recovery } : {}) },
     devices: devices.map(({ serial, name, status, connection }) => ({ serial, name, status, connection })),
-    message: translate(online.length ? '眼镜已连接，可以继续安装和使用。' : '眼镜尚未连接。我可以先完成制作和打包；安装前请按以下步骤连接。'),
+    message: translate(recovery ? diagnostic.message : online.length ? '眼镜已连接，可以继续安装和使用。' : '眼镜尚未连接。我可以先完成制作和打包；安装前请按以下步骤连接。'),
     steps: (method === 'usb' ? step === 'ready' ? [...steps.ready.slice(0, 3), '使用期间保持数据线连接，工坊会自动检测断开和恢复。'] : ['在工坊「连接眼镜」选择「有线连接」Tab。', '使用适配当前眼镜型号、支持数据传输的 Rokid 调试线。普通充电线无法完成调试连接。', 'Rokid AI → 主页 → 眼镜卡片右侧齿轮 → 开发者 → 眼镜 ADB 调试。', '连接电脑与眼镜。眼镜弹出「允许 USB 调试」时确认；也可用 Rokid AI 工具箱里的遥控器确认。'] : steps[step]).map(translate),
-    nextAction: { owner: online.length ? 'ai' : 'user', view: 'devices', resumeSameWorkflow: true },
+    nextAction: recovery || { owner: online.length ? 'ai' : 'user', view: 'devices', resumeSameWorkflow: true },
     images: [],
   };
+  if (recovery && online.length) result.steps = recovery.steps;
+  if (recovery && !online.length && method === 'wireless') result.steps.unshift(translate(ROKID_ADB_STEP));
   if (shareHelper) {
     const helper = await workbench.wirelessHelper.start({ locale });
     result.helper = helper;

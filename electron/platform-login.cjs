@@ -31,42 +31,79 @@ class PlatformLogin{
         const host=cookie.domain.replace(/^\./,''),details={url:'https://'+host+cookie.path,name:cookie.name,value:cookie.value,path:cookie.path,secure:true,httpOnly:!!cookie.httpOnly,sameSite:cookie.sameSite||'unspecified',...cookie.hostOnly?{}:{domain:cookie.domain},...cookie.expirationDate?{expirationDate:cookie.expirationDate}:{}};
         await this.official.cookies.set(details);
       }
-      if(saved.token&&!(await this.official.cookies.get({url:'https://aiui.rokid.com/',name:SESSION})).length)await this.official.cookies.set({url:'https://aiui.rokid.com/',name:SESSION,value:encodeURIComponent(saved.token),secure:true,path:'/',sameSite:'no_restriction',expirationDate:saved.expiresAt/1000});
+      if(saved.token&&!(await this.official.cookies.get({url:'https://aiui.rokid.com/space',name:SESSION})).length)await this.official.cookies.set({url:'https://aiui.rokid.com/',name:SESSION,value:encodeURIComponent(saved.token),secure:true,path:'/',sameSite:'no_restriction',expirationDate:saved.expiresAt/1000});
       if(!saved.token&&saved.cookies?.length){this.graceUntil=Date.now()+30000;this.renew('restore-official-sso');}
     }
     await this.sync();this.timer=setInterval(()=>this.sync().catch(()=>{}),5000);this.timer.unref();
     this.official.cookies.on('changed',(_event,cookie,cause,removed)=>{
       if(!/(^|\.)rokid\.com$/.test(cookie.domain.replace(/^\./,'')))return;
       if(this.logoutTask||this.userLoggedOut)return;
-      if(cookie.name===SESSION&&removed&&cause==='explicit'){this.logout().catch(()=>{});return;}
+      if(cookie.name===SESSION&&removed&&cause==='explicit'&&!this.awaitingLogin){this.logout().catch(()=>{});return;}
       if(cookie.name===SESSION&&!removed)this.userLoggedOut=false;
       if(cookie.name===SESSION&&removed&&cause==='expired')this.renew(tokenValue(cookie));
       this.sync().catch(()=>{});
     });return this;
+  }
+  async sessionInStudio(){
+    const window=this.studio;
+    const page=window&&!window.isDestroyed()?window.webContents:null;
+    const url=page?.getURL()||'';
+    const studioPage=url.startsWith('https://aiui.rokid.com/');
+    const cookies=await this.official.cookies.get({url:studioPage?url:'https://aiui.rokid.com/space',name:SESSION});
+    for(const cookie of cookies){
+      const token=tokenValue(cookie);
+      const expiresAt=cookie.expirationDate*1000;
+      if(validSession(token,Date.now(),expiresAt)){
+        this.pageSession=null;
+        return {token,expiresAt,persist:true};
+      }
+      if(cookie.session&&!cookie.expirationDate&&validSession(token,Date.now(),Date.now()+45000)){
+        this.pageSession=null;
+        return {token,expiresAt:Date.now()+45000,persist:false};
+      }
+    }
+    if(studioPage&&this.awaitingLogin){
+      // Check the executing document too: an SSO redirect can race getURL().
+      const token=await page.executeJavaScript("location.origin === 'https://aiui.rokid.com' && localStorage.getItem('ROKID_ACCOUNT_SESSION')").catch(()=>null);
+      if(typeof token==='string'&&this.studio===window&&this.awaitingLogin){
+        const expiry=validSession(token)?.expiresAt||Date.now()+30*60000;
+        if(validSession(token,Date.now(),expiry)&&this.pageSession?.token!==token)this.pageSession={token,expiresAt:expiry,persist:false};
+      }
+    }
+    if(this.pageSession?.expiresAt>Date.now())return this.pageSession;
+    return {token:'',expiresAt:undefined,persist:false};
   }
   async sync(){
     if(this.userLoggedOut||this.logoutTask)return;
     if(this.syncing){this.resync=true;return this.syncing;}
     const epoch=this.authEpoch;
     this.syncing=(async()=>{
-      const cookies=await this.official.cookies.get({url:'https://aiui.rokid.com/',name:SESSION}),cookie=cookies[0],token=tokenValue(cookie),expiresAt=cookie?.expirationDate*1000;
+      const {token,expiresAt,persist}=await this.sessionInStudio();
       if(epoch!==this.authEpoch||this.userLoggedOut)return;
       const result=await this.client.call('ui_platform_session',{token,expiresAt,desktopKey:this.desktopKey},'desktop-session'),valid=validSession(token,Date.now(),expiresAt);
       if(epoch!==this.authEpoch||this.userLoggedOut)return;
-      if(token&&result.rejected){await this.vault.clear();this.renew(token);}
-      else if(valid){await this.vault.save(token,valid.expiresAt,await this.official.cookies.get({}));if(valid.expiresAt-Date.now()<5*60000)this.renew(token);}
+      if(token&&result.rejected){this.pageSession=null;await this.vault.clear();this.renew(token);}
+      else if(valid&&persist){await this.vault.save(token,valid.expiresAt,await this.official.cookies.get({}));if(valid.expiresAt-Date.now()<5*60000)this.renew(token);}
       else if(Date.now()>this.graceUntil&&!this.renewal)await this.vault.clear();
       if(epoch!==this.authEpoch||this.userLoggedOut)return;
-      const active=!!valid&&!!result.loggedIn&&!result.rejected;this.notifySession(active,token);
-      if(active&&this.awaitingLogin&&this.studio&&!this.studio.isDestroyed()){
-        const window=this.studio;this.studio=null;this.awaitingLogin=false;window.destroy();
+      const active=!!valid&&!!result.loggedIn&&!result.rejected;
+      const window=this.awaitingLogin&&this.studio;
+      if(active&&window){
+        // The session heartbeat accepts local claims. Wait for the official
+        // account list before acknowledging a first sign-in to the user.
+        await this.client.call('aiui_platform_agents',{},'desktop');
+        if(epoch!==this.authEpoch||this.userLoggedOut||this.studio!==window)return;
+      }
+      this.notifySession(active,token);
+      if(active&&window&&this.studio===window&&!window.isDestroyed()){
+        this.studio=null;this.awaitingLogin=false;window.destroy();
       }
     })();
     try{await this.syncing;}finally{this.syncing=null;if(this.resync){this.resync=false;this.sync().catch(()=>{});}}
   }
   async logout(){
     if(this.logoutTask)return this.logoutTask;
-    this.userLoggedOut=true;this.authEpoch++;this.graceUntil=0;this.resync=false;
+    this.userLoggedOut=true;this.pageSession=null;this.authEpoch++;this.graceUntil=0;this.resync=false;
     this.awaitingLogin=false;
     for(const window of [this.renewal,this.studio])if(window&&!window.isDestroyed())window.destroy();
     this.renewal=null;this.studio=null;
@@ -97,10 +134,18 @@ class PlatformLogin{
     if(this.studio&&!this.studio.isDestroyed()){this.studio.show();this.studio.focus();return;}
     this.studio=new this.BrowserWindow({width:1240,height:850,title:this.getLocale()==='en'?'Rokid Official Platform':'Rokid 官方平台',webPreferences:{partition:this.partition,nodeIntegration:false,contextIsolation:true,sandbox:true}});
     this.awaitingLogin=!this.loggedIn;const window=this.studio;
-    window.on('closed',()=>{if(this.studio===window){this.studio=null;this.awaitingLogin=false;}});
+    let loginPoll;
+    if(this.awaitingLogin){
+      const check=()=>{if(this.studio===window&&this.awaitingLogin)this.sync().catch(()=>{});};
+      loginPoll=setInterval(check,1000);
+      loginPoll.unref();
+      window.webContents.on('did-finish-load',check);
+      window.webContents.on('did-navigate-in-page',check);
+    }
+    window.on('closed',()=>{clearInterval(loginPoll);if(this.studio===window){this.studio=null;this.awaitingLogin=false;}});
     this.studio.webContents.on('will-navigate',(event,url)=>{try{const u=new URL(url);if(u.protocol!=='https:'||!['aiui.rokid.com','account-web.rokid.com','account-center.rokid.com'].includes(u.hostname))event.preventDefault();}catch{event.preventDefault();}});
     this.studio.webContents.setWindowOpenHandler(({url})=>{try{const u=new URL(url);if(u.protocol==='https:'&&['aiui.rokid.com','account-web.rokid.com','account-center.rokid.com'].includes(u.hostname))this.studio.loadURL(url);}catch{}return{action:'deny'};});this.studio.loadURL('https://aiui.rokid.com/space');
   }
-  close(){clearInterval(this.timer);if(this.renewal&&!this.renewal.isDestroyed())this.renewal.destroy();}
+  close(){clearInterval(this.timer);if(this.studio&&!this.studio.isDestroyed())this.studio.destroy();if(this.renewal&&!this.renewal.isDestroyed())this.renewal.destroy();}
 }
 module.exports={PlatformLogin};

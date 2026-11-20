@@ -75,11 +75,14 @@ test('direct agent imports discover and watch sibling branding without changing 
   assert.equal(project.lastCheck.stale, false);
   await projects.close();
   const restored = await new Projects(projects.home, () => {}).init();
-  t.after(() => restored.close());
-  assert.equal(restored.get(project.id).iconPath, project.iconPath);
-  assert.equal(restored.get(project.id).projectPath, agent);
-  assert.equal((await restored.import(directory)).id, project.id);
-  assert.equal(restored.list().length, 1);
+  try {
+    assert.equal(restored.get(project.id).iconPath, project.iconPath);
+    assert.equal(restored.get(project.id).projectPath, agent);
+    assert.equal((await restored.import(directory)).id, project.id);
+    assert.equal(restored.list().length, 1);
+  } finally {
+    await restored.close();
+  }
 });
 
 test('inferred sibling branding rejects symlinks and manifest paths outside its asset directory', async t => {

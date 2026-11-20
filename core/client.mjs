@@ -109,7 +109,7 @@ export async function connect(home = homePath(), { autoStart = true, requireCurr
     // A write may have completed before its response was lost. Never replay it
     // automatically after a disconnect; the next call rediscovers the service.
     const r=await fetch(current.origin+'/api/call',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${current.token}`},body:JSON.stringify({tool,args,actor}),signal:AbortSignal.timeout(120000)});
-    const value=await r.json();if(!r.ok||value.error)throw Object.assign(new Error(value.error||`HTTP ${r.status}`),{diagnosticId:value.diagnosticId,sharedDiagnostics:value.sharedDiagnostics});return value.result;
+    const value=await r.json();if(!r.ok||value.error)throw Object.assign(new Error(value.error||`HTTP ${r.status}`),{diagnosticId:value.diagnosticId,sharedDiagnostics:value.sharedDiagnostics,deviceDiagnostic:value.deviceDiagnostic,recovery:value.recovery});return value.result;
   }
   async function catalog(options = {}) {
     const current = await refresh(options), key = identity(current);

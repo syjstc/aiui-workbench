@@ -7,10 +7,12 @@ import { Previews } from './previews.mjs';
 import { Jobs } from './jobs.mjs';
 import { serviceLogStatus, clearServiceLog } from './logs.mjs';
 import { DeviceDiscovery } from './devices.mjs';
+import { connectionAdbDiagnostic, diagnoseAdbFailure } from './adb-access.mjs';
 import { AdbTools } from './adb.mjs';
 import { WirelessDebugging } from './wireless.mjs';
 import { WirelessSetup } from './wireless-setup.mjs';
 import { WirelessHelperShare } from './wireless-helper-share.mjs';
+import { resolvePairingService } from './wireless-pair-bonjour.mjs';
 import { WirelessPairQr } from './wireless-pair-qr.mjs';
 import { connectionGuide } from './connection-guide.mjs';
 import { GlassesTools } from './glasses.mjs';
@@ -61,7 +63,7 @@ export class Workbench {
   async initialize() {
     this.wirelessSetup = new WirelessSetup(this.wireless);
     this.wirelessHelper = new WirelessHelperShare();
-    this.wirelessQr = new WirelessPairQr(this.wireless);
+    this.wirelessQr = new WirelessPairQr(this.wireless,{resolveService:resolvePairingService});
     this.skillHome=process.env.AIUI_SKILL_HOME||os.homedir();
     if(this.skillHome!==os.homedir())this.skillOptions={globalRoots:['.agents','.codex','.claude','.cursor'].map(name=>path.join(this.skillHome,name,'skills'))};
     this.skillTargets=await readJson(path.join(this.home,'skill-targets.json'),{user:false,projects:[]});
@@ -72,7 +74,7 @@ export class Workbench {
     this.mcpConfig = await installMcpLauncher(this.home);
     await Promise.all([this.projects.init(), this.knowledge.init(), this.jobs.init()]);
     this.aiConnection=await new AiConnection(this.home,toolCatalog()).init();
-    this.jobs.onFailure=async(error,job)=>{const d=await this.captureDiagnostic(error,{source:'job',tool:job.type,jobId:job.id,projectId:job.projectId,workflowId:job.workflowId,stage:job.type==='preview-test'?'preview':job.stage});return d?.id;};
+    this.jobs.onFailure=async(error,job)=>{if(job.serial)await diagnoseAdbFailure(error,{serial:job.serial},(_command,args,options)=>this.adb.execute(args,options));const d=await this.captureDiagnostic(error,{source:'job',tool:job.type,jobId:job.id,projectId:job.projectId,workflowId:job.workflowId,stage:job.type==='preview-test'?'preview':job.stage});return d?.id;};
     this.sdk = await new SdkManager(this.home, this.projects, this.emit).init();
     this.projects.getToolchain = () => this.sdk.get();
     this.previews.getToolchain = project => this.sdk.forProject(project);
@@ -131,6 +133,7 @@ export class Workbench {
       }
       return result;
     }catch(error){
+      if(args.serial && /^(?:aiui_glasses_|aiui_device_|aiui_adb_wireless_enable$)/.test(tool))await diagnoseAdbFailure(error,{serial:args.serial},(_command,args,options)=>this.adb.execute(args,options));
       if(!error.diagnosticId&&!tool.startsWith('aiui_diagnostics_')){
         const d=await this.captureDiagnostic(error,{source:'operation',actor,tool,projectId:args?.projectId,sessionId:args?.sessionId,workflowId:args?.workflowId,context:args}).catch(()=>null);
         if(d)error.diagnosticId=d.id;
@@ -239,6 +242,8 @@ export class Workbench {
         return this.platform.bind(args);
       }
       case 'aiui_platform_status': return args.reconcile ? this.platform.reconcile(args.projectId) : this.platform.status(args.projectId);
+      case 'aiui_platform_create': return this.platform.createAndBind(args);
+      case 'aiui_platform_bind': return this.platform.bind(args,{replace:false});
       case 'aiui_platform_agents': return this.platform.list();
       case 'aiui_platform_upload': return this.platform.upload(args);
       case 'aiui_platform_review_prepare': return this.platform.prepareReview(args);
@@ -352,7 +357,7 @@ export class Workbench {
           this.devices.inspections.delete(args.serial);
           if (result.code) throw new Error(result.output);
           return result;
-        });
+        }, { serial: args.serial });
       }
       case 'aiui_device_inspect': {
         if (!args.serial) throw new Error('请选择明确的目标眼镜');
@@ -369,11 +374,11 @@ export class Workbench {
       case 'aiui_project_pack': return this.pack(args.projectId);
       case 'aiui_device_deploy': {
         const p = this.projects.get(args.projectId); if (!args.serial) throw new Error('请选择明确的目标眼镜');
-        return this.jobs.start('deploy', p.id, async ({ signal, progress }) => { const result = await this.cli(['install', p.agentPath, '--serial', args.serial], { signal, onOutput: progress }, this.sdk.forProject(p).id); if (result.code) throw new Error(result.output); p.lastDeploy = { at: new Date().toISOString(), revision: p.revision, serial: args.serial, output: result.output, cloudIndexing: 'not-verified' }; await this.projects.save(); return p.lastDeploy; });
+        return this.jobs.start('deploy', p.id, async ({ signal, progress }) => { const result = await this.cli(['install', p.agentPath, '--serial', args.serial], { signal, onOutput: progress }, this.sdk.forProject(p).id); if (result.code) throw new Error(result.output); p.lastDeploy = { at: new Date().toISOString(), revision: p.revision, serial: args.serial, output: result.output, cloudIndexing: 'not-verified' }; await this.projects.save(); return p.lastDeploy; }, { serial: args.serial });
       }
       case 'aiui_device_launch': {
         const p = this.projects.get(args.projectId); if (!args.serial) throw new Error('请选择明确的目标眼镜');
-        return this.jobs.start('launch', p.id, async ({ signal, progress }) => { const result = await this.cli(['launch-page', p.agentPath, args.page || p.pages[0], '--serial', args.serial], { signal, onOutput: progress }, this.sdk.forProject(p).id); if (result.code) throw new Error(result.output); return result; });
+        return this.jobs.start('launch', p.id, async ({ signal, progress }) => { const result = await this.cli(['launch-page', p.agentPath, args.page || p.pages[0], '--serial', args.serial], { signal, onOutput: progress }, this.sdk.forProject(p).id); if (result.code) throw new Error(result.output); return result; }, { serial: args.serial });
       }
       case 'aiui_platform_prepare': {
         const p = this.projects.get(args.projectId);
@@ -414,7 +419,8 @@ export class Workbench {
     // During handoff, prefer the verified Wi-Fi transport for the same glasses.
     const devices = environment.devices.filter(device => device.connection !== 'usb' || !wireless.saved.some(record =>
       record.identity === device.serial && this.wireless.deviceFor(record, environment.devices)?.status === 'device'));
-    return { ...environment, devices, usbDevices, wireless, connection: { connected: devices.some(d => d.status === 'device'), message: devices.some(d => d.status === 'device') ? '眼镜已连接，可以继续检查运行环境。' : '眼镜尚未连接或尚未授权，请主动告诉用户；可先继续制作和打包，安装前用 aiui_connection_guide 展示连接步骤。', guideTool: 'aiui_connection_guide' }, adbTool: await this.adb.resolveInfo(), ...this.runtimeInfo() };
+    const diagnostic = connectionAdbDiagnostic(environment, devices);
+    return { ...environment, devices, usbDevices, wireless, connection: { connected: devices.some(d => d.status === 'device'), adbUsable: diagnostic?.state === 'available', diagnostic, message: diagnostic?.message || '眼镜已连接，可以继续检查运行环境。', nextAction: diagnostic?.recovery, guideTool: 'aiui_connection_guide' }, adbTool: await this.adb.resolveInfo(), ...this.runtimeInfo() };
   }
   async close() { this.wirelessSetup?.cancel(); this.wirelessHelper?.stop(); this.wirelessQr?.cancel(); await this.wireless.close();await this.feedback?.close();await this.skillRefresh;await this.workflows?.close(); await this.knowledge.close(); await this.mirroring?.close(); await this.glasses.settingsFocus.close(); await this.jobs.close(); await this.recordings?.close(); await this.previews.close(); await this.sdk?.close(); await this.projects.close(); await this.diagnostics?.close(); }
 }

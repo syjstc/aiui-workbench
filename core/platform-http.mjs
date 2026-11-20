@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 
 export const PLATFORM_API = Object.freeze({
+  create: 'https://rcs.rokid.com/metis/agent/addThirdAgent',
   agents: 'https://rcs.rokid.com/metis/agent/getAIUIAgentList',
   save: 'https://rcs.rokid.com/metis/agent/updateThirdAgent',
   sts: 'https://rcs.rokid.com/metis/user/oss/getOssSts',

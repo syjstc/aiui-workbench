@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DeviceDiscovery, parseDevices, parseInspection } from '../core/devices.mjs';
 import { AdbTools } from '../core/adb.mjs';
+import { ADB_ACCESS_MARKER } from '../core/adb-access.mjs';
 import { ROOT, run } from '../core/util.mjs';
 
 const ready = 'Device: glasses-1\nDeveloper Mode: enabled\nWidget Runtime: ready\n';
@@ -27,7 +28,7 @@ test('unknown or not-ready CLI output cannot be mistaken for a ready device', ()
 test('polling observes disconnect/reconnect and authorization without stale ready state', async () => {
   let listing = row(), clock = 0, inspections = 0, toolChecks = 0;
   const cli = async args => { if (args[0] === '--help') { toolChecks++; return { code: 0, output: 'help' }; } inspections++; return { code: 0, output: ready }; };
-  const discovery = new DeviceDiscovery(cli, async () => ({ code: 0, output: listing }), () => clock);
+  const discovery = new DeviceDiscovery(cli, async (_command, args) => ({ code: 0, output: args[0] === 'devices' ? listing : ADB_ACCESS_MARKER }), () => clock);
   assert.equal((await discovery.check()).devices[0].inspection.developerMode, 'enabled');
   clock += 3000;
   await discovery.check();
@@ -60,7 +61,7 @@ test('overlapping checks coalesce, failed ADB output is not treated as connected
 
 test('non-ready devices are retried and a transport change invalidates a ready cache', async () => {
   let clock = 0, output = 'Developer Mode: disabled\nWidget Runtime: not ready', listing = row(), checks = 0;
-  const discovery = new DeviceDiscovery(async args => { if (args[0] === '--help') return { code: 0, output: '' }; checks++; return { code: 0, output }; }, async () => ({ code: 0, output: listing }), () => clock);
+  const discovery = new DeviceDiscovery(async args => { if (args[0] === '--help') return { code: 0, output: '' }; checks++; return { code: 0, output }; }, async (_command, args) => ({ code: 0, output: args[0] === 'devices' ? listing : ADB_ACCESS_MARKER }), () => clock);
   assert.equal((await discovery.check()).devices[0].inspection.developerMode, 'disabled');
   clock = 3001; output = ready;
   assert.equal((await discovery.check()).devices[0].inspection.runtimeReady, true);
@@ -71,7 +72,7 @@ test('non-ready devices are retried and a transport change invalidates a ready c
 
 test('failed environment reads recover automatically on the next check', async () => {
   let unavailable = true;
-  const discovery = new DeviceDiscovery(async () => ({ code: 0, output: ready }), async () => { if (unavailable) throw new Error('spawn adb ENOENT'); return { code: 0, output: row() }; });
+  const discovery = new DeviceDiscovery(async () => ({ code: 0, output: ready }), async (_command, args) => { if (unavailable) throw new Error('spawn adb ENOENT'); return { code: 0, output: args[0] === 'devices' ? row() : ADB_ACCESS_MARKER }; });
   assert.equal((await discovery.check()).adb, false);
   unavailable = false;
   const recovered = await discovery.check();

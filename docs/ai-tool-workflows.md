@@ -12,6 +12,8 @@ AI 用现有编码工具修改真实源码，工坊负责运行、等待、模�
 
 AI 发现眼镜未连接、未授权或断开时，主动说明当前状态和下一步，制作和打包可先继续。`aiui_connection_guide` 按语言返回连接步骤与操作示例截图，`step=install,shareHelper=true` 生成手机下载码；APK 通过 Rokid AI 的「工具箱 → 眼镜应用管理 → 安装新应用」安装，「工具箱 → 遥控器」可完成选择、确认和返回。`aiui_adb_pair_qr` 提供由眼镜系统扫码入口扫描的配对码，不能与手机下载码混用。连接后继续原项目和任务，说明安装、打开及实际操作方式。
 
+`aiui_environment_check` 分别检查 ADB 连接、Rokid App 的独立操作开关、基本命令和 AIUI 运行环境。已验证的 Rokid 固件通过 `persist.vendor.adb` 暴露手机开关；关闭时 ADB 仍可在线、Android `adb_enabled` 仍为 `1`，但截图、遥控等命令会被拦截。此时 `devices[].adbAccess.state=rokid-adb-disabled`、`phoneAdbSwitch=off`，`rokidAppAdb` 保留属性和固件证据。MCP、CLI 的设备错误及安装／启动任务也会返回 `deviceDiagnostic`、`recovery` 与重新检查的方法，明确指引：**手机 Rokid AI → 主页 → 眼镜卡片右侧齿轮 → 开发者 → 眼镜 ADB 调试**。Android 调试开关及 AIUI 开发者模式不能代替这个开关。厂商属性不存在或无法识别时保持 `unknown`，不能仅凭一般权限错误断言关闭。用户完成操作后重新检查，继续原项目和任务。
+
 MCP 与共享 CLI 不要求自己的应用版本和后台服务版本一致，也不会为了版本差异停止正在使用的工坊。它们从已认证的本机服务 `/api/tools` 读取实际工具及 JSON Schema；`aiui_tools_list` 和 `aiui://tools` 提供相同清单。服务替换后，现有 MCP 进程重新发现端口和口令，并在工具清单变化时发送 MCP 通知。已经发出的写操作不会因响应丢失而自动重放。
 
 连接页生成的配置使用数据目录中的固定启动入口；启动新版工坊会更新入口指向的程序，因此升级或更换安装目录后不必重新复制这份配置。未启动工坊时，入口使用最近一次注册的安装启动后台。桌面本身仍会确认后台与其界面匹配，并在旧版没有运行任务和活动界面时切换到新版。
@@ -140,10 +142,10 @@ node web/cli.mjs mcp
 
 ## 草稿上传与用户确认提审
 
-首次登录由用户在桌面“构建与上传 → 登录官方平台”完成；使用 Web / CLI / MCP 时也保持桌面运行，复用其有效加密会话。用户在工坊界面把本地应用绑定到一个正式名称和官网 Agent ID，构建、上传及提审共用此绑定。MCP 只能读取绑定，不能更改或从本地 UUID 推断官方身份。
+首次登录由用户在桌面“构建与上传 → 登录官方平台”完成；使用 Web / CLI / MCP 时也保持桌面运行，复用其有效加密会话。用户在工坊界面把本地应用绑定到一个正式名称和官网 Agent ID，构建、上传及提审共用此绑定。MCP 只能首次关联使用 `aiui_platform_bind`，创建并关联使用 `aiui_platform_create`或从本地 UUID 推断官方身份。
 
 ```text
-aiui_platform_status / aiui_platform_agents → 用户在工坊设置官方绑定
+aiui_platform_status / aiui_platform_agents → aiui_platform_bind（关联已有）或 aiui_platform_create（新建并关联）
 → aiui_project_build → aiui_platform_upload
 → aiui_platform_review_prepare → aiui_platform_review_request
 → 用户在桌面核对，并在原生窗口确认提交审核

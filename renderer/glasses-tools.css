@@ -257,3 +257,10 @@
 .aiui-detail-read-only>svg{flex-shrink:0;margin-top:2px}.aiui-detail-read-only strong{display:block;font-size:12px;font-weight:500}.aiui-detail-read-only small{display:block;font-size:11px;margin-top:6px;line-height:1.7}
 .aiui-app-description{margin-bottom:24px}.aiui-app-description h4{font-size:12px;margin:0 0 10px;font-weight:500}.aiui-app-description p{font-size:12px;line-height:1.9;color:var(--secondary);margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .installed-app-technical .installed-app-metadata dd{overflow-wrap:anywhere}
+
+.aiui-inventory .aiui-source-filters{margin:14px 0}
+.aiui-inventory .aiui-source-filters>button[aria-pressed=true]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.aiui-inventory .aiui-source-filters>button[aria-pressed=true]>span{color:inherit}
+.aiui-source-status{display:flex;align-items:baseline;gap:7px;margin:0 0 14px;color:var(--secondary);font-size:12px;line-height:1.6}
+.aiui-source-status>svg{flex:none;align-self:center}
+.aiui-inventory .glasses-app-list strong{font-size:14px;font-weight:600}

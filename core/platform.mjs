@@ -6,7 +6,8 @@ import semver from 'semver';
 import {zipSync,unzipSync} from 'fflate';
 import { setTimeout as pause } from 'node:timers/promises';
 import { atomicJson, readJson, sha, id } from './util.mjs';
-import { platformUploadSchema, platformReviewSchema, platformAgentId } from './platform-contract.mjs';
+import {platformCategories} from './platform-categories.mjs';
+import { platformBindSchema, platformCreateSchema, platformUploadSchema, platformReviewSchema, platformAgentId } from './platform-contract.mjs';
 import { PLATFORM_API, businessOK, md5, mediaUrl, codeDraftPath, readMedia, putMedia } from './platform-http.mjs';
 
 const require = createRequire(import.meta.url);
@@ -26,6 +27,7 @@ export class Platform {
   async init() {
     this.state = await readJson(this.file, { uploads: [], reviews: [] });
     this.state.bindings??=[];
+    this.state.pendingCreations??=[];
     for(const upload of this.state.uploads.filter(item=>item.stage==='verified')){
       const peers=this.state.uploads.filter(item=>item.projectId===upload.projectId&&item.accountId===upload.accountId&&item.stage==='verified');
       if(new Set(peers.map(item=>item.agentId)).size===1&&!this.state.bindings.some(item=>item.projectId===upload.projectId&&item.accountId===upload.accountId))this.state.bindings.push({projectId:upload.projectId,accountId:upload.accountId,agentId:upload.agentId,agentName:upload.agentName,boundAt:upload.verifiedAt||upload.createdAt});
@@ -57,6 +59,7 @@ export class Platform {
     const loggedIn = !!this.session && this.session.expiresAt > Date.now() && Date.now()-this.session.syncedAt<45000;
     const belongs=item=>loggedIn&&(!projectId||item.projectId===projectId)&&item.accountId===this.session.accountId;
     return { loggedIn, loginRequired: !loggedIn, loginVia: 'desktop-official-window', studioUrl: 'https://aiui.rokid.com/space',
+      pendingCreation:!!this.state?.pendingCreations?.some(item=>belongs(item)&&item.projectId===projectId),
       binding:loggedIn&&projectId?this.binding(projectId,this.session.accountId):null,
       uploads: (this.state?.uploads || []).filter(belongs).map(publicUpload),
       reviews: (this.state?.reviews || []).filter(belongs).map(publicReview),
@@ -69,13 +72,65 @@ export class Platform {
     if(binding.agentId!==agentId)throw new Error('目标与应用绑定的官方智能体不一致，已停止操作');
     return binding;
   }
-  async bind(input){
-    const args=platformUploadSchema.pick({projectId:true,agentId:true}).parse(input),identity=this.identity();
-    this.guard(args.projectId,args.agentId);await this.w.projects.refresh(args.projectId);
-    const target=await this.target(args.agentId,identity,AbortSignal.timeout(20000));this.current(identity);
-    this.guard(args.projectId,args.agentId);
-    const record={projectId:args.projectId,accountId:identity.accountId,agentId:target.agentId,agentName:target.agentName,boundAt:new Date().toISOString()};
-    this.state.bindings=this.state.bindings.filter(item=>item.projectId!==args.projectId||item.accountId!==identity.accountId);this.state.bindings.push(record);this.approvals.clear();await this.save();return this.status(args.projectId);
+  async saveBinding(projectId,identity,target){
+    this.current(identity);
+    const belongs=item=>item.projectId===projectId&&item.accountId===identity.accountId;
+    const record={projectId,accountId:identity.accountId,agentId:target.agentId,agentName:target.agentName,boundAt:new Date().toISOString()};
+    this.state.bindings=this.state.bindings.filter(item=>!belongs(item));
+    this.state.bindings.push(record);
+    this.state.pendingCreations=this.state.pendingCreations.filter(item=>!belongs(item));
+    this.approvals.clear();
+    await this.save();
+    return this.status(projectId);
+  }
+  async bind(input,{replace=true}={}){
+    const {projectId,agentId}=platformBindSchema.parse(input),identity=this.identity();
+    this.guard(projectId,agentId);
+    this.reservations.add(projectId);
+    try{
+      const prior=this.binding(projectId,identity.accountId);
+      if(prior&&prior.agentId!==agentId&&!replace)throw new Error('请在工坊核对并更改已有的官方绑定');
+      await this.w.projects.refresh(projectId);
+      const target=await this.target(agentId,identity,AbortSignal.timeout(20000));
+      return await this.saveBinding(projectId,identity,target);
+    }finally{this.reservations.delete(projectId);}
+  }
+  async createAndBind(input){
+    const {projectId,agentName,category,description,retryUnconfirmed}=platformCreateSchema.parse(input);
+    const identity=this.identity(),accountId=identity.accountId;
+    this.guard(projectId);
+    this.reservations.add(projectId);
+    try{
+      await this.w.projects.refresh(projectId);
+      if(this.binding(projectId,accountId))throw new Error('此项目已绑定官方智能体');
+      const agents=await this.agents(identity);
+      let pending=this.state.pendingCreations.find(item=>item.projectId===projectId&&item.accountId===accountId);
+      if(pending?.agentId){
+        const target=agents.find(item=>item.agentId===pending.agentId);
+        if(!target)throw new Error('官方已返回 Agent ID，等待列表同步后重试');
+        return await this.saveBinding(projectId,identity,target);
+      }
+      if(agents.some(item=>item.agentName===agentName||item.agentName===pending?.agentName))throw new Error('账号中已有同名智能体，请从列表核对 Agent ID 并关联');
+      if(pending&&!retryUnconfirmed)throw new Error('上次创建结果待确认，请刷新官方列表后再操作');
+      this.current(identity);
+      if(!pending){pending={projectId,accountId};this.state.pendingCreations.push(pending);}
+      pending.agentName=agentName;
+      await this.save();
+      const payload={modelVendor:'native',agentName,category,categoryName:platformCategories[category],description,
+        nativeVersion:'1.0.0',icon:'https://basecloud.rokidcdn.com/basecloud/prod/coze/default_agent_icon.png',
+        agentPrompt:'',prologue:'',versionLog:'',permissions:'',permissionsDesc:'{}',needParam:'{}',needUserAgree:0,
+        previewMaterials:[],widgets:'',jsuiTools:'',cutParamStr:''};
+      try{
+        const result=await this.request('create',identity,{body:payload,signal:AbortSignal.timeout(20000)});
+        pending.agentId=platformAgentId.parse(result?.agentId);
+      }catch(error){
+        if(error.rejected){this.state.pendingCreations=this.state.pendingCreations.filter(item=>item!==pending);await this.save();throw error;}
+        throw new Error('创建结果待确认，请刷新官方列表并核对后关联');
+      }
+      await this.save();
+      const target=await this.target(pending.agentId,identity,AbortSignal.timeout(20000));
+      return await this.saveBinding(projectId,identity,target);
+    }finally{this.reservations.delete(projectId);}
   }
   identity() { if (!this.session || this.session.expiresAt <= Date.now() || Date.now()-this.session.syncedAt>=45000) throw new Error('请先在工坊的官方平台窗口登录 Rokid 账号，并保持工坊运行'); return { ...this.session }; }
   current(identity) { if (this.identity().accountId !== identity.accountId || this.session.token !== identity.token) throw new Error('官方账号或登录会话已变化，请重新核对目标后操作'); }

@@ -759,3 +759,6 @@ option{background:var(--surface);color:var(--ink)}
 .appearance-label>svg:last-child:not(:first-child){margin-left:auto;color:var(--ink)}
 .appearance-note{font-size:11px;color:var(--muted);margin-top:16px}
 @media(max-width:720px){.appearance-options{gap:9px}.theme-preview{height:68px}.appearance-label{padding:10px 3px 5px;gap:5px}.log-overview{grid-template-columns:1fr}.log-filter{flex-wrap:wrap}.simulator-heading{align-items:flex-start;flex-direction:column}.project-path{max-width:100%;white-space:normal;overflow-wrap:anywhere}.simulator-heading>.heading-actions{flex-wrap:wrap}.view-simulator .device-mat{overflow:auto;justify-content:flex-start}.knowledge-layout{grid-template-columns:190px minmax(0,1fr)}}
+
+.wireless-pair-card{width:404px}
+.wireless-pair-card .wireless-qr{width:100%;border:0}

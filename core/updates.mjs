@@ -6,6 +6,7 @@ import { ROOT, atomicJson, readJson, id } from './util.mjs';
 import { APP_VERSION } from './version.mjs';
 
 export const UPDATE_SOURCES = ['github', 'cnb', 'gitee', 'custom'];
+export const UPDATE_MODES = ['auto', ...UPDATE_SOURCES];
 export const MANIFEST_NAME = 'workbench-update.json';
 const HOUR = 3600000, MAX_PACKAGE = 2 * 1024 ** 3;
 export function httpsUrl(value, base) {
@@ -32,28 +33,33 @@ export function validateManifest(value, base, platform, arch) {
 }
 
 export class AppUpdates {
-  constructor(home, { fetcher = fetch, now = Date.now, version = APP_VERSION, platform = process.platform, arch = process.arch } = {}) {
+  constructor(home, { fetcher = fetch, now = Date.now, version = APP_VERSION, platform = process.platform, arch = process.arch, defaults, checkTimeout = 10000, downloadIdleTimeout = 20000 } = {}) {
     this.home = home; this.fetcher = fetcher; this.now = now; this.version = version; this.platform = platform; this.arch = arch;
+    this.defaultOverrides = defaults; this.checkTimeout = checkTimeout; this.downloadIdleTimeout = downloadIdleTimeout;
     this.file = path.join(home, 'app-updates.json'); this.controller = new AbortController(); this.latest = null; this.downloaded = null;
   }
   async init() {
-    const defaults = await readJson(path.join(ROOT, 'assets/updates.json'));
+    const bundled = await readJson(path.join(ROOT, 'assets/updates.json'));
+    const defaults = { ...bundled, ...this.defaultOverrides, sources: Object.fromEntries(UPDATE_SOURCES.map(key => [key, { ...bundled.sources[key], ...this.defaultOverrides?.sources?.[key] }])) };
     this.defaults = { autoCheck:true, intervalHours:24, ...defaults };
     const saved = await readJson(this.file, {});
     this.data = { autoCheck: true, intervalHours: 24, ...defaults, ...saved, sources: Object.fromEntries(UPDATE_SOURCES.map(key => [key, { ...defaults.sources[key], ...saved.sources?.[key] }])) };
-    if (!UPDATE_SOURCES.includes(this.data.source)) this.data.source = 'github';
+    if (!UPDATE_MODES.includes(this.data.source)) this.data.source = defaults.source;
     if (![24, 168].includes(this.data.intervalHours)) this.data.intervalHours = 24;
     this.data.autoCheck = this.data.autoCheck !== false;
     return this;
   }
-  configured() { const source = this.data.sources[this.data.source]; return !!(this.data.source === 'github' ? source.repository : source.manifestUrl); }
+  sourceSettings(source) { return (this.data.source === 'auto' ? this.defaults : this.data).sources[source]; }
+  sourceConfigured(source) { const config = this.sourceSettings(source); return !!(source === 'github' ? config.repository : config.manifestUrl); }
+  candidates() { return this.data.source === 'auto' ? ['cnb', 'github'].filter(source => this.sourceConfigured(source)) : [this.data.source].filter(source => this.sourceConfigured(source)); }
+  configured() { return this.candidates().length > 0; }
   status() {
-    return { version: this.version, platform: this.platform, arch: this.arch, ...structuredClone(this.data), defaults:structuredClone(this.defaults), configured: this.configured(), checking: !!this.checking, downloading: !!this.downloading, progress: this.progress || null, latest: this.latest, updateAvailable: !!this.latest && semver.gt(this.latest.version, this.version), downloaded: this.downloaded };
+    return { version: this.version, platform: this.platform, arch: this.arch, ...structuredClone(this.data), defaults:structuredClone(this.defaults), configured: this.configured(), activeSource: this.activeSource || null, sourceResults: this.sourceResults || [], checking: !!this.checking, downloading: !!this.downloading, progress: this.progress || null, latest: this.latest, updateAvailable: !!this.latest && semver.gt(this.latest.version, this.version), downloaded: this.downloaded };
   }
   async save() { await atomicJson(this.file, this.data); }
   async settings({ source, sources, autoCheck, intervalHours } = {}) {
     if (this.checking || this.downloading) throw new Error('正在检查或下载更新，请完成后再修改更新源');
-    if (source !== undefined && !UPDATE_SOURCES.includes(source)) throw new Error('未知更新源');
+    if (source !== undefined && !UPDATE_MODES.includes(source)) throw new Error('未知更新源');
     if (autoCheck !== undefined && typeof autoCheck !== 'boolean') throw new Error('自动检查设置无效');
     if (intervalHours !== undefined && ![24, 168].includes(intervalHours)) throw new Error('检查频率只能为每天或每周');
     const next = structuredClone(this.data), before = JSON.stringify([next.source, next.sources]);
@@ -73,6 +79,7 @@ export class AppUpdates {
     if (intervalHours !== undefined) next.intervalHours = intervalHours;
     if (before !== JSON.stringify([next.source, next.sources])) {
       this.latest = null; this.downloaded = null; this.progress = null;
+      this.activeSource = null; this.sourceResults = []; this.available = [];
       delete next.checkedAt; delete next.attemptedAt; delete next.error; delete next.nextCheckAt;
     }
     this.data = next; await this.save(); return this.status();
@@ -105,28 +112,44 @@ export class AppUpdates {
     if (!this.checking) this.checking = this.checkNow().finally(() => { this.checking = null; });
     return this.checking.then(() => this.status());
   }
+  async checkSource(source) {
+    const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(this.data.source === 'auto' ? this.checkTimeout : 30000)]);
+    const config = this.sourceSettings(source); let manifestUrl = config.manifestUrl, release = null;
+    if (source === 'github') {
+      const result = await this.json(`https://api.github.com/repos/${config.repository}/releases/latest`, signal);
+      release = result.value;
+      if (release.draft || release.prerelease || !semver.valid(release.tag_name)) throw new Error('GitHub 最新发行版不是有效稳定版');
+      const asset = release.assets?.find(a => a.name === MANIFEST_NAME);
+      if (!asset) throw new Error(`该发行版未附带 ${MANIFEST_NAME}`);
+      manifestUrl = httpsUrl(asset.browser_download_url);
+    }
+    // Resolve relative package URLs against the publisher's stable manifest URL,
+    // not an expiring CDN redirect used to transfer the manifest itself.
+    const result = await this.json(manifestUrl, signal), latest = validateManifest(result.value, manifestUrl, this.platform, this.arch);
+    if (release && !semver.eq(release.tag_name, latest.version)) throw new Error('更新清单与发行版的版本号不一致');
+    return { ...latest, source };
+  }
   async checkNow() {
     if (!this.configured()) { this.data.error = null; return; }
     this.data.attemptedAt = new Date(this.now()).toISOString(); this.data.error = null;
-    const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(30000)]);
+    const sources = this.candidates();
+    const results = await Promise.allSettled(sources.map(source => this.checkSource(source)));
+    this.sourceResults = results.map((result, index) => ({ source: sources[index], ...(result.status === 'fulfilled' ? { version: result.value.version } : { error: result.reason.message }) }));
+    this.available = results.filter(result => result.status === 'fulfilled').map(result => result.value);
+    // Never let a lagging mirror mask a newer stable release. For equal versions,
+    // prefer CNB (or the source used for the last verified in-app download).
+    this.available.sort((a, b) => semver.rcompare(a.version, b.version) || Number(!!b.file) - Number(!!a.file) || Number(b.source === this.data.lastDownloadSource) - Number(a.source === this.data.lastDownloadSource));
     try {
-      const config = this.data.sources[this.data.source]; let manifestUrl = config.manifestUrl, release = null;
-      if (this.data.source === 'github') {
-        const result = await this.json(`https://api.github.com/repos/${config.repository}/releases/latest`, signal);
-        release = result.value;
-        if (release.draft || release.prerelease || !semver.valid(release.tag_name)) throw new Error('GitHub 最新发行版不是有效稳定版');
-        const asset = release.assets?.find(a => a.name === MANIFEST_NAME);
-        if (!asset) throw new Error(`该发行版未附带 ${MANIFEST_NAME}`);
-        manifestUrl = httpsUrl(asset.browser_download_url);
+      if (!this.available.length) {
+        if (this.data.source !== 'auto') throw results[0].reason;
+        throw new Error('官方更新源暂时不可用，请稍后重试或手动选择更新源');
       }
-      // Resolve relative package URLs against the publisher's stable manifest URL,
-      // not an expiring CDN redirect used to transfer the manifest itself.
-      const result = await this.json(manifestUrl, signal), latest = validateManifest(result.value, manifestUrl, this.platform, this.arch);
-      if (release && !semver.eq(release.tag_name, latest.version)) throw new Error('更新清单与发行版的版本号不一致');
+      const latest = this.available[0];
       this.latest = latest;
+      this.activeSource = latest.source;
       if (this.downloaded?.version !== latest.version || this.downloaded?.sha256 !== latest.file?.sha256) this.downloaded = null;
       this.data.checkedAt = new Date(this.now()).toISOString();
-    } catch (error) { this.latest = null; this.downloaded = null; this.data.error = error.message; }
+    } catch (error) { this.latest = null; this.downloaded = null; this.activeSource = null; this.data.error = error.message; }
     this.data.nextCheckAt = new Date(this.now() + this.data.intervalHours * HOUR).toISOString(); await this.save();
   }
   start() {
@@ -143,22 +166,45 @@ export class AppUpdates {
   }
   async downloadNow() {
     if (!this.latest || !semver.gt(this.latest.version, this.version) || !this.latest.file) throw new Error('没有适合当前系统的新版本安装包');
-    const { file, version } = this.latest, dir = path.join(this.home, 'updates', version);
+    const selected = this.latest;
+    const candidates = this.data.source === 'auto' ? [selected, ...(this.available || []).filter(candidate => candidate.source !== selected.source && candidate.version === selected.version && candidate.file?.sha256 === selected.file.sha256 && candidate.file?.size === selected.file.size)] : [selected];
+    for (const candidate of candidates) {
+      try {
+        const downloaded = await this.downloadFile(candidate);
+        this.latest = candidate; this.activeSource = candidate.source;
+        this.data.lastDownloadSource = candidate.source;
+        this.data.lastDownloadVersion = candidate.version;
+        await this.save();
+        return downloaded;
+      } catch (error) {
+        if (this.controller.signal.aborted || candidate === candidates.at(-1)) throw error;
+      }
+    }
+  }
+  async downloadFile({ file, version, source }) {
+    const dir = path.join(this.home, 'updates', version);
     await fs.mkdir(dir, { recursive: true }); const destination = path.join(dir, file.name), temporary = path.join(dir, id() + '.part');
     this.progress = { received: 0, total: file.size }; this.data.error = null;
     let handle;
     try {
       const signal = AbortSignal.any([this.controller.signal, AbortSignal.timeout(30 * 60 * 1000)]);
-      const { response } = await this.request(file.url, signal), hash = createHash('sha256');
-      handle = await fs.open(temporary, 'wx', 0o600);
-      for await (const chunk of response.body) {
-        this.progress.received += chunk.length;
-        if (this.progress.received > file.size) throw new Error('安装包大小与清单不符');
-        hash.update(chunk); await handle.writeFile(chunk);
-      }
-      if (this.progress.received !== file.size || hash.digest('hex') !== file.sha256) throw new Error('安装包 SHA256 或大小校验失败，请更换源或稍后重试');
-      await handle.close(); handle = null; await fs.rename(temporary, destination);
-      this.downloaded = { path: destination, version, sha256: file.sha256, size: file.size }; return this.downloaded;
+      const idle = new AbortController();
+      let idleTimer;
+      const touch = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => idle.abort(new Error('安装包下载长时间无响应')), this.downloadIdleTimeout); idleTimer.unref(); };
+      touch();
+      try {
+        const { response } = await this.request(file.url, AbortSignal.any([signal, idle.signal])), hash = createHash('sha256');
+        handle = await fs.open(temporary, 'wx', 0o600);
+        for await (const chunk of response.body) {
+          touch();
+          this.progress.received += chunk.length;
+          if (this.progress.received > file.size) throw new Error('安装包大小与清单不符');
+          hash.update(chunk); await handle.writeFile(chunk);
+        }
+        if (this.progress.received !== file.size || hash.digest('hex') !== file.sha256) throw new Error('安装包 SHA256 或大小校验失败，请更换源或稍后重试');
+        await handle.close(); handle = null; await fs.rename(temporary, destination);
+        this.downloaded = { path: destination, version, source, sha256: file.sha256, size: file.size }; return this.downloaded;
+      } finally { clearTimeout(idleTimer); }
     } catch (error) { this.data.error = error.message; throw error; }
     finally { await handle?.close(); await fs.rm(temporary, { force: true }); }
   }

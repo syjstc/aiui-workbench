@@ -51,7 +51,43 @@ test('legacy official login migrates to a memory partition and only an encrypted
   const notifications=[];
   login.close();const restarted=await new PlatformLogin({home,session,BrowserWindow:Window,safeStorage,client,desktopKey:'c'.repeat(64),getLocale:()=> 'zh-CN',onStatus:value=>notifications.push(value)}).init();t.after(()=>restarted.close());assert.equal(calls.at(-1).args.token,'');
   await restarted.open();const loginWindow=restarted.studio;assert.equal(restarted.awaitingLogin,true);
-  await restarted.official.cookies.set({url:'https://aiui.rokid.com/',name:'ROKID_ACCOUNT_SESSION',value:sessionToken,path:'/',expirationDate:expires});await restarted.sync();assert.equal(calls.at(-1).args.token,sessionToken);
+  await restarted.official.cookies.set({url:'https://aiui.rokid.com/',name:'ROKID_ACCOUNT_SESSION',value:sessionToken,path:'/',expirationDate:expires});await restarted.sync();assert.equal(calls.findLast(c=>c.name==='ui_platform_session').args.token,sessionToken);
   assert.equal(loginWindow.isDestroyed(),true);assert.equal(restarted.studio,null);assert.deepEqual(notifications.at(-1),{loggedIn:true});assert.equal(notifications.some(value=>Object.hasOwn(value,'token')),false);
   await restarted.open();const managementWindow=restarted.studio;assert.equal(restarted.awaitingLogin,false);await restarted.sync();assert.equal(managementWindow.isDestroyed(),false);managementWindow.destroy();
+});
+test('first sign-in polls Studio storage and keeps the window open until the account read succeeds',async t=>{
+  const {EventEmitter}=await import('node:events');
+  const {PlatformLogin}=createRequire(import.meta.url)('../electron/platform-login.cjs');
+  const home=await fs.mkdtemp(path.join(os.tmpdir(),'studio-first-login-'));
+  t.after(()=>fs.rm(home,{recursive:true,force:true}));
+  let stored=null,accountReady=false;
+  class Window extends EventEmitter{
+    constructor(){super();this.webContents=Object.assign(new EventEmitter(),{
+      getURL:()=>this.url,executeJavaScript:async()=>stored,setWindowOpenHandler:()=>{},
+    });}
+    async loadURL(url){this.url=url;}
+    isDestroyed(){return !!this.closed;}
+    destroy(){this.closed=true;this.emit('closed');}
+  }
+  const cookies=Object.assign(new EventEmitter(),{get:async()=>[]});
+  const login=await new PlatformLogin({home,session:{fromPartition:()=>({cookies})},BrowserWindow:Window,
+    safeStorage:{isEncryptionAvailable:()=>false},getLocale:()=> 'en',desktopKey:'a'.repeat(64),
+    client:{call:async(name,args)=>{
+      if(name==='ui_platform_session')return {loggedIn:!!args.token};
+      assert.equal(name,'aiui_platform_agents');
+      if(!accountReady)throw Error('Transient failure');
+      return {agents:[]};
+    }},
+  }).init();
+  t.after(()=>login.close());
+  await login.open();const window=login.studio;
+  stored=token(Math.floor(Date.now()/1000)+600);
+  await assert.rejects(login.sync(),/Transient failure/);
+  assert.equal(window.isDestroyed(),false);
+  accountReady=true;
+  const closed=new Promise(resolve=>window.once('closed',resolve));
+  let deadline;
+  try{await Promise.race([closed,new Promise((_,reject)=>{deadline=setTimeout(()=>reject(Error('First sign-in did not complete')),3500);})]);}
+  finally{clearTimeout(deadline);}
+  assert.equal(login.loggedIn,true);await login.sync();assert.equal(login.loggedIn,true);
 });

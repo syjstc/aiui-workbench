@@ -8,10 +8,11 @@ export function devicePresentation(environment, device, error) {
   if (error) return { tone: 'warning', title: t("暂时无法读取连接状态"), description: t("正在自动重试。请检查无线网络或数据线连接，保持眼镜开机。") };
   if (!environment) return { tone: 'waiting', title: t("正在寻找你的眼镜…"), description: t("连接后会自动检查，无需手动刷新。") };
   if (!environment.adb || !environment.aix) return { tone: 'warning', title: t("连接工具需要准备"), description: !environment.adb ? t("内置连接工具暂时不可用。请确认客户端已完整解压，或打开新手指南第 3 步查看解决方法。") : t("应用安装工具暂时不可用，请重新打开工坊。详细原因可在下方查看。") };
-  if (!environment.devices.length) return { tone: 'waiting', title: t("等待连接眼镜"), description: t("选择无线或有线连接，按下方步骤完成授权。") };
+  if (!environment.devices.length) return { tone: 'waiting', title: t("等待连接眼镜"), description: t("未找到眼镜时，请先在手机 Rokid AI 的眼镜设置 → 开发者中检查「眼镜 ADB 调试」，再按下方步骤连接。") };
   if (!device) return { tone: 'waiting', title: t("选择要使用的眼镜"), description: t("检测到多台设备，请在下方选择这次要使用的一台。") };
   if (device.status === 'unauthorized') return { tone: 'warning', title: t("等待你允许连接"), description: t("请在眼镜上允许调试连接；使用无线配对的固件请完成配对。确认后会自动继续检查。") };
   if (device.status !== 'device') return { tone: 'warning', title: t("眼镜连接暂时中断"), description: device.connection === 'wireless' ? t("请保持眼镜开机并连接同一 Wi-Fi。已记住的设备会自动重连，下方会显示恢复提示。") : t("请重新插好数据线，并确认眼镜已开机。恢复连接后会自动继续检测。") };
+  if (device.adbAccess && device.adbAccess.state !== 'available') return { tone: 'warning', title: t(device.adbAccess.recovery?.title || '请检查眼镜 ADB 调试与连接'), description: t(device.adbAccess.message) };
   const inspection = device.inspection;
   if (!inspection) return { tone: 'waiting', title: t("眼镜已连接，正在检查…"), description: t("正在确认眼镜是否可以运行你的应用。") };
   if (inspection.error || inspection.developerMode === 'unknown') return { tone: 'warning', title: t("已连接，暂未读到眼镜状态"), description: t("请确认连接的是支持 AIUI 的 Rokid 眼镜，并保持眼镜开机。工坊会自动重试。") };

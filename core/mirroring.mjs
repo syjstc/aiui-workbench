@@ -26,6 +26,11 @@ export class Mirroring {
   async status({ serial } = {}) {
     let component;
     try { component = { available: true, ...await this.bundled() }; } catch (error) { component = { available: false, source: 'bundled', error: error.message }; }
+    for (const session of [...this.sessions.values(), ...this.embedded.sessions.values()]) {
+      if (session.status !== 'failed' || !session.error || session.deviceDiagnostic || !this.glasses.diagnoseFailure) continue;
+      const error = await this.glasses.diagnoseFailure(session.serial, new Error(session.error));
+      if (error.deviceDiagnostic) Object.assign(session, { error: error.message, deviceDiagnostic: error.deviceDiagnostic, recovery: error.recovery });
+    }
     return { ...component, session: this.public(this.sessions.get(serial)), sessions: [...this.sessions.values()].map(session => this.public(session)) };
   }
   start(args) {

@@ -151,9 +151,10 @@ test('sign-out revokes approval and running platform jobs, hides account records
   const loggedOut=f.platform.setSession(null);assert.equal(loggedOut.loggedIn,false);assert.deepEqual(loggedOut.uploads,[]);assert.deepEqual(loggedOut.reviews,[]);assert.equal(f.platform.approvals.size,0);assert.equal((await f.w.jobs.wait(job.id,1000)).status,'cancelled');
   await assert.rejects(f.platform.upload(uploadArgs),/登录/);assert.equal(f.platform.state.uploads[0].stage,'verified');f.platform.setSession(token(),desktopKey);assert.equal(f.platform.status().uploads[0].stage,'verified');
 });
-test('all mutations share one account-bound official target and MCP cannot change the binding',async t=>{
+test('all mutations share one account-bound official target and only the UI can replace the binding',async t=>{
   const f=await fixture(t);assert.equal(f.platform.status(f.project.id).binding.agentId,f.remote.agentId);
   const wrong=await f.platform.upload({...uploadArgs,agentId:'another-cloud-agent'});assert.equal(wrong.status,'failed');assert.match(wrong.error,/不一致/);assert.equal(f.requests.some(r=>r.url===PLATFORM_API.sts),false);
+  await assert.rejects(f.platform.bind({...uploadArgs,agentId:'another-cloud-agent'},{replace:false}),/更改已有/);
   await assert.rejects(Workbench.prototype.dispatch.call({...f.w,clients:new Map()},'ui_platform_bind',uploadArgs,'MCP'),/只能在工坊/);
 });
 test('legacy verified receipts restore only an unambiguous official binding',async t=>{
@@ -165,7 +166,7 @@ test('legacy verified receipts restore only an unambiguous official binding',asy
 test('official listing is read-only and no cloud deletion endpoint or MCP operation is available',async t=>{
   const f=await fixture(t),listed=await f.platform.list();assert.equal(listed.agents[0].readOnly,true);assert.equal(listed.agents[0].canDelete,false);
   const before=f.requests.length;await assert.rejects(f.platform.request('delete',f.platform.identity(),{body:{agentId:f.remote.agentId}}),/不受支持/);assert.equal(f.requests.length,before);
-  assert.equal(toolCatalog().tools.some(tool=>/^aiui_platform_.*(?:delete|remove|edit|bind)/.test(tool.name)),false);
+  assert.equal(toolCatalog().tools.some(tool=>/^aiui_platform_.*(?:delete|remove|edit)/.test(tool.name)),false);
 });
 test('media upload signs only the official scoped OSS destination and verifies the ETag',async()=>{
   const media={bytes:Buffer.from('media'),md5:md5(Buffer.from('media')),extension:'.png',mime:'image/png',type:'image'};
@@ -173,4 +174,27 @@ test('media upload signs only the official scoped OSS destination and verifies t
   const result=await putMedia(sts,media,{fetcher:async(url,options)=>{assert.match(url,/^https:\/\/rokid-test\.oss-cn-hangzhou\.aliyuncs\.com\/test-user\/workbench-/);assert.match(options.headers.Authorization,/^OSS access:/);assert.equal(options.headers['x-oss-security-token'],'sts');return new Response(null,{headers:{etag:'"'+media.md5+'"'}});}});
   assert.match(result.url,/static\.rokidcdn\.com/);assert.equal(JSON.stringify(result).includes('secret'),false);
   await assert.rejects(putMedia({...sts,cdnUrl:'https://attacker.test/'},media),/不可信/);
+});
+
+test('creating an agent binds only the verified receipt and can resume a delayed list without another write',async t=>{
+  const {platform,project,remote}=await fixture(t);
+  platform.state.bindings=[];
+  const args={projectId:project.id,agentName:'New app',description:'A description',category:'study'};
+  let writes=0,visible=false;
+  platform.fetcher=async(url,options)=>{
+    if(url===PLATFORM_API.create){
+      writes++;
+      const body=JSON.parse(options.body);
+      assert.equal(body.agentName,args.agentName);assert.equal(body.modelVendor,'native');
+      return success({agentId:'new-cloud-agent'});
+    }
+    assert.equal(url,PLATFORM_API.agents);
+    const list=[remote,...visible?[{...remote,agentId:'new-cloud-agent',agentName:'New app'}]:[]];
+    return success({list,total:list.length});
+  };
+  await assert.rejects(platform.createAndBind(args),/不属于|移除|同步/);
+  assert.equal(platform.status(project.id).binding,null);
+  visible=true;
+  assert.equal((await platform.createAndBind(args)).binding.agentId,'new-cloud-agent');
+  assert.equal(writes,1);
 });

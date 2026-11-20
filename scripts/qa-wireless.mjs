@@ -9,7 +9,7 @@ import { parseDevices } from '../core/devices.mjs';
 import { ROOT } from '../core/util.mjs';
 
 const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-wireless-ui-'));
-const output = path.join(ROOT, 'output/qa/wireless');
+const output = process.env.AIUI_QA_OUTPUT || path.join(ROOT, 'output/qa/wireless');
 await fs.mkdir(output, { recursive: true });
 const daemon = await startDaemon(home), service = daemon.service;
 await service.knowledge.settings({ autoUpdate: false });

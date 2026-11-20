@@ -15,7 +15,7 @@ import {GlassesToolsPage} from './glasses-tools.jsx';
 import {useDeviceDiscovery} from './use-device-discovery.js';
 import {JobList,JobHistory} from './job-history.jsx';
 import {LogsPage} from './logs-page.jsx';
-import {Box,PanelsTopLeft,Monitor,BookOpen,Glasses,Plug,CloudUpload,Plus,FolderOpen,ArrowUpRight,ArrowLeft,ArrowRight,ChevronRight,Check,CheckCircle2,AlertCircle,RefreshCw,Search,Play,MousePointer2,Move3D,Camera,Terminal,Copy,ExternalLink,MoreHorizontal,Orbit,Gamepad2,Wifi,ShieldCheck,Activity,X,Square,LoaderCircle,FileCheck2,Package,SlidersHorizontal,Link2,Download,Settings2,Radio,Image,Power,RotateCcw,HelpCircle,Trash2,Globe2,Sparkles} from 'lucide-react';
+import {Box,PanelsTopLeft,LayoutGrid,Monitor,BookOpen,Glasses,Plug,CloudUpload,Plus,FolderOpen,ArrowUpRight,ArrowLeft,ArrowRight,ChevronRight,Check,CheckCircle2,AlertCircle,RefreshCw,Search,Play,MousePointer2,Move3D,Camera,Terminal,Copy,ExternalLink,MoreHorizontal,Orbit,Gamepad2,Wifi,ShieldCheck,Activity,X,Square,LoaderCircle,FileCheck2,Package,SlidersHorizontal,Link2,Download,Settings2,Radio,Image,Power,RotateCcw,HelpCircle,Trash2,Globe2,Sparkles} from 'lucide-react';
 import './style.css';
 import {Simulator} from './simulator.jsx';
 import {ProjectIcon} from './project-icon.jsx';
@@ -41,7 +41,7 @@ const time=s=>s?new Date(s).toLocaleString(getLocale(),{month:'numeric',day:'num
 const formatSize=n=>n>1024*1024?(n/1024/1024).toFixed(1)+' MB':Math.round((n||0)/1024)+' KB';
 const navigationGroups=[
  ['应用开发',[['projects',PanelsTopLeft,'我的项目'],['simulator',Monitor,'模拟器'],['publish',CloudUpload,'构建与上传']]],
- ['眼镜管理',[['devices',Glasses,'连接眼镜'],['glasses',SlidersHorizontal,'眼镜工具']]],
+ ['眼镜管理',[['devices',Glasses,'连接眼镜'],['aiui-apps',LayoutGrid,'眼镜 AIUI 应用'],['glasses',SlidersHorizontal,'眼镜工具']]],
  ['资源与工具',[['knowledge',BookOpen,'官方资料'],['connect',Plug,'连接 AI 工具'],['sdk',Package,'SDK 更新'],['logs',Terminal,'日志与记录']]],
 ];
 const navigation=[...navigationGroups.flatMap(([,items])=>items),['feedback',MessageSquare,'反馈与建议']];
@@ -56,7 +56,7 @@ function App(){
  useEffect(()=>{const close=event=>{if(!event.target.closest('.project-actions'))setProjectMenu(null);};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close);},[]);
  useEffect(()=>{if(api.kind==='web'||!api.updates)return;let mounted=true;const poll=()=>api.updates('status').then(value=>{if(mounted)setAppUpdates(value);}).catch(()=>{});poll();const timer=setInterval(poll,2000);return()=>{mounted=false;clearInterval(timer);};},[]);
  const[deletingJobs,setDeletingJobs]=useState(false),[clearingPreview,setClearingPreview]=useState(null);
- const discovery=useDeviceDiscovery(api,view==='devices'||view==='guide'||view==='glasses'),environment=discovery.environment;
+ const discovery=useDeviceDiscovery(api,view==='devices'||view==='guide'||view==='glasses'||view==='aiui-apps'),environment=discovery.environment;
  const contentRef=useRef();
  useEffect(()=>{if(contentRef.current)contentRef.current.scrollTop=0;},[view]);
  const toastTimer=useRef(), lastRequest=useRef(Date.now()), sdkNotice=useRef(null), stateRequest=useRef(0);
@@ -135,7 +135,7 @@ function App(){
    {view==='connect'&&<ConnectPage key={connectProject?.id||'new'} state={state} project={connectProject} copyConfig={copyConfig} notify={notify} go={v=>{if(v==='project'&&connectProject)setSelected(connectProject.id);chooseView(v);}}/>}
    {view==='guide'&&<BeginnerGuide environment={environment} importProject={importProject} go={chooseView} notify={notify}/>}
    {view==='devices'&&<><div className="page-heading"><div><h1>{t("连接眼镜")}</h1><p>{t("通过 Wi-Fi 或数据线连接，自动检查授权，准备好后即可安装应用。")}</p></div></div><DevicePanel discovery={discovery} project={activeProject} projects={projects} setSelected={setSelected} startJob={startJob} jobs={jobs} goToProjects={()=>setView('projects')} goToGuide={()=>setView('guide')}/><JobHistory title={t("安装与打开记录")} jobs={jobs.filter(j=>['deploy','launch','device-setup'].includes(j.type))} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs}/></>}
-   {view==='glasses'&&<GlassesToolsPage discovery={discovery} jobs={jobs} refresh={refresh} notify={notify} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs} goToGuide={()=>setView('guide')}/>}
+   {(view==='glasses'||view==='aiui-apps')&&<GlassesToolsPage aiuiOnly={view==='aiui-apps'} discovery={discovery} jobs={jobs} refresh={refresh} notify={notify} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs} goToGuide={()=>setView('guide')}/>}
    {view==='publish'&&<PublishPage api={api} projects={projects} project={activeProject} onSelect={setSelected} onImport={importProject} jobs={jobs} busy={busy} startJob={startJob} onCancel={cancelJob} onDelete={deleteJobs} deleting={deletingJobs} notify={notify}/>}
    </main>
    <footer className="statusbar"><span><ShieldCheck size={11}/>{t(" 项目保存在本机 ")}<span className="statusbar-divider">·</span> v{__APP_VERSION__}</span><span>{running.length?<><LoaderCircle size={11} className="spin"/> {translateMessage(running[0].message).slice(0,90)}</>:<>Ink SDK {state?.webSdkVersion||'—'}</>}</span></footer>

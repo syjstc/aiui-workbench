@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {atomicJson,readJson,id} from './util.mjs';
+import { adbAccessDiagnostic } from './adb-access.mjs';
 
 export const DEVELOPMENT_GUIDE = `用户只需描述想法。官方 aiui-dev 负责开发规则和交付验收，工坊只补 MCP 编排；官方要求的检查可用工坊等效工具执行，不能降低验收标准。以下工具只在当前清单中存在时使用，不根据 runtime/CLI 版本猜测：
 1. aiui_workflow_start(request) 自动准备项目目录并返回官方规范、当前源码路径和验收要求。已有项目可传 projectId。不要要求新手选择目录或学习 MCP。
@@ -13,11 +14,12 @@ export const DEVELOPMENT_GUIDE = `用户只需描述想法。官方 aiui-dev 负
 export function deviceBlocker(environment, serial) {
   const e=environment;
   if(!e?.adb||!e?.aix)return {code:'tools-unavailable',message:'连接工具暂时不可用，请检查完整客户端',owner:'user',title:'请检查工坊安装',steps:['确认使用完整桌面安装包，重新打开工坊。','连接工具仍不可用时，打开新手指南选择备用工具。'],view:'guide'};
-  if(!e.devices?.length)return {code:'no-device',message:'尚未发现眼镜，请检查无线连接或数据线',owner:'user',title:'连接眼镜后就可以继续',steps:['打开工坊“连接眼镜”，按你的选择使用“无线连接”或“有线连接”Tab。无线使用同一 Wi-Fi；有线使用适配眼镜的数据调试线。','首次使用可点“用手机安装无线助手”：手机下载 APK 后，在 Rokid AI → 工具箱 → 眼镜应用管理 → 安装新应用中安装。工具箱的遥控器可操作眼镜。','开启无线调试，使用六位码或眼镜扫码配对；等工坊显示已连接，再告诉 AI 继续。'],view:'devices'};
+  if(!e.devices?.length)return {...adbAccessDiagnostic('missing').recovery,code:'no-device'};
   const d=serial?e.devices.find(d=>d.serial===serial):e.devices.length===1?e.devices[0]:null;
   if(!d)return {code:'select-device',message:'请选择明确的目标眼镜',owner:'user',title:'请选择这次使用的眼镜',steps:['打开“连接眼镜”，按设备名称和尾号选择目标。','让 AI 使用该设备继续原任务。'],view:'devices'};
-  if(d.status==='unauthorized')return {code:'unauthorized',message:'请在眼镜上允许 USB 调试',owner:'user',title:'请在眼镜上允许连接',steps:['戴上眼镜，确认“允许 USB 调试”。','没有出现提示时重新连接，然后继续。'],view:'devices'};
-  if(d.status!=='device')return {code:'offline',message:'眼镜连接已中断',owner:'user',title:'请重新连接眼镜',steps:['确认眼镜开机，重新连接数据线或无线连接。','连接恢复后重新检查并继续。'],view:'devices'};
+  if(d.status==='unauthorized')return {...adbAccessDiagnostic('unauthorized',d).recovery,code:'unauthorized'};
+  if(d.status!=='device')return {...adbAccessDiagnostic('offline',d).recovery,code:'offline'};
+  if(d.adbAccess && d.adbAccess.state!=='available')return d.adbAccess.recovery;
   if(d.inspection?.developerMode==='disabled')return {code:'developer-mode',message:'需要开启 AIUI 开发者模式',owner:'user',title:'请开启眼镜开发者模式',steps:['在“连接眼镜”页面点击“开启 AIUI 开发者模式”。','等待眼镜运行环境就绪，再继续。'],view:'devices'};
   if(d.inspection?.error||!d.inspection?.runtimeReady)return {code:'runtime-not-ready',message:'眼镜运行环境尚未就绪',owner:'user',title:'请保持眼镜开机并稍等',steps:['保持连接，等待眼镜运行环境准备完成。','如果一直未就绪，重新启动眼镜后再检查。'],view:'devices'};
   return null;

@@ -7,7 +7,7 @@ import { MirrorPacketParser,mirrorInput } from './mirror-protocol.mjs';
 
 export class EmbeddedMirroring {
   constructor(adb,glasses,bundled,getOrigin,emit=()=>{}){Object.assign(this,{adb,glasses,bundled,getOrigin,emit});this.sessions=new Map();this.starts=new Map();}
-  public(s){if(!s)return null;return {id:s.id,serial:s.serial,status:s.status,mode:'embedded',width:s.width,height:s.height,frames:s.frames,maxFps:s.maxFps,rotation:s.rotation,readOnly:s.readOnly,startedAt:s.startedAt,error:s.error,output:s.output,viewers:s.clients.size,url:`${this.getOrigin()}/runtime/mirror/index.html?session=${s.id}&key=${s.key}`};}
+  public(s){if(!s)return null;return {id:s.id,serial:s.serial,status:s.status,mode:'embedded',width:s.width,height:s.height,frames:s.frames,maxFps:s.maxFps,rotation:s.rotation,readOnly:s.readOnly,startedAt:s.startedAt,error:s.error,deviceDiagnostic:s.deviceDiagnostic,recovery:s.recovery,output:s.output,viewers:s.clients.size,url:`${this.getOrigin()}/runtime/mirror/index.html?session=${s.id}&key=${s.key}`};}
   status({serial}={}){return {session:this.public(this.sessions.get(serial)),sessions:[...this.sessions.values()].map(s=>this.public(s))};}
   authorize(sessionId,key){const session=[...this.sessions.values()].find(s=>s.id===sessionId);if(!session||session.key!==key)throw new Error('投屏会话授权无效');return session;}
   start(args){if(this.starts.has(args.serial))return this.starts.get(args.serial);const task=this.startNow(args).finally(()=>this.starts.delete(args.serial));this.starts.set(args.serial,task);return task;}

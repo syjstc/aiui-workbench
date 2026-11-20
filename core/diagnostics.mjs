@@ -39,12 +39,12 @@ export class Diagnostics {
   save() { const value={sequence:this.sequence,items:structuredClone(this.items)}; this.saving=(this.saving||Promise.resolve()).catch(()=>{}).then(()=>atomicJson(this.file,value)); return this.saving; }
   async record(error, context = {}) {
     const message=diagnosticValue(error?.message || String(error)), safe=diagnosticValue({...context,...this.enrich?.(context)});
-    const recovery=safe.recovery || recoveryFor(message,safe.source);
+    const recovery=safe.recovery || diagnosticValue(error?.recovery) || recoveryFor(message,safe.source);
     const fingerprint=sha(JSON.stringify([safe.tool,safe.projectId,safe.sessionId,safe.workflowId,safe.operationPath,safe.revision,message]));
     const previous=this.items.find(item=>item.fingerprint===fingerprint&&item.status==='open');
     const now=new Date().toISOString();
     const item=previous || {id:id(),fingerprint,status:'open',createdAt:now,occurrences:0};
-    Object.assign(item,safe,{message,stack:diagnosticValue(error?.stack || safe.stack || ''),code:error?.code || safe.code,details:diagnosticValue(error?.result || safe.details),recovery,lastSeenAt:now,sequence:++this.sequence,occurrences:item.occurrences+1,readAt:null,readBy:null});
+    Object.assign(item,safe,{message,stack:diagnosticValue(error?.stack || safe.stack || ''),code:error?.code || safe.code,details:diagnosticValue(error?.result || safe.details),...(error?.deviceDiagnostic?{deviceDiagnostic:diagnosticValue(error.deviceDiagnostic)}:{}),recovery,lastSeenAt:now,sequence:++this.sequence,occurrences:item.occurrences+1,readAt:null,readBy:null});
     if(!previous)this.items.unshift(item);
     this.items.sort((a,b)=>b.sequence-a.sequence); this.items=this.items.slice(0,200);
     await this.save().catch(e=>{this.persistenceError=e.message;}); this.emit('diagnostic',item); return structuredClone(item);

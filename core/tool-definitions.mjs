@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import { previewTestSchema, previewStep, buildSchema, jobWaitSchema, recordingSchema,clipSchema } from './automation-contract.mjs';
-import { platformUploadSchema, platformReviewSchema } from './platform-contract.mjs';
+import { platformCreateSchema, platformBindSchema, platformUploadSchema, platformReviewSchema } from './platform-contract.mjs';
 import {feedbackDraftSchema} from './feedback.mjs';
 const string=z.string(), project={projectId:string}, session={sessionId:string};
 export const TOOL_DEFINITIONS=[
  ['aiui_connection_guide','检查实际眼镜连接并返回当前步骤、Rokid AI 安装 APK/遥控器路径和中英文操作截图。无线与有线是两个同级 Tab，按用户选择传 method=wireless 或 usb，无优先推荐。未连接时主动说明下一步；可先制作和打包。step=install,shareHelper=true 生成同工坊语言的手机下载页和下载码，仅下载助手。截图是操作示例，状态以 connected/devices 为准。',{step:z.enum(['overview','install','pair','ready']).default('overview'),method:z.enum(['wireless','usb']).optional(),locale:z.enum(['zh-CN','en']).default('zh-CN'),shareHelper:z.boolean().default(false),includeImages:z.boolean().default(true)}],
- ['aiui_adb_pair_qr','生成 Android 无线调试配对二维码。start 后将 qrDataUrl 图片展示给用户，让眼镜的“使用二维码配对设备”扫描；手机普通扫码不能替眼镜配对。用返回的 id 调用 status 有限等待，只匹配本会话的扫码服务。connected=true 才完成；paired=true 仍需连接端口。两分钟过期；离开或改用六位码时 cancel。固件无扫码入口时使用 aiui_adb_connect 六位码。',{action:z.enum(['start','status','cancel']),id:z.string().uuid().optional()}],
+ ['aiui_adb_pair_qr','生成 Android 无线调试配对二维码。start 后将 qrDataUrl 图片展示给用户，让眼镜的“使用二维码配对设备”扫描；手机普通扫码不能替眼镜配对。用返回的 id 调用 status；waiting 等待扫码，pairing 表示已发现并正在配对，继续查询至结束。只匹配本会话的扫码服务。connected=true 才完成；paired=true 仍需连接端口。两分钟过期；离开或改用六位码时 cancel。固件无扫码入口时使用 aiui_adb_connect 六位码。',{action:z.enum(['start','status','cancel']),id:z.string().uuid().optional()}],
  ['aiui_feedback_status','查看反馈目标（当前更新源仓库）、反馈预览和 issue 回执。仅工坊自身问题及用户主动提出的建议；不自动上报应用开发错误。',{}],
  ['aiui_feedback_prepare','接收调用方填写的已定位工坊自身问题或用户主动建议，按本机固定规则隐藏敏感字段并生成反馈预览；不调用模型，不发送 issue。只可附加工坊公共环境诊断，不上传项目源码、照片或完整日志。目标跟随当前更新源，用户在反馈页面检查后提交；禁止批量自动举报普通应用报错。',feedbackDraftSchema.shape],
  ['aiui_project_files','在项目内列出/读取/写入 UTF-8 应用源码。只有 MCP 的 AI 也可直接制作应用。write 必须传读取时返回的 expectedRevision，版本变化时拒绝覆盖。每次最多 20 个文件/1 MB；禁止项目外路径、符号链接、工具配置、指令和隐藏目录；不能删除文件。',{projectId:string,action:z.enum(['list','read','write']),paths:z.array(z.string().min(1)).min(1).max(20).optional(),files:z.array(z.object({path:z.string().min(1),content:z.string().max(1024*1024)}).strict()).min(1).max(20).optional(),expectedRevision:z.string().regex(/^[a-f0-9]{64}$/).optional()}],
@@ -62,7 +62,7 @@ export const TOOL_DEFINITIONS=[
  ['aiui_preview_capture','截取实际官方运行时画面，返回 PNG 和本地保存路径',session],
  ['aiui_preview_logs','读取应用日志和 SDK 调用；用 afterSequence=上次 nextSequence 增量读取，支持 level/contains/runId 过滤。truncated 表示游标前日志已丢弃。',{...session,limit:z.number().int().min(1).max(300).optional(),afterSequence:z.number().int().nonnegative().optional(),level:z.enum(['log','info','warn','error','debug']).optional(),contains:string.optional(),runId:string.optional()}],
  ['aiui_preview_logs_clear','清空指定预览会话的应用日志与 SDK 调用记录；新日志继续记录',session],
- ['aiui_environment_check','检查 Node、官方 CLI、ADB 和 USB 设备',{}],
+ ['aiui_environment_check','检查工具、ADB 连通、Rokid App 独立 ADB 操作开关及基本命令。已验证 Rokid 的 persist.vendor.adb=false 时，即使设备在线，也返回 adbAccess.state=rokid-adb-disabled、phoneAdbSwitch=off 和手机开启步骤。区别于 Android 调试及 AIUI 开发者模式；不支持读取时返回 unknown。',{}],
  ['aiui_device_inspect','检查指定眼镜开发者模式和已安装应用',{serial:string}],
  ['aiui_glasses_info','只读查询指定 ADB 眼镜的 Android、内存、存储空间、电池与网络信息',{serial:string}],
  ['aiui_glasses_files','浏览眼镜目录，保留真实文件名与元数据；无需 AIUI 开发者模式',{serial:string,path:string.optional()}],
@@ -71,7 +71,7 @@ export const TOOL_DEFINITIONS=[
  ['aiui_glasses_pull','导出眼镜文件或文件夹到电脑的独立目录，返回可取消任务 ID',{serial:string,path:string,directory:string.optional()}],
  ['aiui_glasses_push','导入本机普通文件到眼镜共享存储，拒绝覆盖同名文件；返回可取消任务 ID',{serial:string,files:z.array(string).min(1).max(50),directory:string.optional()}],
  ['aiui_glasses_apps','列出指定眼镜的 Android 包、真实名称和图标、版本号、系统/第三方与停用状态',{serial:string}],
- ['aiui_glasses_aiui_apps','只读查询可访问的 AIUI 清单：开发安装包、系统内置信息及商店清单读取状态，返回名称、图标、版本、说明、权限和身份。正式版与内置版只读，不提供删除；商店权限受限时数量未知，不等于未安装',{serial:string}],
+ ['aiui_glasses_aiui_apps','查询眼镜上的开发版、系统内置与商店 AIUI 应用。商店数据只读；sources 的 snapshot 表示上次眼镜同步时确认的记录，observedAt 为同步时间，observed 中的 lastOpenedAt 是正式版成功显示的时间，count 为 null 时当前安装总数未知。refresh 可重新读取设备',{serial:string,refresh:z.boolean().optional()}],
  ['aiui_glasses_aiui_uninstall','按完整 Agent ID 卸载一个已核实的 AIUI 开发应用，必须有用户明确授权且 confirmAgentId 与 agentId 完全一致。调用官方 CLI 并重新检查本地安装包；不保证云端移除。返回任务 ID',{serial:string,agentId:string,confirmAgentId:string}],
  ['aiui_glasses_app_details','查询 Android 应用版本、安装时间、APK 路径和原始系统详情',{serial:string,packageName:string}],
  ['aiui_glasses_app_action','打开/停止第三方应用；卸载或清空数据必须有用户明确授权并将 confirmPackage 设为目标包名。系统应用只允许打开。返回任务 ID',{serial:string,packageName:string,action:z.enum(['launch','stop','uninstall','clear']),confirmPackage:string.optional()}],
@@ -91,6 +91,8 @@ export const TOOL_DEFINITIONS=[
  ['aiui_project_pack','调用官方 CLI 打包，保存 SHA256 和源码版本',project],
  ['aiui_platform_prepare','准备平台导入包与本地核对清单；不会假报上传成功',project],
  ['aiui_platform_status','读取官方登录、应用绑定、AIX 上传和提审草稿回执。绑定仅由用户在工坊设置。reconcile=true 只回读核对未知结果，不会重传。',{projectId:string.optional(),reconcile:z.boolean().optional()}],
+ ['aiui_platform_bind','按所选本地项目与当前账号的明确 Agent ID 关联已有官方智能体。已有绑定的更换由用户在工坊核对。',platformBindSchema.shape],
+ ['aiui_platform_create','在用户需要新建官方身份时创建原生智能体草稿，回读官方 Agent ID 并绑定本地项目。已有身份使用 aiui_platform_bind。结果不明先查列表，不自动重试。',platformCreateSchema.shape],
  ['aiui_platform_agents','只读当前官方账号的完整原生智能体列表、草稿资料、审核版本和已上架版本；不支持修改或删除已有云端记录。上传新草稿必须匹配工坊设置的应用绑定，不从本地开发身份猜测商店身份。',{}],
  ['aiui_platform_upload','将当前已检查和打包的 AIX 上传为指定智能体的云端草稿，回读包 MD5、目标和版本后才报告 uploaded=true。使用官方 STS/OSS 保存 AIX 和一致的代码 ZIP，保留目标正式名称；不提审或发布。断线不自动重传，显式恢复需同一回执 resumeUploadId、包摘要和资料。',platformUploadSchema.shape],
  ['aiui_platform_review_prepare','上传本机图标、3–5 个 PNG/JPG/MP4 素材并保存介绍、开场白、更新日志和权限用途为提审草稿。previewFiles 省略时沿用云端素材。返回 draftId，尚未提交审核。',platformReviewSchema.shape],

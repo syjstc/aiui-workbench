@@ -76,7 +76,7 @@ export async function startDaemon(home = homePath()) {
       if (url.pathname === '/api/tools' && req.method === 'GET') return send(res,await service.call('aiui_tools_list',{},'MCP-discovery'));
       if (url.pathname === '/api/call' && req.method === 'POST') { const value = await body(req); return send(res,{result:await service.call(value.tool,value.args,value.actor || 'client')}); }
       return send(res,{error:'Not found'},404);
-    } catch(e) { if(!res.destroyed&&!res.writableEnded)send(res,{error:redact(e.message),deviceRequired:e.deviceRequired||undefined,diagnosticId:e.diagnosticId,sharedDiagnostics:e.sharedDiagnostics},400); }
+    } catch(e) { if(!res.destroyed&&!res.writableEnded)send(res,{error:redact(e.message),deviceRequired:e.deviceRequired||undefined,diagnosticId:e.diagnosticId,sharedDiagnostics:e.sharedDiagnostics,deviceDiagnostic:e.deviceDiagnostic,recovery:e.recovery},400); }
   });
   try { await new Promise((resolve,reject) => { server.once('error',reject); server.listen(0,'127.0.0.1',resolve); }); }
   catch(error) { await service.close(); throw error; }

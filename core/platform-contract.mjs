@@ -2,6 +2,12 @@ import { z } from 'zod';
 
 export const platformAgentId = z.string().regex(/^[A-Za-z0-9._-]{8,128}$/);
 const text = (max) => z.string().trim().min(1).max(max);
+import {platformCategories} from './platform-categories.mjs';
+export const platformCreateSchema = z.object({
+  projectId: text(128), agentName: text(50), description: text(500),
+  category: z.enum(Object.keys(platformCategories)), retryUnconfirmed: z.boolean().optional(),
+}).strict();
+export const platformBindSchema = z.object({ projectId: text(128), agentId: platformAgentId }).strict();
 export const platformUploadSchema = z.object({
   projectId: text(128), agentId: platformAgentId,
   version: z.string().regex(/^\d+\.\d+\.\d+$/).optional(),

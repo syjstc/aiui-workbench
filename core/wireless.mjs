@@ -4,6 +4,7 @@ import { adbAddress, LEGACY_ADB_PORT } from './adb.mjs';
 import { parseDevices } from './devices.mjs';
 import { atomicJson, readJson, id, sleep } from './util.mjs';
 import { deviceAdbTrust } from './adb-trust.mjs';
+import { ROKID_ADB_STEP } from './adb-access.mjs';
 
 const serviceKey = value => value?.replace(/\.$/, '');
 export function parseMdns(output) {
@@ -43,10 +44,10 @@ export function wirelessProblem(error, pairing = false) {
   if (/身份不一致|无法核对/.test(message)) return message;
   if (/unauthorized|authentication|failed to authenticate/i.test(message)) return '无线连接尚未授权。请在眼镜上允许调试；使用配对码的固件请重新打开配对窗口，输入新的六位配对码。';
   if (pairing && /wrong|pair|protocol|failed|closed/i.test(message)) return '配对未完成。请保持眼镜的配对窗口打开，重新输入当前配对地址和六位配对码；配对端口与连接端口不同。';
-  if (/ECONNREFUSED|refused|10061/i.test(message)) return '眼镜没有接受无线连接。请重新开启无线调试并核对当前连接端口；通过数据线准备的设备重启后可能需要再插线开启一次。';
+  if (/ECONNREFUSED|refused|10061/i.test(message)) return '眼镜没有接受无线连接。' + ROKID_ADB_STEP + '请重新开启无线调试并核对当前连接端口；通过数据线准备的设备重启后可能需要再插线开启一次。';
   if (/timeout|超时|unreachable|no route|10060/i.test(message)) return '暂时无法通过网络找到眼镜。请让电脑和眼镜连接同一 Wi-Fi 或热点，保持眼镜开机；避免访客网络，并检查 VPN、防火墙及系统的本地网络权限。';
   if (/ENOENT|not found|unknown command.*mdns/i.test(message)) return '无线连接工具不可用。请使用完整的工坊安装包，或在新手指南中选择 Android 官方 platform-tools 文件夹。';
-  return '无线连接未完成。请确认眼镜已开启无线调试，电脑与眼镜在同一网络，并使用当前显示的连接地址；需要配对时先完成配对。';
+  return '无线连接未完成。' + ROKID_ADB_STEP + '请确认眼镜已开启无线调试，电脑与眼镜在同一网络，并使用当前显示的连接地址；需要配对时先完成配对。';
 }
 
 export class WirelessDebugging {

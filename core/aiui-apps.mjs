@@ -26,7 +26,7 @@ export function installedAiuiApps(entries, manifest, projects = []) {
 
 export class AiuiApps {
   constructor(glasses, cli, projects) { Object.assign(this, { glasses, cli, projects }); this.catalog=new AiuiCatalog(glasses); }
-  async list({ serial, includeCatalog=true }) {
+  async list({ serial, includeCatalog=true, refresh=false }) {
     let apps=[],developerError;
     try {
     const { entries } = await this.glasses.files({ serial, path: PACKAGE_DIRECTORY });
@@ -36,7 +36,7 @@ export class AiuiApps {
     catch { throw new Error('AIUI 开发应用清单损坏，暂时无法核对应用身份'); }
     apps=installedAiuiApps(entries, manifest, this.projects.list());
     } catch(error) { if(!includeCatalog)throw error;developerError=error.message; }
-    const catalog=includeCatalog?await this.catalog.read(serial).catch(error=>({apps:[],sources:[{source:'store',status:'unavailable',readOnly:true,count:null,error:error.message}]})):{apps:[],sources:[]};
+    const catalog=includeCatalog?await this.catalog.read(serial, refresh).catch(error=>({apps:[],sources:[{source:'store',status:'unavailable',readOnly:true,count:null,error:error.message}]})):{apps:[],sources:[]};
     return { serial, checkedAt: new Date().toISOString(), kind: 'aiui', scope:includeCatalog?'visible-catalog':'developer', apps:[...apps,...catalog.apps], sources:[{source:'developer',status:developerError?'unavailable':'available',readOnly:false,count:developerError?null:apps.length,...(developerError?{error:developerError}:{})},...catalog.sources] };
   }
   async uninstall({ serial, agentId, confirmAgentId }, { signal, progress = () => {} } = {}) {

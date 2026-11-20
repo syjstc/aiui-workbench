@@ -29,6 +29,13 @@ test('feedback follows the active saved update repository and never falls back f
   assert.equal((await feedbackTarget(f.home)).supported,false);await assert.rejects(f.feedback.prepare(input()),/不会改投/);
 });
 
+test('automatic official update mode keeps feedback on the official GitHub repository',async t=>{
+  const f=await fixture(t);
+  await atomicJson(path.join(f.home,'app-updates.json'),{source:'auto',sources:{github:{repository:'example/alternate'}}});
+  const target=await feedbackTarget(f.home);
+  assert.equal(target.supported,true);assert.equal(target.repository,repository);assert.equal(target.source,'github');
+});
+
 test('a damaged feedback history preserves original bytes and does not disable Workshop startup',async t=>{
   const f=await fixture(t);await fs.writeFile(f.feedback.file,'{broken history');
   const recovered=await new Feedback(f.home,f.diagnostics).init();assert.deepEqual(recovered.records,[]);

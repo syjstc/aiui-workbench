@@ -1,5 +1,5 @@
 {
-  "source": "github",
+  "source": "auto",
   "autoCheck": true,
   "intervalHours": 24,
   "sources": {
@@ -7,7 +7,7 @@
       "repository": "syjstc/aiui-workbench"
     },
     "cnb": {
-      "manifestUrl": ""
+      "manifestUrl": "https://cnb.cool/openwork-labs/aiui-workbench/-/releases/download/stable/workbench-update.json"
     },
     "gitee": {
       "manifestUrl": ""

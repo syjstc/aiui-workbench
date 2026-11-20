@@ -5,7 +5,7 @@ export const UI_TOOLS = new Set([
   'aiui_feedback_status','aiui_feedback_prepare',
   'aiui_adb_connect','aiui_adb_discover','aiui_adb_wireless_enable','aiui_adb_saved','aiui_adb_restart','aiui_adb_reset',
   'aiui_workflow_start','aiui_workflow_get','aiui_workflow_continue','aiui_diagnostics_get','aiui_diagnostics_report','aiui_diagnostics_resolve','aiui_diagnostics_mark_read','aiui_service_log_read',
-  'ui_platform_bind',
+  'ui_platform_bind','aiui_platform_create','aiui_platform_bind',
   'ui_project_removal_begin', 'ui_project_removal_commit', 'ui_project_removal_cancel',
   'aiui_record_start','aiui_record_stop','aiui_record_status','aiui_record_clip',
   'aiui_tools_list', 'aiui_capabilities_get', 'aiui_cli_info', 'aiui_preview_test', 'aiui_project_build', 'aiui_job_wait',

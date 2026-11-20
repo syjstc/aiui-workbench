@@ -586,6 +586,15 @@ test('simultaneous phone download links are independent and serve the named rele
   shares.stop(two.id); assert.equal(shares.status(two.id).stage, 'expired');
 });
 
+async function pairingResult(qr,id) {
+  for(let attempt=0;attempt<100;attempt++){
+    const status=await qr.status(id);
+    if(status.stage!=='pairing')return status;
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  assert.fail('Pairing did not finish');
+}
+
 test('QR pairing ignores other sessions, pairs the exact advertised name once and verifies online without storing its secret', async t => {
   const { wireless, state, home } = await fixture(t);
   const qr = new WirelessPairQr(wireless, { now: () => state.clock });
@@ -599,8 +608,9 @@ test('QR pairing ignores other sessions, pairs the exact advertised name once an
   assert.equal(state.calls.filter(args => args[0] === 'pair').length, 0);
   state.mdns += service('pairing', 38123, session.name);
   const [a, b] = await Promise.all([qr.status(first.id), qr.status(first.id)]);
-  assert.equal(a.stage, 'connected'); assert.equal(b.connected, true);
-  assert.equal(a.address, address);
+  assert.equal(a.stage, 'pairing'); assert.equal(b.stage, 'pairing');
+  const final=await pairingResult(qr,first.id);
+  assert.equal(final.connected,true);assert.equal(final.address, address);
   assert.equal(state.calls.filter(args => args[0] === 'pair').length, 1);
   assert.deepEqual(state.calls.find(args => args[0] === 'pair'), ['pair', ip + ':38123']);
   assert.equal(state.pairInput, password + '\n');
@@ -647,12 +657,12 @@ test('QR pairing distinguishes pending transport, terminal failures and discover
   t.after(() => qr.cancel());
   let first = qr.start(), session = qr.sessions.get(first.id);
   state.mdns = service('pairing', 37123, session.name);
-  let result = await qr.status(first.id);
+  let result = await pairingResult(qr,first.id);
   assert.equal(result.stage, 'paired'); assert.equal(result.paired, true); assert.equal(result.connected, false);
   assert.equal(result.nextStep, 'connect'); assert.equal(result.qrDataUrl, undefined);
   first = qr.start(); session = qr.sessions.get(first.id);
   state.mdns = service('pairing', 37123, session.name); state.pairError = 'error: wrong code ' + session.password;
-  result = await qr.status(first.id);
+  result = await pairingResult(qr,first.id);
   assert.equal(result.stage, 'failed'); assert.equal(session.password, ''); assert.equal(result.qrDataUrl, undefined);
   first = qr.start(); state.mdnsError = 'mdns unavailable';
   result = await qr.status(first.id);
@@ -704,4 +714,16 @@ test('connection guidance keeps wired and wireless transport status separate, in
   assert.doesNotMatch(JSON.stringify(wired), /[\u3400-\u9fff]/);
   usb.status = 'device';
   assert.equal((await connectionGuide(workbench, { method: 'usb', includeImages: false })).connected, true);
+});
+
+test('QR discovery uses the exact Bonjour instance when ADB misses the pairing advertisement', async t => {
+  const { wireless, state } = await fixture(t);
+  let requested;
+  const qr = new WirelessPairQr(wireless, {resolveService: async name => { requested=name; return ip+':38200'; }});
+  t.after(()=>qr.cancel());
+  const session=qr.start();
+  assert.equal((await qr.status(session.id)).stage,'pairing');
+  assert.equal(requested,qr.sessions.get(session.id).name);
+  assert.equal((await pairingResult(qr,session.id)).connected,true);
+  assert.deepEqual(state.calls.filter(args=>args[0]==='pair'),[['pair',ip+':38200']]);
 });

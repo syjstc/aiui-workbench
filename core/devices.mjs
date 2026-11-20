@@ -1,4 +1,5 @@
 import { run } from './util.mjs';
+import { adbAccessDiagnostic, probeAdbAccess } from './adb-access.mjs';
 
 export function parseDevices(output) {
   return output.split(/\r?\n/).flatMap(line => {
@@ -51,7 +52,9 @@ export class DeviceDiscovery {
       if (!devices.some(d => d.serial === serial && d.status === 'device' && d.transport === cached.transport)) this.inspections.delete(serial);
     }
     await Promise.all(devices.map(async device => {
-      if (device.status !== 'device' || cli.code !== 0) return;
+      device.adbAccess = device.status === 'device' ? await probeAdbAccess(this.execute, device) : adbAccessDiagnostic(device.status === 'unauthorized' ? 'unauthorized' : 'offline', device);
+      if (device.adbAccess.state !== 'available') { this.inspections.delete(device.serial); return; }
+      if (cli.code !== 0) return;
       let cached = this.inspections.get(device.serial);
       if (!cached || this.now() >= cached.expires) {
         const result = await this.cli(['device', '--serial', device.serial], { timeout: 12000 }).catch(failed);

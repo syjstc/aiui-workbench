@@ -1,3 +1,4 @@
+import { readStoreCatalog } from './aiui-store-catalog.mjs';
 const HOST = 'com.rokid.os.sprite.assistserver';
 const ASSET = 'assets/aiui_builtin_agents/builtin_manifest.json';
 export const STORE_PROVIDER = 'content://com.rokid.os.sprite.assistserver.aiui.packages/';
@@ -22,9 +23,9 @@ export function builtinAiuiApps(manifest, { hostApk, hostVersion, hostUpdatedAt 
 // catalog is deliberately not accessed through root, grants, or mode changes.
 export class AiuiCatalog {
   constructor(glasses, { now=Date.now } = {}) { this.glasses=glasses; this.now=now; this.cache=new Map(); this.pending=new Map(); }
-  async read(serial) {
+  async read(serial, refresh = false) {
     const device=await this.glasses.ready(serial), key=serial+':'+device.transport;
-    const cached=this.cache.get(key); if(cached&&cached.expires>this.now())return cached.value;
+    const cached=this.cache.get(key); if(!refresh&&cached&&cached.expires>this.now())return cached.value;
     if(this.pending.has(key))return this.pending.get(key);
     const task=this.readNow(serial).then(value=>{this.cache.set(key,{value,expires:this.now()+60000});return value;}).finally(()=>this.pending.delete(key));
     this.pending.set(key,task);return task;
@@ -41,10 +42,9 @@ export class AiuiCatalog {
       apps.push(...builtinAiuiApps(JSON.parse(text),{hostApk,hostVersion,hostUpdatedAt}));
       sources.push({source:'builtin',status:'available',readOnly:true,count:apps.length,hostPackage:HOST,hostApk,hostVersion,hostUpdatedAt});
     } catch(error) { sources.push({source:'builtin',status:'unavailable',readOnly:true,count:null,error:error.message}); }
-    let reason='not-supported';
-    try { const result=await this.glasses.adbCommand(serial,['shell','content','query','--uri',STORE_PROVIDER],{timeout:10000,maxBytes:65536}); if(/Permission Denial|ACCESS_AIUI_PACKAGES|SecurityException/.test(result.stdout.toString()+result.stderr))reason='permission-denied'; }
-    catch(error) { if(/Permission Denial|ACCESS_AIUI_PACKAGES|SecurityException/.test(error.message))reason='permission-denied'; }
-    sources.push({source:'store',status:'unavailable',readOnly:true,count:null,reason,hostPackage:HOST,provider:STORE_PROVIDER,complete:false});
+    const store = await readStoreCatalog(this.glasses, serial, HOST, STORE_PROVIDER);
+    apps.push(...store.apps);
+    sources.push(store.source);
     return {apps,sources,checkedAt:new Date(this.now()).toISOString()};
   }
 }

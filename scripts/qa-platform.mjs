@@ -8,7 +8,7 @@ import { startDaemon } from '../core/daemon.mjs';
 import { PLATFORM_API, md5 } from '../core/platform-http.mjs';
 import { ROOT, sleep } from '../core/util.mjs';
 
-const home=path.join(ROOT,'.local/platform-qa',String(Date.now())),output=path.join(ROOT,'output/qa/platform');
+const home=path.join(ROOT,'.local/platform-qa',String(Date.now())),output=process.env.AIUI_QA_OUTPUT||path.join(ROOT,'output/qa/platform');
 await fs.mkdir(output,{recursive:true});
 const report={realPlatform:false,productionUploaded:false,productionSubmitted:false,checks:[]};
 let daemon,app,mcp;
@@ -20,10 +20,12 @@ try{
   daemon=await startDaemon(home);const service=daemon.service;await service.sdk.settings({autoCheck:false});
   const remote={agentId:'fixture-cloud-agent',agentName:'Platform QA',modelVendor:'native',nativeVersion:'1.0.0',description:'Example app',category:'entertainment',icon:'https://static.rokidcdn.com/qa.png',displayStatus:'草稿',filePath:'https://static.rokidcdn.com/qa-old.aix',fileMd5:'old',previewMaterials:[{type:'image',url:'https://static.rokidcdn.com/qa-1.png'},{type:'image',url:'https://static.rokidcdn.com/qa-2.png'},{type:'video',url:'https://static.rokidcdn.com/qa.mp4'}]};
   Object.assign(remote,{agentPrompt:'A QA-only intent description.',prologue:'Official greeting from the fixture.',permissions:'camera',permissionsDesc:JSON.stringify({camera:'Capture a photo for the demo.'})});
+  let created=false;
   service.platform.fetcher=async(url,options)=>{
     requests.push(url);
     const ok=data=>Response.json({code:0,msg:'success',data});
-    if(url===PLATFORM_API.agents)return ok({list:[structuredClone(remote)],total:1});
+    if(url===PLATFORM_API.agents)return ok({list:created?[structuredClone(remote)]:[],total:created?1:0});
+    if(url===PLATFORM_API.create){assert.equal(created,false);assert.equal(JSON.parse(options.body).agentName,remote.agentName);created=true;return ok({agentId:remote.agentId});}
     if(url===PLATFORM_API.sts)return ok({bucketName:'rokid-test',region:'oss-cn-hangzhou',accessKey:'access',secretKey:'secret',sessionToken:'sts',directory:'platform-qa/',cdnUrl:'https://static.rokidcdn.com/'});
     if(options.method==='PUT'){const bytes=Buffer.from(options.body);assert.equal(bytes[0],80);assert.equal(bytes[1],75);return new Response(null,{headers:{etag:'"'+md5(bytes)+'"'}});}
     if(url===PLATFORM_API.save){Object.assign(remote,JSON.parse(options.body));for(const key of ['versionLog','needParam','jsuiTools','jsuiTitle','jsuiVersion','jsuiPages'])delete remote[key];return ok({agentId:remote.agentId});}
@@ -37,16 +39,22 @@ try{
   await until(()=>app.evaluate(({BrowserWindow,session})=>BrowserWindow.getAllWindows().some(window=>window.webContents.session===session.fromPartition('rokid-studio-private'))));
   report.checks.push('desktop shows upload and sign-in actions');
   const sessionToken='fixture.'+Buffer.from(JSON.stringify({accountId:'platform-qa-account',timestamp:Date.now(),iss:'fixture',type:'session'})).toString('base64url')+'.signature';
-  const loginCompletedAt=Date.now();await app.evaluate(async({session},token)=>{await session.fromPartition('rokid-studio-private').cookies.set({url:'https://aiui.rokid.com/',name:'ROKID_ACCOUNT_SESSION',value:encodeURIComponent(token),secure:true,path:'/',expirationDate:Date.now()/1000+3600});},sessionToken);
+  const loginCompletedAt=Date.now();await app.evaluate(async({session},token)=>{await session.fromPartition('rokid-studio-private').cookies.set({url:'https://aiui.rokid.com/space',name:'ROKID_ACCOUNT_SESSION',value:encodeURIComponent(token),secure:true,path:'/space',expirationDate:Date.now()/1000+3600});},sessionToken);
   // Real IPC synchronizes the isolated official cookie, never a test-only tool.
   await page.getByRole('button',{name:'打开官方平台',exact:true}).waitFor({timeout:2000});report.loginUiSyncMs=Date.now()-loginCompletedAt;
   assert.equal(await app.evaluate(({BrowserWindow,session})=>BrowserWindow.getAllWindows().some(window=>window.webContents.session===session.fromPartition('rokid-studio-private'))),false);
   await page.getByRole('button',{name:'打开官方平台',exact:true}).click();await page.getByRole('button',{name:'刷新登录与云端结果',exact:true}).click();assert.equal(await app.evaluate(({BrowserWindow,session})=>BrowserWindow.getAllWindows().some(window=>window.webContents.session===session.fromPartition('rokid-studio-private'))),true);
   await app.evaluate(({BrowserWindow,session})=>{for(const window of BrowserWindow.getAllWindows())if(window.webContents.session===session.fromPartition('rokid-studio-private'))window.destroy();});report.checks.push('login cookie immediately updates the desktop and closes only the sign-in window; an explicit official management window remains open');
   const config=service.config().mcpServers['aiui-workbench'];mcp=new Client({name:'platform-qa',version:'1.0.0'});await mcp.connect(new StdioClientTransport({command:config.command,args:config.args,env:{...process.env,...config.env}}));
-  const catalog=await mcp.listTools();for(const name of ['aiui_platform_upload','aiui_platform_review_prepare','aiui_platform_review_request'])assert.ok(catalog.tools.some(t=>t.name===name));assert.equal(catalog.tools.some(t=>t.name.includes('review_submit')||t.name==='ui_platform_session'),false);
+  const catalog=await mcp.listTools();for(const name of ['aiui_platform_create','aiui_platform_bind','aiui_platform_upload','aiui_platform_review_prepare','aiui_platform_review_request'])assert.ok(catalog.tools.some(t=>t.name===name));assert.equal(catalog.tools.some(t=>t.name.includes('review_submit')||t.name==='ui_platform_session'),false);
   const directory=path.join(home,'example');await fs.cp(path.join(ROOT,'examples/hello-aiui'),directory,{recursive:true});const project=await tool('aiui_project_import',{directory});
   const build=await tool('aiui_project_build',{projectId:project.id});assert.equal(build.status,'succeeded');
+  await page.getByRole('button',{name:'新建官方智能体',exact:true}).click();
+  await page.getByLabel('智能体名称',{exact:true}).fill(remote.agentName);
+  await page.getByLabel('应用分类',{exact:true}).selectOption(remote.category);
+  await page.getByLabel('功能介绍',{exact:true}).fill(remote.description);
+  await page.getByRole('button',{name:'创建并关联到当前应用',exact:true}).click();
+  await until(()=>service.platform.status(project.id).binding?.agentId===remote.agentId);
   await page.getByRole('button',{name:'设置官方绑定',exact:true}).click();await page.getByRole('combobox',{name:'绑定官方智能体',exact:true}).selectOption(remote.agentId);await page.getByRole('button',{name:'保存官方绑定',exact:true}).click();await until(()=>service.platform.status(project.id).binding?.agentId===remote.agentId);
   assert.equal(await page.getByRole('combobox',{name:'选择应用',exact:true}).count(),1);assert.equal(await page.getByRole('combobox',{name:'上传目标智能体',exact:true}).count(),0);report.checks.push('one application selection and a saved account binding drive build, upload and review');
   const beforeRead=requests.filter(url=>url!==PLATFORM_API.agents).length;

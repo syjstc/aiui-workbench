@@ -39,8 +39,9 @@ export function publicFeedbackText(value){
 export async function feedbackTarget(home){
   const defaults=await readJson(path.join(ROOT,'assets/updates.json'));
   const saved=await readJson(path.join(home,'app-updates.json'),{});
-  const source=saved.source??defaults.source;
-  const repository=String(saved.sources?.[source]?.repository??defaults.sources?.[source]?.repository??'').trim();
+  const selected=saved.source??defaults.source;
+  const source=selected==='auto'?'github':selected;
+  const repository=String((selected==='auto'?defaults.sources.github.repository:saved.sources?.[source]?.repository??defaults.sources?.[source]?.repository)??'').trim();
   if(source!=='github')return {supported:false,source,repository:null,reason:'当前更新源尚不支持 issue 提交；不会改投其他仓库'};
   if(!repositoryPattern.test(repository)||['.','..'].includes(repository.split('/')[1]))return {supported:false,source,repository:null,reason:'请先在设置中保存有效的 GitHub 更新仓库'};
   return {supported:true,source,repository,url:`https://github.com/${repository}/issues`,identity:sha(JSON.stringify([source,repository.toLowerCase()]))};

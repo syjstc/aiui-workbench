@@ -84,7 +84,8 @@ export function WirelessSetupGuide({ guide, pairingServices, setup, busy, id, co
           <button className="button primary" disabled={busy || !endpoint || code.length !== 6}>{t('配对并连接')}</button></form>
 </>}
       {stage === 'qr' && <>{pairOptions}<p>{t('在眼镜的「无线调试」中选择「使用二维码配对设备」，用眼镜扫描下方二维码，工坊会自动连接。')}</p><p className="wireless-note">{t('这是配对二维码。手机相机扫码只能读取内容，不能代替眼镜配对；没有扫码入口时，选「六位码配对」。')}</p>
-        {setup.qr?.stage === 'waiting' && <div className="wireless-download-card"><img className="wireless-qr" src={setup.qr.qrDataUrl} alt={t('眼镜无线调试配对二维码')}/><p role="status"><LoaderCircle size={14} className="spin"/>{t('等待眼镜扫描 · 两分钟内有效')}</p></div>}
+        {setup.qr?.stage === 'waiting' && <div className="wireless-download-card wireless-pair-card"><img className="wireless-qr" src={setup.qr.qrDataUrl} alt={t('眼镜无线调试配对二维码')}/><p role="status"><LoaderCircle size={14} className="spin"/>{t('等待眼镜扫描 · 两分钟内有效')}</p></div>}
+        {setup.qr?.stage === 'pairing' && <p role="status"><LoaderCircle size={14} className="spin"/>{t('已收到眼镜扫码，正在配对并检查连接…')}</p>}
         {setup.qr?.stage === 'paired' && <><p role="status">{translateMessage(setup.qr.message)}</p>{button(t('输入连接地址'), () => manual('direct'))}</>}
         {['expired', 'failed'].includes(setup.qr?.stage) && <><p role="status">{setup.qr.stage === 'expired' ? t('配对二维码已过期，请重新生成。') : translateMessage(setup.qr.message)}</p>{button(t('重新生成配对码'), setup.useQr)}</>}
         {setup.qr?.stage === 'waiting' && setup.qr.message && <p role="status">{translateMessage(setup.qr.message)}</p>}

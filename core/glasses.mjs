@@ -4,6 +4,7 @@ import { id } from './util.mjs';
 import { parseDevices } from './devices.mjs';
 import { AndroidAppInfo } from './android-app-info.mjs';
 import { SettingsFocus } from './settings-focus.mjs';
+import { withAdbRecovery, adbFailureState, diagnoseAdbFailure } from './adb-access.mjs';
 
 const MiB = 1024 * 1024;
 export const KEY_CODES = { home: 3, back: 4, up: 19, down: 20, left: 21, right: 22, enter: 23, volumeUp: 24, volumeDown: 25, wake: 224, sleep: 223 };
@@ -50,10 +51,18 @@ export function parseFileList(output, directory) {
 
 export class GlassesTools {
   constructor(home, adb) { this.home = home; this.adb = adb; this.mutations = new Set(); this.appInfo = new AndroidAppInfo(this); this.settingsFocus = new SettingsFocus(adb); }
+  diagnoseFailure(serial, error) {
+    return diagnoseAdbFailure(error, { serial }, async (_command, args, options) => {
+      const result = await this.adb.capture(args, options);
+      return { code: result.code, output: result.stdout.toString('utf8') + result.stderr };
+    });
+  }
   async adbCommand(serial, args, options) {
-    const result = await this.adb.capture(['-s', serial, ...args], options);
-    if (result.code !== 0) throw new Error((result.stderr || result.stdout.toString('utf8')).trim() || '眼镜操作失败，请检查连接与授权');
-    return result;
+    try {
+      const result = await this.adb.capture(['-s', serial, ...args], options);
+      if (result.code !== 0) throw new Error((result.stderr || result.stdout.toString('utf8')).trim() || '眼镜操作失败，请检查连接与授权');
+      return result;
+    } catch (error) { throw await this.diagnoseFailure(serial, error); }
   }
   async shell(serial, words, options) {
     return (await this.adbCommand(serial, ['shell', '-T', Array.isArray(words) ? words.map(shellQuote).join(' ') : words], options)).stdout.toString('utf8').replaceAll('\r\n', '\n');
@@ -63,9 +72,9 @@ export class GlassesTools {
     const result = await this.adb.capture(['devices', '-l'], { timeout: 10000 });
     if (result.code) throw new Error(result.stderr || '无法读取眼镜连接状态');
     const device = parseDevices(result.stdout.toString('utf8')).find(item => item.serial === serial);
-    if (!device) throw new Error('目标眼镜已断开，请重新连接');
-    if (device.status === 'unauthorized') throw new Error(device.connection === 'wireless' ? '请先在眼镜上允许无线调试连接，或完成无线配对' : '请先在眼镜上允许 USB 调试');
-    if (device.status !== 'device') throw new Error(device.connection === 'wireless' ? '目标眼镜离线，请检查 Wi-Fi 和无线调试开关' : '目标眼镜离线，请检查数据线');
+    if (!device) throw withAdbRecovery(new Error('目标眼镜已断开，请重新连接'), { serial, state: 'missing' });
+    if (device.status === 'unauthorized') throw withAdbRecovery(new Error(device.connection === 'wireless' ? '请先在眼镜上允许无线调试连接，或完成无线配对' : '请先在眼镜上允许 USB 调试'), { ...device, state: 'unauthorized' });
+    if (device.status !== 'device') throw withAdbRecovery(new Error(device.connection === 'wireless' ? '目标眼镜离线，请检查 Wi-Fi 和无线调试开关' : '目标眼镜离线，请检查数据线'), { ...device, state: 'offline' });
     return device;
   }
   async exclusive(serial, work) {
@@ -234,7 +243,11 @@ export class GlassesTools {
     await this.ready(serial);
     const result = await this.adbCommand(serial, ['exec-out', 'screencap', '-p'], { maxBytes: 20 * MiB });
     const bytes = result.stdout;
-    if (bytes.length < 24 || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error('眼镜未返回有效截图，当前画面可能不支持截取');
+    if (bytes.length < 24 || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) {
+      const detail = (result.stderr + '\n' + bytes.subarray(0, 2000).toString('utf8')).trim();
+      const state = adbFailureState(detail);
+      throw await this.diagnoseFailure(serial, withAdbRecovery(new Error('眼镜未返回有效截图，当前画面可能不支持截取' + (state ? '\n' + detail : '')), { serial, ...(state ? { state } : {}) }));
+    }
     return { serial, ...await this.saveArtifact('png', bytes), data: bytes.toString('base64'), width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
   }
   async logs({ serial, lines = 500 }) {
@@ -249,7 +262,7 @@ export class GlassesTools {
     if (action === 'reboot' && confirmSerial !== serial) throw new Error('请确认重启这台眼镜');
     return this.exclusive(serial, async device => {
       const output = action === 'reboot' ? (await this.adbCommand(serial, ['reboot'])).stdout.toString('utf8') : await this.shell(serial, action === 'settings' ? ['am', 'start', '--user', '0', '-a', 'android.settings.SETTINGS'] : ['input', 'keyevent', String(KEY_CODES[action])]);
-      if (/Error:|Exception/.test(output)) throw new Error(output.trim());
+      if (/Error:|Exception/i.test(output) || adbFailureState(output)) throw await this.diagnoseFailure(serial, withAdbRecovery(new Error(output.trim()), { serial }));
       if (action === 'settings') this.settingsFocus.acquire(device, { temporary: true });
       return { serial, action, output: output.trim() };
     });

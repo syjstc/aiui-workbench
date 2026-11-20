@@ -52,4 +52,4 @@ try {
     if (!values['no-open']) openOnHost(web.url).catch(error => console.error(localize(error.message) + localize('，请手动打开上面的完整链接。')));
     for (const event of ['SIGINT', 'SIGTERM']) process.once(event, async () => { await web.close(); process.exit(0); });
   }
-} catch (error) { console.error(error.sharedDiagnostics?JSON.stringify({error:error.message,diagnosticId:error.diagnosticId,sharedDiagnostics:error.sharedDiagnostics},null,2):localize('AIUI 工坊 Web 启动失败：') + localize(error.message)); process.exitCode = 1; }
+} catch (error) { console.error(error.sharedDiagnostics||error.deviceDiagnostic?JSON.stringify({error:error.message,diagnosticId:error.diagnosticId,sharedDiagnostics:error.sharedDiagnostics,deviceDiagnostic:error.deviceDiagnostic,recovery:error.recovery},null,2):localize('AIUI 工坊 Web 启动失败：') + localize(error.message)); process.exitCode = 1; }

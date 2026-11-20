@@ -156,15 +156,12 @@ export function useWirelessSetup({ discover, connected }) {
         if (!active || generation !== owner.generation) return;
         setQr(previous => ({ ...value, qrDataUrl: value.stage === 'waiting' ? previous.qrDataUrl : undefined }));
         if (value.connected) { onConnected.current(value.serial); clear(); return; }
-        if (value.stage !== 'waiting') return;
+        if (!['waiting', 'pairing'].includes(value.stage)) return;
       } catch (e) { if (active && generation === owner.generation) setError(displayError(e)); }
       if (active) timer = setTimeout(poll, 1500);
     }
-    const expiry = setTimeout(() => {
-      if (active && generation === owner.generation) { setQr(previous => previous?.stage === 'waiting' ? { stage: 'expired' } : previous); if (owner.qr) window.workbench.call('aiui_adb_pair_qr', { action: 'cancel', id: owner.qr }).catch(() => {}); owner.qr = null; }
-    }, Math.max(0, qr.expiresAt - Date.now()));
     timer = setTimeout(poll, 800);
-    return () => { active = false; clearTimeout(timer); clearTimeout(expiry); };
+    return () => { active = false; clearTimeout(timer); };
   }, [qrId]);
   function useCode() { clear(); setSession({ stage: 'codeEntry' }); }
   return { peers, session, helper, qr, working, error, start, clear, openHelper, useCode, useQr, showError: setError };
