@@ -185,7 +185,7 @@ try {
   await check('missing local documents keep the current page and delayed clicks cannot replace a newer selection', async () => {
     await openGuide();
     await page.locator('.doc-body').getByRole('link', { name: '未同步文档', exact: true }).click();
-    await page.locator('.toast').filter({ hasText: '资料尚未同步或该版本没有此文档，请先同步官方资料' }).waitFor();
+    await page.locator('.toast.error').getByRole('button', { name: '查看诊断', exact: true }).waitFor();
     assert.equal(await title(), '大语言模型');
     delayed = true;
     await page.locator('.doc-body').getByRole('link', { name: '语音播报', exact: true }).click();
