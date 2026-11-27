@@ -7,9 +7,11 @@ import storageRuntime from './storage-runtime.js?raw';
 import imageCodecRuntime from './image-codec.js?raw';
 import fflateRuntime from '../node_modules/fflate/esm/browser.js?raw';
 import { CanvasRecording } from './recording.mjs';
+import { installAudioOutput } from './audio-output.mjs';
 import './style.css';
 
 const query = new URLSearchParams(location.search), sessionId = query.get('session'), key = query.get('key');
+const setMuted = installAudioOutput(query.get('muted') === '1');
 const canvas = document.querySelector('#screen'), notice = document.querySelector('#status');
 let view, current, dead = false, reloading = false, currentStatus = 'loading', logEntries = [], logGeneration = null, pendingCommands = Promise.resolve(), logFlush = Promise.resolve(), runId = crypto.randomUUID();
 let pose = { ...NEUTRAL_POSE, connected: true }, mouse = { ...DEFAULT_MOUSE, dragging:false }, battery = { level:.85, charging:false, chargingTime:0, dischargingTime:28800 };
@@ -60,6 +62,7 @@ canvas.classList.toggle('mouse-look',mouse.enabled);
 window.addEventListener('message',e=>{
   if(e.source!==window.parent||(e.origin!=='null'&&!/^http:\/\/127\.0\.0\.1:\d+$/.test(e.origin))||e.data?.channel!=='aiui-preview-control'||e.data.sessionId!==sessionId||e.data.key!==key)return;
   const {action,parameters}=e.data;
+  if(action==='audio_mute'){if(typeof parameters?.muted==='boolean')setMuted(parameters.muted);return;}
   if(action==='sync'){notifyParent();return;}
   if(action==='mouse_leave'){mouseInput.cancel();return;}
   if(action==='pose') { if(currentStatus!=='ready')return;try{mouseInput.cancel();manualPose(updatePose(pose,parameters||{}));}catch(error){console.error(error);}return; }

@@ -3,10 +3,10 @@ import path from 'node:path';
 import os from 'node:os';
 import {ROOT,atomicJson,readJson,id,sha} from './util.mjs';
 import {APP_VERSION} from './version.mjs';
+import {isOfficialSkillName,officialSkillBundles,skillMetadata} from './official-skills.mjs';
 
-const officialPrefix='skills/aiui-dev/';
 const marker='.aiui-managed.json';
-const skillName=text=>text.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1].match(/^name:\s*['"]?([a-z0-9-]+)['"]?\s*$/m)?.[1];
+const skillName=text=>skillMetadata(text).name;
 const absent=error=>{if(error.code==='ENOENT')return null;throw error;};
 const userRoots=()=>['.agents','.codex','.claude','.cursor'].map(name=>path.join(os.homedir(),name,'skills'));
 
@@ -29,11 +29,11 @@ export async function workflowSkillFiles(){
   await read();return files;
 }
 
-async function officialFiles(knowledge,revision){
-  const docs=(await knowledge.index(revision)).filter(doc=>doc.path.startsWith(officialPrefix));
-  if(!docs.some(doc=>doc.path===officialPrefix+'SKILL.md'))throw new Error('当前项目的官方 Skill 尚未缓存，请在官方资料中同步后重试');
-  if(docs.some(doc=>sha(doc.content)!==doc.sha256))throw new Error('官方 Skill 缓存完整性核对失败，请重新同步官方资料');
-  return Object.fromEntries(docs.map(doc=>[doc.path.slice(officialPrefix.length),doc.content]));
+function officialFiles(bundle,name){
+  if(!bundle)throw new Error(`官方 Skill ${name} 尚未缓存，请同步官方资料`);
+  if(bundle.documents.some(doc=>sha(doc.content)!==doc.sha256))throw new Error(`官方 Skill ${name} 缓存完整性核对失败，请重新同步官方资料`);
+  const prefix=`skills/${name}/`;
+  return Object.fromEntries(bundle.documents.map(doc=>[doc.path.slice(prefix.length),doc.content]));
 }
 
 export async function findAgentSkills(projectPath,{globalRoots=userRoots()}={}){
@@ -51,7 +51,7 @@ export async function findAgentSkills(projectPath,{globalRoots=userRoots()}={}){
       const file=path.join(root,entry.name,'SKILL.md');
       const content=await fs.readFile(file,'utf8').catch(absent);
       const managed=await readJson(path.join(root,entry.name,marker),null).catch(()=>null);
-      const name=managed?.owner==='aiui-workbench'?managed.name:content&&skillName(content);if(!['aiui-dev','aiui-workshop'].includes(name))continue;
+      const name=managed?.owner==='aiui-workbench'?managed.name:content&&skillName(content);if(name!=='aiui-workshop'&&!isOfficialSkillName(name))continue;
       const real=await fs.realpath(path.dirname(file));if(found.some(item=>item.real===real))continue;
       found.push({name,path:file,real,managed,baseRoot:path.dirname(path.dirname(root)),symlink:entry.isSymbolicLink(),sha256:content===null?null:sha(content),scope:globalRoots.includes(root)?'user':path.relative(projectPath,file).startsWith('..')?'inherited':'project'});
     }
@@ -121,24 +121,45 @@ async function installOneUnlocked(projectPath,name,files,metadata,{destination,b
 
 const pending=new Map();
 export async function ensureAgentSkills(project,knowledge,options={}){
-  const key=project.projectPath;if(pending.has(key))return pending.get(key);
-  const work=(async()=>{
+  const key=project.projectPath;
+  const work=(pending.get(key)||Promise.resolve()).catch(()=>{}).then(async()=>{
     if(options.writeIgnore!==false){const ignore=await fs.lstat(path.join(project.agentPath,'.aixignore')).catch(absent);if(ignore?.isSymbolicLink()||ignore&&!ignore.isFile())throw new Error('.aixignore 不是普通文件，已停止 Skill 安装并保留现有内容');}
-    const found=await findAgentSkills(key,options),results=[];
-    for(const name of ['aiui-dev','aiui-workshop']){
+    const found=await findAgentSkills(key,options),results=[],snapshots=new Map();
+    const installMissing=options.installMissing==='managed'
+      ?found.some(item=>item.scope==='user'&&item.managed?.owner==='aiui-workbench')
+      :options.installMissing!==false;
+    const current=knowledge.meta.revision,pinned=project.knowledgeRevision||current;
+    const getBundles=revision=>{
+      if(!snapshots.has(revision))snapshots.set(revision,knowledge.index(revision).then(officialSkillBundles));
+      return snapshots.get(revision);
+    };
+    const [projectBundles,currentBundles]=await Promise.all([getBundles(pinned),getBundles(current)]);
+    const names=new Set(['aiui-dev','aiui-workshop',...projectBundles.keys(),...currentBundles.keys()]);
+    for(const name of names){
       const existing=found.filter(item=>item.name===name),copies=[];
       // A loaded skill says nothing about its on-disk version. Update managed
       // global/inherited copies before considering the client's no-duplicate hint.
       for(const item of existing.length?existing:[null]){
-        if(!item&&(options.existingSkills?.includes(name)||options.installMissing===false))continue;
-        const revision=item?.scope==='user'?knowledge.meta.revision:project.knowledgeRevision||knowledge.meta.revision;
-        const files=name==='aiui-dev'?await officialFiles(knowledge,revision):await workflowSkillFiles();
-        const metadata=name==='aiui-dev'?{revision,source:`https://github.com/yodaos-project/AIUI/tree/${revision}/skills/aiui-dev`}:{version:APP_VERSION};
+        if(!item&&(options.existingSkills?.includes(name)||!installMissing))continue;
+        const workflow=name==='aiui-workshop';
+        let revision=item?.scope==='user'?current:pinned;
+        let bundle=(await getBundles(revision)).get(name);
+        if(!workflow&&name!=='aiui-dev'&&!bundle){
+          revision=current;bundle=currentBundles.get(name);
+          if(!bundle)continue;
+        }
+        const files=workflow?await workflowSkillFiles():officialFiles(bundle,name);
+        const metadata=workflow?{version:APP_VERSION}:{revision,source:`https://github.com/yodaos-project/AIUI/tree/${revision}/skills/${name}`};
         if(item?.symlink){copies.push({name,status:'existing',path:item.path,updateAvailable:true,reason:'Linked skills are preserved; read current guidance inline.'});continue;}
         const originals=[hashes(files)];
-        if(item&&!item.managed&&name==='aiui-dev'){
+        if(item&&!item.managed&&!workflow){
           const bundled=await readJson(path.join(ROOT,'vendor/official/current.json'),null);
-          if(bundled?.revision&&bundled.revision!==revision){try{originals.push(hashes(await officialFiles(knowledge,bundled.revision)));}catch{}}
+          if(bundled?.revision&&bundled.revision!==revision){
+            try{
+              const original=(await getBundles(bundled.revision)).get(name);
+              if(original)originals.push(hashes(officialFiles(original,name)));
+            }catch{}
+          }
         }
         copies.push(await installOne(key,name,files,metadata,{destination:item&&path.dirname(item.path),baseRoot:item?.baseRoot,originalHashes:options.adoptOriginal===false?[]:originals}));
       }
@@ -152,5 +173,5 @@ export async function ensureAgentSkills(project,knowledge,options={}){
       if(additions.length)await fs.appendFile(ignoreFile,(ignore&&!ignore.endsWith('\n')?'\n':'')+additions.join('\n')+'\n');
     }
     return {skills:results,officialRules:'aiui-dev',workflowRules:'aiui-workshop',scope:options.writeIgnore===false?'user':'project',reloadRequired:results.some(item=>['updated','adopted','installed'].includes(item.status)),delivery:'Managed global and project copies update automatically; read current inline guidance in this chat, as client skill caches may require a reload.'};
-  })();pending.set(key,work);try{return await work;}finally{pending.delete(key);}
+  });pending.set(key,work);try{return await work;}finally{if(pending.get(key)===work)pending.delete(key);}
 }

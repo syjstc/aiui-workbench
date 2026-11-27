@@ -35,7 +35,7 @@ export function documentNavigation(index, { locale = 'zh-CN', sort = 'recommende
   // Keep the other translation accessible without doubling every visible row.
   const translations = official(!english);
   if (translations.length) roots.push({ id: 'translations', title: label('English 文档', '中文文档'), children: translations });
-  const skill = { id: 'skill', title: label('开发 Skill 与示例', 'Development Skill & examples'), children: [] };
+  const skill = { id: 'skill', title: label('AIUI Skill 与示例', 'AIUI Skills & examples'), children: [] };
   const other = { id: 'other', title: label('补充资料与目录文件', 'Additional references & catalogs'), children: [] };
   function addFile(root, doc, segments) {
     let parent = root;
@@ -48,8 +48,8 @@ export function documentNavigation(index, { locale = 'zh-CN', sort = 'recommende
     used.add(doc.path);
   }
   for (const doc of documents) if (!used.has(doc.path)) {
-    const isSkill = doc.path.startsWith('skills/aiui-dev/');
-    addFile(isSkill ? skill : other, doc, doc.path.replace(isSkill ? /^skills\/aiui-dev\// : /^documentation\//, '').split('/'));
+    const isSkill = doc.path.startsWith('skills/');
+    addFile(isSkill ? skill : other, doc, doc.path.replace(isSkill ? /^skills\// : /^documentation\//, '').split('/'));
   }
   if (skill.children.length) roots.push(skill);
   if (other.children.length) roots.push(other);

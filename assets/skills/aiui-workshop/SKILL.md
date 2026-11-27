@@ -11,7 +11,15 @@ This skill supplements the official `aiui-dev` skill. The official skill and its
 
 If the Workshop service is unavailable, first explain that the user should open **AIUI Workshop** and retry. If it is already open but unresponsive, ask the user to restart it, then refresh the MCP connection. If the service is older, its launcher is missing, or required tools still do not appear, direct the user to Workshop's update controls or the current official release, reopen the updated app and refresh the AI connection (or start a new chat if that client caches tools). Do not assume a timeout means an update is required: distinguish not-open, disconnected, busy and outdated states using the evidence available. Use the startup diagnostic/retry tools if exposed. Preserve the request and project/workflow identities; continue after recovery without recreating the project or endlessly repeating failed calls.
 
-Before setup, check your own loaded skills, including plugin/cloud skills. Report an already available `aiui-dev` or `aiui-workshop` through `existingSkills` on context and workflow-start calls when supported, avoiding duplicate installation.
+Before setup, check your loaded AIUI skills, including plugin-provided copies. Report their names through `existingSkills` when the tool supports them to avoid duplicate installation.
+
+Installation makes skills available for later use. Start development with the pinned `aiui-dev`. When a task reaches a specialty, use the matching version already loaded or read its `path` and `revision` from `officialSkills` via `aiui_docs_read`. `aiui-debug` covers failure diagnosis, `aiui-cloud-apis` covers the app's built-in `open` module, and `aiui-cloud-integration` covers server integration.
+
+## Load optimization guidance when it can change a decision
+
+- Before choosing or exporting substantial image or audio assets, or when reducing package size, read official `aiui-optimize` for the AIX budget and [asset optimization](references/asset-optimization.md) for a repeatable media workflow.
+- Before designing an animated game scene or adding continuous input, use the early design section in [game performance](references/optimization.md). Use the profiling section for slow startup, frame drops or input stalls. See the official `aiui-dev` API reference for the specific runtime capability in use.
+- For a small UI or logic edit, use the relevant development reference. Open specialists and supporting references when the work reaches their topic.
 
 Context checks managed global and inherited copies even when reported in `existingSkills`. Workshop updates intact managed copies and verified original snapshots, including supporting references; user edits and linked folders are preserved. Use the current inline guide immediately if a client's cached skill is older. Do not repeatedly reinstall or reread all context. Official project rules stay pinned to that project's revision; global copies follow the current official snapshot.
 
@@ -31,13 +39,15 @@ Let Workshop execute preview interactions, assertions, screenshots, logs and bui
 
 When blocked, read the returned diagnostic or recovery instructions. Fix AI-owned problems, then retry the same task. For user-owned steps, state the blocker, the exact UI action (for example enabling glasses ADB or allowing debugging), and how to continue. Avoid dumping raw logs or repeatedly retrying an unresolved prerequisite.
 
-When a device check shows missing, unauthorized or disconnected glasses, proactively explain the state and the next user action. Continue source work, simulation and packaging where possible. Use `aiui_connection_guide` when available for localized steps and real Workshop example screenshots; read [Connecting and using glasses](references/connection.md) for phone installation, QR pairing or remote control. Restore the same project/workflow after connection.
+When glasses are missing, unauthorized or offline, explain the observed state and the next action while continuing work that can proceed. Read `devices[].adbAccess` and returned `deviceDiagnostic`/`recovery`, then use `aiui_connection_guide` for localized steps and example screenshots. The Rokid App ADB switch has its own verified state and recovery in [Connecting and using glasses](references/connection.md). Resume the same workflow after connection.
 
-Read `devices[].adbAccess`, its `rokidAppAdb`, and `connection.diagnostic` from environment checks, and `deviceDiagnostic`/`recovery` from failed operations or jobs. Rokid App's ADB operation switch is separate from Android USB/wireless debugging and AIUI developer mode. On verified Rokid firmware, `persist.vendor.adb=false` leaves transport online but blocks screenshots, input and other controlled operations. `state: "rokid-adb-disabled"` / `phoneAdbSwitch: "off"` is a confirmed vendor gate: guide the user to **Rokid AI → Home → gear beside the glasses card → Developer → Glasses ADB debugging**, rather than repeatedly reconnecting or changing AIUI mode. Missing or unrecognized vendor properties return `unknown`; do not infer off from a generic permission error. A file error may instead require Android permissions or a corrected path. Recheck after the user fixes the prerequisite and continue the same task.
-
-Tool responses automatically include unread `sharedDiagnostics` for the current project and shared Workshop environment, including failures. Read them directly without asking the user to copy logs. Match each record's projectId, projectPath and workflowId before editing; do not act on a different project or guess the owner of an unassigned record. Reading through MCP/CLI persists readAt/readBy and hides those records from the default unread list. Read is separate from repaired: verify the fix before resolving, and expect recurring errors to become unread again. If remainingUnread is nonzero, use aiui_diagnostics_get with the same projectId and read=false to continue; explicit diagnosticId lookups and markRead=false inspection remain available. An idle external AI cannot be awakened by Workshop; delivery occurs on its next tool call.
+Use attached `sharedDiagnostics` when present. Match projectId and workflowId, and confirm the owner of unassigned issues. Reading marks them read; resolve after verifying the fix. For remaining unread items, use `aiui_diagnostics_get` with the same scope and `read=false`. Use diagnosticId for targeted lookup.
 
 Report static checks, simulator execution and actual device/worn acceptance separately, as required by the official checklist. Respect the user's requested scope; installing, uploading or publishing is not implied by a request to validate a package. Formal store submission uses Workshop's existing user-confirmation flow.
+
+## Reuse local lessons
+
+When `aiui_local_lessons` is available, use the relevant hints returned by context or search by symptom and project. Treat saved notes as prior evidence; check the current request, official docs and environment before applying a fix. After a reproduced fix or an explicit reusable preference, save one short trigger, action and verification boundary. Use the project ID for project-specific findings, or omit it for the user's reusable local preferences. Update an existing entry when evidence changes. Keep credentials, raw logs and project source out of the notes, and keep private details out of shared skills and feedback. Ask the user before forgetting an entry unless they already requested it.
 
 ## Common workflows
 
@@ -45,7 +55,7 @@ For feedback, use `aiui_feedback_prepare` only for a diagnosed Workshop defect o
 
 Read only the reference relevant to the request, from the installed skill folder or `aiui_skill_read` if local files are unavailable:
 
-- [Project lessons](references/project-lessons.md): reuse confirmed findings from recent AIUI apps and WorkBuddy runs when planning or debugging input, lifecycle, full-screen/voice entry, AI services, assertion timing, media or performance. Read the relevant entries before repeating an investigation; keep device/version limits and unresolved findings explicit.
+- [Common issues](references/project-lessons.md): input, lifecycle, entry routes, services, assertions and media troubleshooting.
 - [Verification and recovery](references/verification.md): discrete temple input, 3DoF direction, camera, recording, source changes and device handoff.
 - [Connecting and using glasses](references/connection.md): first connection, helper APK installation through Rokid AI, pairing codes and QR codes, screenshots and phone remote control.
 - [AI-assisted simulator verification](references/simulator-ai.md): temporary event handoff to the active AI during automation. Ordinary simulator users test AI features on glasses. This does not start an AI process or wake an idle chat.

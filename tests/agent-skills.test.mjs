@@ -9,6 +9,7 @@ import {collectFiles} from '../core/projects.mjs';
 import {Workbench} from '../core/service.mjs';
 import {AiConnection} from '../core/ai-connection.mjs';
 import {toolCatalog,legacyToolCatalog} from '../core/tool-catalog.mjs';
+import {officialSkillBundles} from '../core/official-skills.mjs';
 import {sha} from '../core/util.mjs';
 
 async function fixture(t){
@@ -21,12 +22,14 @@ const options={globalRoots:[]};
 
 test('missing official skill is installed byte-for-byte with references, separately from the workflow skill',async t=>{
   const {knowledge,project}=await fixture(t),first=await ensureAgentSkills(project,knowledge,options);
-  assert.deepEqual(first.skills.map(s=>s.status),['installed','installed']);
-  const official=(await knowledge.index()).filter(d=>d.path.startsWith('skills/aiui-dev/'));assert.ok(official.length>20);
+  const bundles=officialSkillBundles(await knowledge.index());
+  assert.deepEqual(new Set(first.skills.map(s=>s.name)),new Set(['aiui-workshop',...bundles.keys()]));
+  assert.ok(first.skills.every(s=>s.status==='installed'));
+  const official=[...bundles.values()].flatMap(bundle=>bundle.documents);assert.ok(official.length>20);
   for(const doc of official)assert.equal(sha(await fs.readFile(path.join(project.projectPath,'.agents',doc.path))),doc.sha256,doc.path);
   assert.match(await fs.readFile(path.join(project.projectPath,'.agents/skills/aiui-workshop/SKILL.md'),'utf8'),/supplements the official/);
   assert.ok((await collectFiles(project.agentPath)).every(file=>!file.path.startsWith('.agents/')));
-  const second=await ensureAgentSkills(project,knowledge,options);assert.deepEqual(second.skills.map(s=>s.status),['current','current']);
+  const second=await ensureAgentSkills(project,knowledge,options);assert.ok(second.skills.every(s=>s.status==='current'));
 });
 
 test('an official skill in an inherited client folder or a renamed global folder is reused without creating a duplicate',async t=>{
@@ -48,7 +51,7 @@ test('managed official snapshots update together, while user edits to either ski
   const updated=await ensureAgentSkills({...project,knowledgeRevision:'a'.repeat(40)},updatedKnowledge,options);assert.equal(updated.skills[0].status,'updated');
   const reference=path.join(project.projectPath,'.agents/skills/aiui-dev/references/checklist.md'),workflow=path.join(project.projectPath,'.agents/skills/aiui-workshop/SKILL.md');
   await fs.appendFile(reference,'\nPersonal checklist rule.\n');await fs.appendFile(workflow,'\nPersonal workflow rule.\n');
-  const preserved=await ensureAgentSkills(project,knowledge,options);assert.deepEqual(preserved.skills.map(s=>s.status),['user-modified','user-modified']);assert.match(await fs.readFile(reference,'utf8'),/Personal checklist rule/);assert.match(await fs.readFile(workflow,'utf8'),/Personal workflow rule/);
+  const preserved=await ensureAgentSkills(project,knowledge,options);assert.deepEqual(preserved.skills.filter(s=>s.status==='user-modified').map(s=>s.name),['aiui-dev','aiui-workshop']);assert.match(await fs.readFile(reference,'utf8'),/Personal checklist rule/);assert.match(await fs.readFile(workflow,'utf8'),/Personal workflow rule/);
 });
 
 test('managed global copies and their references update despite client-reported loaded skills, without project duplicates',async t=>{
@@ -97,9 +100,51 @@ test('copied configuration, failed calls, CLI and discovery do not verify an ext
 test('one setup call installs only missing user skills, checks the environment once and leaves project creation to the user request',async t=>{
   const {root}=await fixture(t),w=await new Workbench(path.join(root,'setup-service')).init();t.after(()=>w.close());
   w.skillHome=path.join(root,'user-home');await fs.mkdir(w.skillHome);w.skillOptions={globalRoots:[]};let checks=0;w.devices.check=async()=>{checks++;return {adb:true,aix:true,devices:[]};};
-  const context=await w.call('aiui_context_get',{setup:true},'MCP');assert.equal(checks,1);assert.equal(context.skillSetup.status,'ready');assert.equal(context.skillSetup.scope,'user');assert.deepEqual(context.skillSetup.skills.map(s=>s.status),['installed','installed']);assert.deepEqual(context.environment.devices,[]);assert.match(context.nextAction,/ask what app/);assert.equal(w.projects.list().length,0);
+  const context=await w.call('aiui_context_get',{setup:true},'MCP');assert.equal(checks,1);assert.equal(context.skillSetup.status,'ready');assert.equal(context.skillSetup.scope,'user');assert.ok(context.skillSetup.skills.every(s=>s.status==='installed'));assert.deepEqual(context.environment.devices,[]);assert.match(context.nextAction,/ask what app/);assert.equal(w.projects.list().length,0);
   assert.equal(await fs.access(path.join(w.skillHome,'.aixignore')).then(()=>true,()=>false),false);
-  const again=await w.call('aiui_context_get',{setup:true},'MCP');assert.deepEqual(again.skillSetup.skills.map(s=>s.status),['current','current']);assert.equal(checks,2);
+  const again=await w.call('aiui_context_get',{setup:true},'MCP');assert.ok(again.skillSetup.skills.every(s=>s.status==='current'));assert.equal(checks,2);
+});
+
+test('official specialist skills install after sync and stay out of initial MCP context bodies', async t => {
+  const { root } = await fixture(t), w = await new Workbench(path.join(root, 'specialists-service')).init();
+  t.after(() => w.close());
+  w.skillHome = path.join(root, 'skill-profile');
+  const globalRoot = path.join(w.skillHome, '.agents/skills');
+  w.skillOptions = { globalRoots: [globalRoot] };
+  w.environmentCheck = async () => ({ devices: [] });
+  w.knowledge.meta.revision = '00c6ec71ee313817705683248b3ebe2acf0937f0';
+  const existingSkills = ['aiui-dev', 'aiui-workshop', 'aiui-cloud-apis'];
+  const before = await w.call('aiui_context_get', { setup: true, existingSkills }, 'MCP');
+  assert.equal(before.officialSkills.length, 1);
+  const project = await w.call('aiui_project_create', { directory: path.join(root, 'older-project'), name: 'Older project' });
+  const pinned = project.knowledgeRevision, updated = 'a'.repeat(40);
+  const nextIndex = [...await w.knowledge.index(pinned)];
+  const specialistBodies = new Map(['aiui-optimize', 'aiui-debug', 'aiui-cloud-apis', 'aiui-cloud-integration'].map(name =>
+    [name, `---\nname: ${name}\ndescription: Guide for ${name}\n---\n# Specialist\nPRIVATE_TEST_MARKER_${name}`]));
+  const attach = (path, content) => nextIndex.push({ path, title: path, content, sha256: sha(content) });
+  for (const [name, content] of specialistBodies) attach(`skills/${name}/SKILL.md`, content);
+  attach('skills/aiui-optimize/scripts/audit_aix.py', 'print("audit")\n');
+  w.knowledge.indexes.set(updated, Promise.resolve(nextIndex));
+  w.knowledge.meta.revision = updated;
+
+  await w.refreshAgentSkills();
+  const optimized = path.join(globalRoot, 'aiui-optimize');
+  assert.equal(await fs.readFile(path.join(optimized, 'SKILL.md'), 'utf8'), specialistBodies.get('aiui-optimize'));
+  assert.equal(await fs.readFile(path.join(optimized, 'scripts/audit_aix.py'), 'utf8'), 'print("audit")\n');
+  await assert.rejects(fs.access(path.join(globalRoot, 'aiui-cloud-apis')), { code: 'ENOENT' });
+  await fs.appendFile(path.join(optimized, 'SKILL.md'), '\nUser notes\n');
+  const context = await w.call('aiui_context_get', { projectId: project.id, existingSkills }, 'MCP');
+  assert.equal(context.officialSkill.revision, pinned);
+  assert.equal(context.officialSkills.find(skill => skill.name === 'aiui-dev').revision, pinned);
+  assert.equal(context.officialSkills.length, 5);
+  assert.ok(context.officialSkills.every(skill => !('content' in skill)));
+  assert.ok(!JSON.stringify(context).includes('PRIVATE_TEST_MARKER_'));
+  assert.equal(context.skillSetup.skills.find(skill => skill.name === 'aiui-optimize').status, 'user-modified');
+  assert.equal(context.skillSetup.skills.find(skill => skill.name === 'aiui-cloud-apis').status, 'provided-by-client');
+  await assert.rejects(fs.access(path.join(project.agentPath, '.agents/skills/aiui-optimize')), { code: 'ENOENT' });
+  const { path: reference, revision } = context.officialSkills.find(skill => skill.name === 'aiui-optimize');
+  assert.equal(revision, updated);
+  assert.equal((await w.call('aiui_docs_read', { path: reference, revision }, 'MCP')).content, specialistBodies.get('aiui-optimize'));
 });
 
 test('legacy guidance does not advertise unavailable workflow/source/diagnostic tools or unsupported setup arguments',()=>{

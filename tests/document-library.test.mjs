@@ -16,12 +16,12 @@ const paths = nodes => nodes.flatMap(node => [...(node.path ? [node.path] : []),
 const blob = bytes => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jE9sAAAAASUVORK5CYII=', 'base64');
 const old = 'a'.repeat(40), latest = 'b'.repeat(40);
-async function fixture(t, { index = [{ path: 'documentation/0-guide/intro.md', title: 'Introduction', content: '# Introduction\n\nOffline guide.' }], fetcher, now } = {}) {
+async function fixture(t, { index = [{ path: 'documentation/0-guide/intro.md', title: 'Introduction', content: '# Introduction\n\nOffline guide.' }], fetcher, now, skillsSyncVersion = 1 } = {}) {
   const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-doc-library-'));
   const directory = path.join(home, 'knowledge', old);
   await fs.mkdir(directory, { recursive: true });
   await fs.writeFile(path.join(directory, 'index.json'), JSON.stringify(index));
-  await fs.writeFile(path.join(home, 'knowledge/current.json'), JSON.stringify({ status: 'ready', revision: old, documents: index.length }));
+  await fs.writeFile(path.join(home, 'knowledge/current.json'), JSON.stringify({ status: 'ready', revision: old, documents: index.length, skillsSyncVersion }));
   const knowledge = await new Knowledge(home, { fetcher, now }).init();
   t.after(async () => { await knowledge.close(); await fs.rm(home, { recursive: true, force: true }); });
   return knowledge;
@@ -31,7 +31,7 @@ test('the complete official hierarchy retains every document once in either lang
   for (const locale of ['zh-CN', 'en']) for (const sort of ['recommended', 'title', 'path']) {
     const catalog = documentNavigation(bundled, { locale, sort, revision: metadata.revision });
     const all = paths(catalog.tree);
-    assert.equal(catalog.total, 468);
+    assert.equal(catalog.total, metadata.documents);
     assert.equal(all.length, bundled.length);
     assert.equal(new Set(all).size, bundled.length);
     assert.deepEqual(new Set(all), new Set(bundled.map(doc => doc.path)));
@@ -41,8 +41,8 @@ test('the complete official hierarchy retains every document once in either lang
       assert.ok(catalog.tree.find(node => node.title === (locale === 'en' ? 'Framework' : '框架')).children.find(node => node.id.endsWith('/open-agent-format')).children.some(node => node.children.length > 2));
     }
   }
-  const fallback = documentNavigation(bundled.filter(doc => !doc.path.startsWith('documentation/toc')));
-  assert.equal(paths(fallback.tree).length, 466);
+  const withoutToc = bundled.filter(doc => !doc.path.startsWith('documentation/toc'));
+  assert.equal(paths(documentNavigation(withoutToc).tree).length, withoutToc.length);
 });
 
 test('search finds unread documents and code beyond the reader chunk and reports full-corpus totals', () => {
@@ -78,11 +78,11 @@ test('section anchors skip fenced examples and distinguish repeated headings', (
   assert.deepEqual(headings.map(item => item.id), ['intro', 'example', 'example-1', 'example-2']);
 });
 
-test('all 81 bundled diagram references have original verified bytes for first-launch offline reading', async () => {
+test('bundled diagrams have original verified bytes for first-launch offline reading', async () => {
   const snapshot = new URL(`../vendor/official/${metadata.revision}/`, import.meta.url);
   const manifest = JSON.parse(await fs.readFile(new URL('images.json', snapshot)));
   const references = new Set(bundled.flatMap(doc => [...documentImages(doc)]));
-  assert.equal(references.size, 81);
+  assert.equal(references.size, metadata.images.total);
   for (const relative of references) {
     const entry = manifest.find(item => item.path === relative);
     assert.ok(entry, relative);
@@ -90,6 +90,21 @@ test('all 81 bundled diagram references have original verified bytes for first-l
     assert.equal(bytes.length, entry.size, relative);
     assert.equal(blob(bytes), entry.sha, relative);
   }
+});
+
+test('an offline upgrade uses newer bundled skills while keeping the project snapshot and sync setting', async t => {
+  const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-doc-bundle-upgrade-'));
+  const knowledgeDir = path.join(home, 'knowledge');
+  await fs.mkdir(knowledgeDir);
+  const previous = '00c6ec71ee313817705683248b3ebe2acf0937f0';
+  await fs.writeFile(path.join(knowledgeDir, 'current.json'), JSON.stringify({ revision: previous, upstreamDate: '2026-11-03T05:42:42Z' }));
+  await fs.writeFile(path.join(knowledgeDir, 'updates.json'), JSON.stringify({ autoUpdate: false }));
+  const knowledge = await new Knowledge(home, { fetcher: () => assert.fail('offline startup must not fetch') }).init();
+  t.after(async () => { await knowledge.close(); await fs.rm(home, { recursive: true, force: true }); });
+  assert.equal(knowledge.meta.revision, metadata.revision);
+  assert.equal(knowledge.status().autoUpdate, false);
+  assert.match((await knowledge.read('skills/aiui-optimize/SKILL.md')).content, /audit_aix\.py/);
+  assert.equal((await knowledge.read('skills/aiui-dev/SKILL.md', previous)).revision, previous);
 });
 
 test('daily checks persist across restarts, respect manual/weekly settings, and retry failed updates without losing offline docs', async t => {
@@ -148,6 +163,35 @@ test('verified sync switches snapshots atomically, builds the new search index a
   await assert.rejects(offline.image({ ...args, path: 'file:///etc/passwd' }), /无效/);
   await assert.rejects(offline.image({ ...args, path: '../../image/unreferenced.png' }), /无效/);
   assert.equal((await knowledge.read('documentation/0-guide/intro.md', old)).revision, old);
+});
+
+test('same-revision skill sync fills the older aiui-dev-only cache and retains official scripts and references', async t => {
+  const existing = {
+    'skills/aiui-dev/SKILL.md': '---\nname: aiui-dev\ndescription: Development\n---\n# AIUI',
+    'skills/aiui-dev/assets/minimal-page.ink': '<page/>',
+  };
+  const additional = {
+    'skills/aiui-optimize/SKILL.md': '---\nname: aiui-optimize\ndescription: Package audits\n---\n# Optimization',
+    'skills/aiui-optimize/references/reporting.md': '# Audit report',
+    'skills/aiui-optimize/scripts/audit_aix.py': 'print("audit")\n',
+  };
+  const sources = { ...existing, ...additional, 'skills/aiui-workshop/SKILL.md': '# Reserved', '.agents/skills/aiui-private/SKILL.md': '# Internal' };
+  const downloads = [];
+  const fetcher = async url => {
+    if (url.endsWith('/commits/main')) return Response.json({ sha: old });
+    if (url.includes('/git/trees/')) return Response.json({ tree: Object.entries(sources).map(([path, content]) => ({ path, type: 'blob', size: Buffer.byteLength(content), sha: blob(Buffer.from(content)) })) });
+    const relative = url.split(`/${old}/`)[1];
+    downloads.push(relative);
+    return new Response(sources[relative]);
+  };
+  const index = Object.entries(existing).map(([path, content]) => ({ path, title: path, content }));
+  const knowledge = await fixture(t, { index, fetcher, skillsSyncVersion: 0 });
+  await knowledge.sync();
+  assert.deepEqual(downloads.sort(), Object.keys(additional).sort());
+  assert.equal((await knowledge.read('skills/aiui-optimize/scripts/audit_aix.py', old)).content, additional['skills/aiui-optimize/scripts/audit_aix.py']);
+  assert.ok(paths((await knowledge.catalog()).tree.find(node => node.id === 'skill').children).includes('skills/aiui-optimize/SKILL.md'));
+  await knowledge.sync();
+  assert.equal(downloads.length, Object.keys(additional).length);
 });
 
 test('a bad upstream snapshot keeps the current catalog and search, and document image URLs cannot escape the official asset directory', async t => {

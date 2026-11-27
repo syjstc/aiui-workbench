@@ -49,7 +49,7 @@ export class DevelopmentFlow {
     const p=projectId?await this.w.projects.refresh(projectId):await this.w.call('aiui_project_create',{name:applicationName,directory:directory||path.join(this.w.home,'projects',flowId.slice(0,8)),locale},'workflow');
     const f={id:flowId,requestId,projectId:p.id,name:applicationName,request,target,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),state:'needs-ai',stage:'create',message:'项目已准备好，等待 AI 制作应用',steps:[],evidence:{},nextAction:{owner:'ai',title:'根据需求制作应用',steps:['读取官方规范并编辑项目源码。','为关键交互添加应用行为断言，然后调用 aiui_workflow_continue。']}};
     this.items.unshift(f);this.items=this.items.slice(0,50);await this.save();this.w.emit('workflow',this.public(f));
-    return {...this.get({workflowId:f.id}),context:await this.w.call('aiui_context_get',{projectId:p.id,existingSkills},'workflow'),nextTool:'aiui_workflow_continue'};
+    return {...this.get({workflowId:f.id}),context:await this.w.call('aiui_context_get',{projectId:p.id,existingSkills,lessonQuery:request},'workflow'),nextTool:'aiui_workflow_continue'};
   }
   async blocked(f,blocker){
     f.state=blocker.owner==='user'?'waiting-user':'needs-ai';f.message=blocker.title;f.nextAction=blocker;f.updatedAt=new Date().toISOString();

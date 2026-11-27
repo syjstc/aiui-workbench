@@ -35,7 +35,9 @@ import { Platform } from './platform.mjs';
 import {Diagnostics,readServiceLog} from './diagnostics.mjs';
 import {DevelopmentFlow,DEVELOPMENT_GUIDE} from './development-flow.mjs';
 import {ProjectFiles} from './project-files.mjs';
-import {ensureAgentSkills,workflowSkill,workflowSkillFiles} from './agent-skills.mjs';
+import {ensureAgentSkills,workflowSkill} from './agent-skills.mjs';
+import {officialSkillCatalog} from './official-skills.mjs';
+import {LocalLessons} from './local-lessons.mjs';
 import {SimulatorAi,AI_DEVICE_HINT} from './simulator-ai.mjs';
 import {AiConnection} from './ai-connection.mjs';
 import {Feedback} from './feedback.mjs';
@@ -61,6 +63,7 @@ export class Workbench {
     try{return await this.initialize();}catch(error){await this.captureDiagnostic(error,{source:'startup'}).catch(()=>{});throw error;}
   }
   async initialize() {
+    this.localLessons = new LocalLessons(this.home);
     this.wirelessSetup = new WirelessSetup(this.wireless);
     this.wirelessHelper = new WirelessHelperShare();
     this.wirelessQr = new WirelessPairQr(this.wireless,{resolveService:resolvePairingService});
@@ -96,9 +99,18 @@ export class Workbench {
   config() { return this.mcpConfig; }
   async syncKnowledge(options){const result=await this.knowledge.sync(options);await this.refreshAgentSkills();return result;}
   async refreshAgentSkills(){
-    const targets=[...(this.skillTargets.user?[{projectPath:this.skillHome,agentPath:this.skillHome}]:[]),...this.projects.list().filter(p=>this.skillTargets.projects.includes(p.id))];
+    const userTarget={projectPath:this.skillHome,agentPath:this.skillHome};
+    const targets=[...(this.skillTargets.user?[userTarget]:[]),...this.projects.list().filter(p=>this.skillTargets.projects.includes(p.id))];
     this.skillUpdates=[];
-    for(const target of targets){try{this.skillUpdates.push(await ensureAgentSkills(target,this.knowledge,{...this.skillOptions,installMissing:false,writeIgnore:false,adoptOriginal:false}));}catch(error){this.skillUpdates.push({status:'requires-attention',error:error.message});}}
+    for(const target of targets){
+      const user=target===userTarget;
+      try{
+        this.skillUpdates.push(await ensureAgentSkills(target,this.knowledge,{
+          ...this.skillOptions,installMissing:user&&!this.skillTargets.userSetup?'managed':true,writeIgnore:!user,adoptOriginal:false,
+          existingSkills:this.skillTargets.clientSkills?.[user?'user':target.id],
+        }));
+      }catch(error){this.skillUpdates.push({status:'requires-attention',error:error.message});}
+    }
     return this.skillUpdates;
   }
   status() { return { version: APP_VERSION, ...this.runtimeInfo(), sdk: this.sdk.status(), home: this.home, projects: this.projects.list(), knowledge: this.knowledge.status(), previews: this.previews.list(), jobs: this.jobs.list(), recordings:this.recordings?.status().recordings||[], clients: [...this.clients.values()].filter(c => Date.now()-c.lastSeen < 60000), sequence: this.sequence, platform: this.platform?.status(),lastAiAt:this.aiConnection?.status().verifiedAt||null,aiConnection:this.aiConnection?.status(),diagnostics:this.diagnostics.summary(),workflows:this.workflows?.list()||[] }; }
@@ -127,15 +139,17 @@ export class Workbench {
   async call(tool, args = {}, actor = 'desktop') {
     try{let result=await this.dispatch(tool,args,actor);await this.aiConnection?.record(tool,actor,result);
       if(isAi(actor)&&args.sessionId&&!tool.startsWith('aiui_ai_')){const hint=this.simulatorAi?.hints(args.sessionId);if(hint)result={...result,pendingAiRequest:hint};}
-      if(isAi(actor)&&result&&typeof result==='object'&&!tool.startsWith('aiui_diagnostics_')&&!tool.startsWith('aiui_ai_')&&tool!=='aiui_tools_list'){
+      if(isAi(actor)&&result&&typeof result==='object'&&!tool.startsWith('aiui_diagnostics_')&&!tool.startsWith('aiui_ai_')&&!['aiui_tools_list','aiui_local_lessons','aiui_skill_read'].includes(tool)){
         const shared=await this.deliverDiagnostics(result,args,actor);
         if(shared.items.length||shared.remainingUnread)return {...result,sharedDiagnostics:shared};
       }
       return result;
     }catch(error){
+      if(tool==='aiui_local_lessons')throw error;
       if(args.serial && /^(?:aiui_glasses_|aiui_device_|aiui_adb_wireless_enable$)/.test(tool))await diagnoseAdbFailure(error,{serial:args.serial},(_command,args,options)=>this.adb.execute(args,options));
       if(!error.diagnosticId&&!tool.startsWith('aiui_diagnostics_')){
-        const d=await this.captureDiagnostic(error,{source:'operation',actor,tool,projectId:args?.projectId,sessionId:args?.sessionId,workflowId:args?.workflowId,context:args}).catch(()=>null);
+        const {lessonQuery,...context}=args||{};
+        const d=await this.captureDiagnostic(error,{source:'operation',actor,tool,projectId:args?.projectId,sessionId:args?.sessionId,workflowId:args?.workflowId,context}).catch(()=>null);
         if(d)error.diagnosticId=d.id;
       }
       if(isAi(actor)&&!tool.startsWith('aiui_diagnostics_'))error.sharedDiagnostics=await this.deliverDiagnostics(error.result,args,actor,error.diagnosticId).catch(()=>undefined);
@@ -166,7 +180,11 @@ export class Workbench {
         if(!['MCP','CLI','workflow','qa'].includes(actor))throw new Error('AI 事件接管仅供自动化工具使用；模拟器 AI 功能请在真机测试');
         return this.simulatorAi[tool==='aiui_ai_configure'?'configure':tool==='aiui_ai_wait'?'wait':'reply'](args);
       }
-      case 'aiui_skill_read': {const files=await workflowSkillFiles();return {path:args.path,version:APP_VERSION,content:files[args.path]};}
+      case 'aiui_skill_read': return {path:args.path,version:APP_VERSION,content:await fs.readFile(path.join(ROOT,'assets/skills/aiui-workshop',args.path),'utf8')};
+      case 'aiui_local_lessons': {
+        if(args.projectId&&args.action==='save')this.projects.get(args.projectId);
+        return this.localLessons.handle(args);
+      }
       case 'aiui_adb_connect':return this.wireless.connect(args);
       case 'aiui_adb_discover':return this.wireless.status(args);
       case 'aiui_adb_wireless_enable':return this.wireless.enable(args);
@@ -288,13 +306,33 @@ export class Workbench {
         let skill = null; try { skill = await this.knowledge.read('skills/aiui-dev/SKILL.md', project?.knowledgeRevision); } catch {}
         let skillSetup={status:'deferred',reason:'A project or setup=true is needed to install skills. Both guides are provided inline without installation.'};
         {
-          try{const target=project||{projectPath:this.skillHome,agentPath:this.skillHome};if(args.setup&&!project)await fs.mkdir(this.skillHome,{recursive:true});skillSetup={status:'ready',...await ensureAgentSkills(target,this.knowledge,{writeIgnore:!!project,installMissing:!!project||!!args.setup,...this.skillOptions,existingSkills:args.existingSkills})};if(skillSetup.skills.some(s=>s.status==='user-modified'))skillSetup.status='user-modified';if(skillSetup.skills.some(s=>s.status==='name-conflict'))skillSetup.status='requires-attention';this.skillTargets.user=true;if(project&&!this.skillTargets.projects.includes(project.id))this.skillTargets.projects.push(project.id);await atomicJson(path.join(this.home,'skill-targets.json'),this.skillTargets);if(project)await this.projects.refresh(project.id);}
+          try{
+            const target=project||{projectPath:this.skillHome,agentPath:this.skillHome};
+            if(args.setup&&!project)await fs.mkdir(this.skillHome,{recursive:true});
+            skillSetup={status:'ready',...await ensureAgentSkills(target,this.knowledge,{
+              ...this.skillOptions,writeIgnore:!!project,installMissing:!!project||!!args.setup,
+              existingSkills:args.existingSkills??this.skillTargets.clientSkills?.[project?.id||'user'],
+            })};
+            if(skillSetup.skills.some(s=>s.status==='user-modified'))skillSetup.status='user-modified';
+            if(skillSetup.skills.some(s=>s.status==='name-conflict'))skillSetup.status='requires-attention';
+            this.skillTargets.user=true;
+            if(args.setup&&!project)this.skillTargets.userSetup=true;
+            if(project&&!this.skillTargets.projects.includes(project.id))this.skillTargets.projects.push(project.id);
+            if(args.existingSkills){
+              this.skillTargets.clientSkills||={};
+              this.skillTargets.clientSkills[project?.id||'user']=args.existingSkills;
+            }
+            await atomicJson(path.join(this.home,'skill-targets.json'),this.skillTargets);
+            if(project)await this.projects.refresh(project.id);
+          }
           catch(error){const diagnostic=await this.captureDiagnostic(error,{source:'skill-setup',projectId:project?.id});skillSetup={status:'requires-attention',error:error.message,diagnosticId:diagnostic?.id,fallback:'Use officialSkill and workflowSkill inline; existing skill files were preserved.'};}
         }
         let environment;
         if(args.setup){try{environment=await this.environmentCheck();}catch(error){const diagnostic=await this.captureDiagnostic(error,{source:'setup-environment'});environment={error:error.message,diagnosticId:diagnostic?.id};}}
         const projectInstructions=project?await fs.readFile(path.join(project.projectPath,'AGENTS.md'),'utf8').then(s=>s.slice(0,24000)).catch(()=>''):'';
-        return { project, projectInstructions, serviceVersion:APP_VERSION,connection:this.aiConnection.status(),availableTools:toolCatalog().tools.map(t=>t.name),setup:!!args.setup,skillSetup,workflowSkill:await workflowSkill(),...(environment?{environment}:{}),...(args.setup?{nextAction:'If the user supplied an idea, continue that request with the available workflow tools now. Otherwise ask what app the user wants to make. Do not create a demo project without a request. Missing glasses should not prevent preview and packaging; explain device connection when installation is reached.'}:{}),...this.runtimeInfo(project), sdkUpdates: this.sdk.status(), officialSkill: skill, knowledge: this.knowledge.status(), instruction: '开发规则及验收要求以项目绑定版本的官方 aiui-dev 和 references/checklist.md 为准；工坊 aiui-workshop 只补 MCP 编排和恢复。首次使用项目自动检查并补齐缺失 Skill；setup=true 同时检查用户级 Skill 与环境，无需逐项调用。自动更新未修改的工坊管理全局/继承 Skill（含参考文件），existingSkills 不跳过版本检查；保留用户修改，不重复安装。当前聊天使用最新内联规范，客户端技能缓存可能需要重载。工具及参数以当前服务清单为准，不要根据 runtime/CLI 版本猜测工坊工具。源码可通过 aiui_project_files 带 expectedRevision 读写，也可使用现有编码工具。优先用 aiui_workflow_start 返回项目上下文，aiui_workflow_continue 一次验证、打包并在就绪时安装；无需重复检查已返回的信息。仅 status=running 时调用 aiui_job_wait。正式提审由用户在工坊确认。', developmentGuide:DEVELOPMENT_GUIDE, diagnostics:this.diagnostics.get({...project?{projectId:project.id}:{scope:'workbench'},status:"open",read:false,limit:10}), capabilities: capabilities(), simulation: { input: 'keydown/keyup, keyup-only, repeated bursts', orientation: 'host absoluteOrientation capability, Android +Z gravity', camera: 'photo fixtures and opt-in computer webcam; continuous getUserMedia / ImageCapture.grabFrame / takePhoto; runtime Canvas and photo adapters encode preview-frame PNG, not full-resolution camera modes; no audio', bluetooth: 'unsupported', network:'online/offline events only; outbound application requests are not enabled', ai: {default:'device-test-required',hint:AI_DEVICE_HINT,automation:{configure:'aiui_ai_configure',wait:'aiui_ai_wait',reply:'aiui_ai_reply',guide:'references/simulator-ai.md',requiresImageCapabilityDeclaration:true,processStarted:false}} } };
+        const localLessons = await this.localLessons.hints(project?.id,args.lessonQuery).catch(()=>null);
+        const officialSkills = await officialSkillCatalog(this.knowledge,project?.knowledgeRevision).catch(()=>[]);
+        return { project, projectInstructions, serviceVersion:APP_VERSION,connection:this.aiConnection.status(),availableTools:toolCatalog().tools.map(t=>t.name),setup:!!args.setup,skillSetup,workflowSkill:await workflowSkill(),...(localLessons?.length?{localLessons}:{}),...(localLessons===null?{localLessonsUnavailable:true}:{}),...(environment?{environment}:{}),...(args.setup?{nextAction:'If the user supplied an idea, continue that request with the available workflow tools now. Otherwise ask what app the user wants to make. Do not create a demo project without a request. Missing glasses should not prevent preview and packaging; explain device connection when installation is reached.'}:{}),...this.runtimeInfo(project), sdkUpdates: this.sdk.status(), officialSkill: skill, officialSkills, knowledge: this.knowledge.status(), instruction: '开发以项目绑定版 aiui-dev 为准。其余官方 Skill 只在任务匹配时用 officialSkills 中的 path 和 revision 调 aiui_docs_read；工坊参考用 aiui_skill_read，本机经验按需查证。', developmentGuide:DEVELOPMENT_GUIDE, diagnostics:this.diagnostics.get({...project?{projectId:project.id}:{scope:'workbench'},status:"open",read:false,limit:10}), capabilities: capabilities(), simulation: { input: 'keydown/keyup, keyup-only, repeated bursts', orientation: 'host absoluteOrientation capability, Android +Z gravity', camera: 'photo fixtures and opt-in computer webcam; continuous getUserMedia / ImageCapture.grabFrame / takePhoto; runtime Canvas and photo adapters encode preview-frame PNG, not full-resolution camera modes; no audio', bluetooth: 'unsupported', network:'online/offline events only; outbound application requests are not enabled', ai: {default:'device-test-required',hint:AI_DEVICE_HINT,automation:{configure:'aiui_ai_configure',wait:'aiui_ai_wait',reply:'aiui_ai_reply',guide:'references/simulator-ai.md',requiresImageCapabilityDeclaration:true,processStarted:false}} } };
       }
       case 'aiui_preview_open': await this.projects.refresh(args.projectId); return this.previews.open(args.projectId, this.origin, { ...args, requestedBy:actor });
       case 'aiui_preview_test': return this.automation.test(args, actor);
@@ -422,5 +460,5 @@ export class Workbench {
     const diagnostic = connectionAdbDiagnostic(environment, devices);
     return { ...environment, devices, usbDevices, wireless, connection: { connected: devices.some(d => d.status === 'device'), adbUsable: diagnostic?.state === 'available', diagnostic, message: diagnostic?.message || '眼镜已连接，可以继续检查运行环境。', nextAction: diagnostic?.recovery, guideTool: 'aiui_connection_guide' }, adbTool: await this.adb.resolveInfo(), ...this.runtimeInfo() };
   }
-  async close() { this.wirelessSetup?.cancel(); this.wirelessHelper?.stop(); this.wirelessQr?.cancel(); await this.wireless.close();await this.feedback?.close();await this.skillRefresh;await this.workflows?.close(); await this.knowledge.close(); await this.mirroring?.close(); await this.glasses.settingsFocus.close(); await this.jobs.close(); await this.recordings?.close(); await this.previews.close(); await this.sdk?.close(); await this.projects.close(); await this.diagnostics?.close(); }
+  async close() { this.wirelessSetup?.cancel(); this.wirelessHelper?.stop(); this.wirelessQr?.cancel(); await this.wireless.close();await this.feedback?.close();await this.skillRefresh;await this.workflows?.close(); await this.localLessons?.close(); await this.knowledge.close(); await this.mirroring?.close(); await this.glasses.settingsFocus.close(); await this.jobs.close(); await this.recordings?.close(); await this.previews.close(); await this.sdk?.close(); await this.projects.close(); await this.diagnostics?.close(); }
 }

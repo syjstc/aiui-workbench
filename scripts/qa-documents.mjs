@@ -78,7 +78,7 @@ try {
   await check('the entire official catalog is available immediately with nested sections and no manual pagination', async () => {
     await ready('documentation/0-guide/quickstart/index.md');
     const catalog = await daemon.service.knowledge.catalog();
-    assert.equal(catalog.total, 468);
+    assert.equal(catalog.total, daemon.service.knowledge.meta.documents);
     const roots = page.locator('.doc-list>.doc-tree>li>.doc-tree-row .doc-tree-label>span');
     assert.deepEqual(await roots.allTextContents(), catalog.tree.map(node => node.title));
     const framework = page.locator('li[data-node-id="zh/1-framework"]>.doc-tree-row .doc-tree-toggle');
@@ -87,7 +87,7 @@ try {
     if (await pageToggle.getAttribute('aria-expanded') !== 'true') await pageToggle.click();
     await page.locator('.doc-tree-label[title="documentation/1-framework/open-agent-format/page-lifecycle.md"]').waitFor();
     assert.equal(await page.getByRole('button', { name: '加载更多文档', exact: true }).count(), 0);
-    assert.match(await page.locator('.doc-search-scope').textContent(), /468/);
+    assert.ok((await page.locator('.doc-search-scope').textContent()).includes(String(catalog.total)));
     await page.screenshot({ path: path.join(output, `${report.mode}-reading-order.png`) });
   });
   await check('title and path sorting include the full hierarchy and preserve the open document', async () => {

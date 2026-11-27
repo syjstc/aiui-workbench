@@ -7,6 +7,7 @@
 .mouse-mode.active{background:var(--selected);border-color:var(--border-strong);color:var(--ink)}
 .pose-reset{margin-left:auto;display:flex;align-items:center;gap:5px;color:var(--accent);font-size:11px;padding:6px}
 .stage-toolbar .button{padding:5px 9px;min-height:27px;font-size:11px}
+.stage-toolbar-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:6px}
 .pose-readout{display:flex;justify-content:center;align-items:center;gap:20px;flex-wrap:wrap;padding:13px 12px;color:var(--muted);font-size:11px;background:var(--soft);border-top:1px solid var(--border)}
 .pose-readout>span{display:flex;align-items:center;gap:6px}.pose-readout b{font-variant-numeric:tabular-nums;color:var(--secondary);min-width:45px;font-weight:500}.pose-readout.is-dragging{background:var(--hover)}
 .mouse-switch{margin:0 0 17px}.sensitivity{margin-bottom:0}

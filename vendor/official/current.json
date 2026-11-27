@@ -1,15 +1,16 @@
 {
   "status": "ready",
   "source": "https://github.com/yodaos-project/AIUI",
-  "revision": "00c6ec71ee313817705683248b3ebe2acf0937f0",
-  "documents": 468,
-  "syncedAt": "2026-11-10T12:27:10.171Z",
-  "checkedAt": "2026-11-10T12:27:10.172Z",
-  "upstreamDate": "2026-11-03T05:42:42Z",
-  "license": "Apache-2.0",
+  "revision": "23ef1821f8db4b7212d361a6a1196558efee024f",
+  "documents": 570,
+  "skillsSyncVersion": 1,
   "images": {
-    "total": 81,
-    "cached": 81,
+    "total": 82,
+    "cached": 82,
     "missing": []
-  }
+  },
+  "syncedAt": "2026-11-27T07:51:40.172Z",
+  "checkedAt": "2026-11-27T07:51:40.172Z",
+  "upstreamDate": "2026-11-27T02:20:47Z",
+  "license": "Apache-2.0"
 }

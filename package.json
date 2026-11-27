@@ -1,7 +1,7 @@
 {
   "name": "aiui-workbench",
   "productName": "AIUI 工坊",
-  "version": "0.6.15",
+  "version": "0.6.16",
   "type": "module",
   "main": "electron/main.cjs",
   "description": "Local AIUI desktop workbench, official runtime simulator and MCP tools",

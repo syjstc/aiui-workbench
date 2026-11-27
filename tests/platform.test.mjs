@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {zipSync} from 'fflate';
+import {zipSync,unzipSync} from 'fflate';
 import { Platform } from '../core/platform.mjs';
 import { Jobs } from '../core/jobs.mjs';
 import { sha } from '../core/util.mjs';
@@ -15,7 +15,7 @@ import semver from 'semver';
 function token(accountId='test-account') { return 'test.'+Buffer.from(JSON.stringify({accountId,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')+'.signature'; }
 const success=data=>Response.json({code:0,msg:'success',data});
 async function fixture(t) {
-  const home=await fs.mkdtemp(path.join(os.tmpdir(),'platform-test-')),bytes=Buffer.from(zipSync({'app.json':Buffer.from('{"name":"Fixture","pages":["index"]}'),'index.ink':Buffer.from('<page/>')})),file=path.join(home,'application.aix');await fs.writeFile(file,bytes);
+  const home=await fs.mkdtemp(path.join(os.tmpdir(),'platform-test-')),bytes=Buffer.from(zipSync({'app.json':Buffer.from('{"name":"Fixture","pages":["index"]}'),'index.ink':Buffer.from('<page/>'),'VERSION':Buffer.from('1'),'META-INF/aix/manifest.json':Buffer.from('{}')})),file=path.join(home,'application.aix');await fs.writeFile(file,bytes);
   const project={id:'project-1',name:'Local temporary name',version:'0.5.6',permissions:[],revision:'source1',toolchainId:'sdk1',lastBuild:{path:file,sha256:sha(bytes),bytes:bytes.length,revision:'source1',toolchainId:'sdk1'},lastCheck:{passed:true,revision:'source1',toolchainId:'sdk1'}};
   const remote={agentId:'cloud-agent-123',agentName:'来捉我吧',modelVendor:'native',nativeVersion:'1.0.2',description:'Game',icon:'https://static.rokidcdn.com/icon.png',category:'entertainment',displayStatus:'草稿',fileMd5:'old',filePath:'https://static.rokidcdn.com/old.aix',previewMaterials:[{type:'image',url:'https://static.rokidcdn.com/a.png'},{type:'image',url:'https://static.rokidcdn.com/b.png'},{type:'video',url:'https://static.rokidcdn.com/c.mp4'}]};
   const requests=[],jobs=await new Jobs(()=>{},home).init(),w={home,jobs,emit:()=>{},projects:{refresh:async()=>project,save:async()=>{}},sdk:{}};
@@ -51,8 +51,27 @@ test('AIX upload preserves the selected cloud name, verifies actual bytes, and n
   assert.equal(job.status,'succeeded');assert.equal(job.result.uploaded,true);assert.equal(job.result.agentName,'来捉我吧');assert.equal(job.result.version,'1.0.3');assert.equal(job.result.localVersion,'0.5.6');
   assert.equal(job.result.md5,md5(f.bytes));assert.equal(job.result.submittedForReview,false);assert.equal(job.result.published,false);
   assert.equal(f.requests.filter(r=>r.url===PLATFORM_API.review).length,0);
+  const archive = f.requests.find(request => request.options.method === 'PUT' &&
+    request.options.headers['Content-Type'] === 'application/zip');
+  const files = unzipSync(archive.options.body);
+  assert.deepEqual(Object.keys(files).sort(), ['project/', 'project/app.json', 'project/index.ink']);
+  assert.deepEqual(files['project/app.json'], unzipSync(f.bytes)['app.json']);
+  assert.deepEqual(files['project/index.ink'], unzipSync(f.bytes)['index.ink']);
+  assert.equal(f.remote.codeFileMd5, md5(archive.options.body));
   const duplicate=await f.platform.upload(uploadArgs);assert.equal(duplicate.result.reused,true);assert.equal(f.requests.filter(r=>r.url===PLATFORM_API.save).length,1);
   assert.equal(JSON.stringify(f.platform.status()).includes(token()),false);assert.equal((await fs.readFile(f.platform.file,'utf8')).includes(token()),false);
+});
+test('upload replaces a legacy flat code draft even when the AIX is unchanged', async t => {
+  const f = await fixture(t);
+  const first = await f.platform.upload(uploadArgs);
+  assert.equal(first.status, 'succeeded');
+  delete f.platform.state.uploads[0].sourceObject.layout;
+  const corrected = await f.platform.upload(uploadArgs);
+  assert.equal(corrected.status, 'succeeded');
+  assert.equal(corrected.result.md5, first.result.md5);
+  assert.notEqual(corrected.result.sourceObject.objectKey, first.result.sourceObject.objectKey);
+  assert.equal(corrected.result.version, '1.0.4');
+  assert.equal((await f.platform.upload(uploadArgs)).result.reused, true);
 });
 test('stale source, modified package and a foreign target all stop before the upload',async t=>{
   const f=await fixture(t);f.project.revision='source2';assert.equal((await f.platform.upload(uploadArgs)).status,'failed');f.project.revision='source1';

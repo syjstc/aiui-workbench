@@ -1,48 +1,11 @@
-# 近期 AIUI 项目经验
+# AIUI 经验复用
 
-整理日期：2026-11-13。覆盖万物捕手、头号寻宝家、来捉我吧、八荒战舰、弯道之间、AIUI 工坊，以及 WorkBuddy 的两轮五子棋开发。
+选择图片、图集和音频规格时查 [素材优化](../assets/skills/aiui-workshop/references/asset-optimization.md)。设计实时游戏场景或排查启动、绘制、声音与输入卡顿时查 [游戏性能](../assets/skills/aiui-workshop/references/optimization.md)。输入、生命周期、入口、服务及验收问题查 [常见问题](../assets/skills/aiui-workshop/references/project-lessons.md)。这些参考也可用 `aiui_skill_read` 按需读取。API 和交付要求以项目绑定的官方规范为准。
 
-这里关注 AI 在源码检查、自动回放和日志排查中发现的具体问题。最初由用户报告、随后由 AI 定位的问题另作标注；失败过程中的猜测不作为已确认结论。
+工坊同步官方 Skill 目录，首次配置或打开项目上下文时补齐已同步的 Skill。后续同步会为已配置的用户和项目补齐新增 Skill。专题正文按任务读取。例如包体审计选 `aiui-optimize`、故障诊断选 `aiui-debug`、应用内 `open` 接口选 `aiui-cloud-apis`、服务端集成选 `aiui-cloud-integration`。从 `officialSkills` 取路径和版本，用 `aiui_docs_read` 读取。项目优先用绑定版本；该版本缺少专题时目录会标出可用的官方快照版本。
 
-## 已沉淀的经验
+工坊通过 `aiui_local_lessons` 保存已复现的修法及用户确认的长期偏好。每条保留触发条件、简短做法和验证边界。有 `projectId` 的记录仅在该项目出现。用户可通过已连接的 AI 检索、修订或按条删除；记录保存在工坊的本机用户数据目录。
 
-| 项目 / 发现路径 | 确认的问题 | 后续直接采用的处理 | 边界 |
-| --- | --- | --- | --- |
-| WorkBuddy 五子棋 · AI 自主检查 | 生成的页面有残缺占位、未定义方法，胜利后仍可能调度电脑落子 | 静态检查之外，验证胜负终态、禁止后续落子及重开；异步回调核对当前局面 | 不把结构检查通过当作玩法正确 |
-| WorkBuddy 五子棋 · AI 自主回放 | 只有 keyup 时用 `now - 0` 算时长，单击变成超长按 | 无匹配 keydown 时按单击；长按触发后释放不再落子；离页清理 | ADB 注入和实体镜腿分别验证 |
-| WorkBuddy 五子棋 · AI 自主排查 | 启动日志已先产生，电脑回应也可能在上一步结束前产生，后续断言假失败 | 核对步骤时间窗与 run/revision；同一步覆盖触发与异步回应 | 不靠放宽断言或改产品延迟过测试 |
-| WorkBuddy 首轮五子棋 · AI 检查源码 | stop 后 sensorReady 仍为 true，挡住 show 后重启 | 生命周期清理实例、监听及启动守卫，恢复重新取有效读数 | 当轮其他“模拟器底层问题”猜测未全部证实 |
-| WorkBuddy 第二轮五子棋 · AI 自主运行检查 | 高频头部读数覆盖镜腿刚选的格子 | 明确输入优先级、重新接管条件，组合验证头部和镜腿 | 具体保留时间是产品参数 |
-| WorkBuddy / 工坊 · AI 连接诊断 | MCP 配置正确、服务能握手，当前聊天仍没注入工具 | 分查配置、客户端信任、服务、工具缓存；实时发现，恢复原项目 | CLI 能工作不能证明客户端 MCP 已连好 |
-| Rokid App ADB · 用户指出后 AI 真机开关对照 | ADB 在线、Android `adb_enabled=1`，Rokid App 开关关闭仍会拦截截图和 input；`persist.vendor.adb` 随开关 true/false/true 变化 | 独立读取厂商操作开关，MCP 返回明确原因和手机设置入口；不改 Android 调试或 AIUI 开发者模式来处理它 | 2026-11-16 验证于 RG-glasses `1.29.013-20261110-150201`；其他固件缺少属性时保持 unknown；input 只读帮助受阻，未注入按键 |
-| WorkBuddy 五子棋 · AI 真机采证 | 模型 available 和启动推荐成功，都不能证明长按推荐链路 | 用 origin=longpress 的请求、真实返回及高亮画面串起证据 | 第二轮日志有实际长按来源返回；仍是注入操作，佩戴体验未通过 |
-| 寻宝 / 多项目 · 用户反馈后 AI 定位 | 同次滑动多方向别名和自动重复；首绘阻塞把尾事件延迟到一秒后 | 复用离散输入模块，合并同向重复、排除同步阻塞，验证页面切换尾事件 | 静默阈值不通用于所有固件 |
-| 万物捕手 / 四款游戏 · 用户反馈后 AI 核验 | 首屏参数 schema 导致历史打包器导出卡片；入口静态尺寸不完整 | 核查实际 AIX 首工具的路由、target、参数及布局 | 全屏工具启动、手机 ACK、真实语音唤起分别验收 |
-| 万物捕手 / 寻宝 · AI 排查与纠正 | 将无默认网络误判为不能联网；模型也曾因手机 IPC 超时失败 | 先查官方手机蓝牙代理及真实响应；识别结果还需本地质量检查 | 评分 0.95 不等于 95% 准确率，过滤通过不证明实景准确率 |
-| 万物捕手 · 用户反馈后 AI 定位 | 取景重试、迟到异步结果、缩放换图和保存/媒体清理时序问题 | 操作代次限制回调；保留有效原图与待保存结果；先提交索引再清媒体 | 相机流、识别、保存分别验收 |
-| 寻宝 / 八荒 / 万物捕手 · AI 服务排查 | 小数语速被实际网关拒绝；音效与播放器能力不同 | 按实际服务值域与官方媒体契约接入，离页取消整条语音链 | 此前整数语速限制只适用于当时网关；日志不能替代听感 |
-| 来捉我吧 · AI 分段计时实验 | 同步逐像素解码拖慢首屏；早期优化只在内存实验包里 | 批量填色、图像一致性验证，再确认真实源码与包包含修改 | 后续 0.5.6 模拟器约 6.8→1.1 秒；真机启动提升未确认 |
-| 来捉我吧 · 用户反馈后 AI 对照实验 | AR 录制中逻辑、绘制和姿态回调共同下降；多轮状态不一致 | 同场景录前/中/后测量，获取故障期间原生调度证据 | 仍无稳定修复，不能归结为单个 JS 热点 |
-| 多项目 / 工坊 · AI 安装与包核验 | 本地、开发、云端、商店身份及版本容易混用 | 原身份更新并核对旧进度、运行文件、真实回执；未知结果先查 | 开发安装不代表正式上架 |
+制作新任务时按需求匹配，最多带入两条短提示。完整经验通过主动检索查看，日常工具结果继续只带各自需要的信息。私人项目资料、原始实测数据与个人偏好留在本机；随工坊分发的 Skill 维护通用判断和验证方法。
 
-## 后续如何直接使用
-
-可执行的判断和验证方法集中维护在工坊 Skill 的 [项目经验参考](../assets/skills/aiui-workshop/references/project-lessons.md)（E01–E11），避免在多个文档复制规则。`aiui-workshop/SKILL.md` 按任务引导读取；源码中的 `aiui_skill_read` 提供 `references/project-lessons.md`，因此客户端没有本地 Skill 文件也可按需获取。官方 `aiui-dev` 继续负责 API、语法和交付要求。
-
-连接新版本服务后，Codex、WorkBuddy 等使用同一套参考。工坊管理且未改动的 Skill 可随上下文检查更新，用户修改保留。正在运行的旧安装或旧聊天不会因为修改本仓库就自动获得新规则；应通过当前工具清单和 Skill 返回内容确认，必要时重开新版工坊并刷新聊天。
-
-排查时先读相关条目，再检查当前项目证据。没有迹象的模块不做整套回归，不为复用经验批量修改其他应用。恢复连接继续原 projectId/workflowId；新源码与工具链需要新证据。
-
-## 证据与维护
-
-仓库内可直接查阅：
-
-- [镜腿离散输入规范](rokid-discrete-input.md)、[公开输入模块](../examples/hello-aiui/lib/temple-navigation.js)。
-- [自动制作与恢复](automated-development.md)、[实际断言实现](../core/automation.mjs)、[MCP / CLI 工作流](ai-tool-workflows.md)。
-- [Skill 安装与更新实现](../core/agent-skills.mjs)、[模拟和真机验证参考](../assets/skills/aiui-workshop/references/verification.md)。
-
-本轮还核对了各项目自己的诊断与版本记录：`nature_atlas/docs/tencent-location-personal-test.md`、`capture-records-experience.md`、`glasses-0.26.0-release.md`；`rokid/docs/aiui-fullscreen-entry.md`；寻宝 `release-0.5.5.md`、`release-0.6.1.md`、`nod-excavation.md`；来捉我吧 `ar-recording-diagnosis-20261110.md`、`release-0.5.5.md`、`release-0.5.6.md`；八荒 `release-0.7.2.md`、`audio-runtime.md`；弯道之间 `release-0.1.1.md`。这些属于独立项目，不要求工坊使用者具备其源码。
-
-WorkBuddy 部分依据 2026-11-13 三段本地会话的助手排查结论、工具失败回执，以及第二轮五子棋的真实源码与请求日志；初始连接会话、首轮失败与第二轮成功分别核对，没有把首轮对姿态方向、传感器底层或 wait 的临时猜测升级成确定规则。原始会话包含私人信息，不随工坊分发。
-
-新增经验时补充发现路径、触发条件、根因、最小修法、验证方式及未验证边界。用新证据修订旧结论，保留仍未解决的问题。
+相关参考见 [镜腿离散输入规范](rokid-discrete-input.md) 和 [模拟与真机验证](../assets/skills/aiui-workshop/references/verification.md)。

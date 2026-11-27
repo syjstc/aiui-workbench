@@ -74,6 +74,35 @@ try{
  });
  await check('桌面点击启动真实 Ink 应用',async()=>{await page.getByRole('button',{name:'运行 姿态测试',exact:true}).click();await running();await page.frameLocator('iframe').locator('#screen').evaluate(node=>{window.pointerEvents=[];for(const type of ['pointerenter','pointerleave','pointermove'])document.addEventListener(type,e=>{window.pointerEvents.push({type,x:e.clientX,y:e.clientY,shift:e.shiftKey,buttons:e.buttons,target:e.target.tagName});window.pointerEvents=window.pointerEvents.slice(-80);},true);});await page.locator('.head-model canvas').evaluate(node=>{window.headEvents=[];for(const type of ['pointerenter','pointermove','pointerdown','pointerup','pointerleave'])node.addEventListener(type,e=>{window.headEvents.push({type,x:e.clientX,y:e.clientY,buttons:e.buttons,pose:document.querySelector('[data-axis=yaw]').textContent});},true);});assert.equal(preview.projectId,probe.id);await until(async()=>(await state()).state.sensorSessions===1);});
  const screen=()=>page.frameLocator('iframe').locator('#screen');
+ await check('静音切换保留正在运行的预览，项目页与完整模拟器共用设置',async()=>{
+  const mute=page.getByRole('button',{name:'预览静音',exact:true});
+  const outputLevel=()=>screen().evaluate(()=>window.previewAudioProbe.gain.gain.value);
+  await screen().evaluate(()=>{
+   const context=new AudioContext(), source=context.createOscillator(), createGain=context.createGain.bind(context);
+   const probe={context,source};
+   context.createGain=()=>{const gain=createGain();probe.gain=gain;return gain;};
+   source.connect(context.destination);
+   source.start();
+   window.previewAudioProbe=probe;
+  });
+  assert.equal(await outputLevel(),1);
+  await mute.click();
+  await until(async()=>await outputLevel()===0);
+  assert.equal(await mute.getAttribute('aria-pressed'),'true');
+  await mute.click();
+  await until(async()=>await outputLevel()===1);
+  assert.equal((await state()).id,preview.id);
+  await screen().evaluate(()=>window.previewAudioProbe.context.close());
+  await mute.click();
+  await page.getByRole('button',{name:'项目概览',exact:true}).click();
+  await mute.waitFor();
+  assert.equal(await mute.getAttribute('aria-pressed'),'true');
+  assert.equal(new URL(await page.locator('iframe').getAttribute('src')).searchParams.get('muted'),'1');
+  await mute.click();
+  await page.getByRole('button',{name:'打开完整模拟器',exact:true}).click();
+  await running();
+  assert.equal(await mute.getAttribute('aria-pressed'),'false');
+ });
  await check('画面内无按键移动同时改变 yaw/pitch，且不误触确认',async()=>{
   await drag(screen(),80,-40);await poseMatches({yaw:20,pitch:10,roll:0});assert.equal((await logs()).filter(l=>l.message.includes('PROBE_TAP')).length,0);
   const q=poseQuaternion({yaw:20,pitch:10,roll:0});await until(async()=>(await logs()).some(l=>{const match=l.message.match(/POSE_PROBE (\{.*\})/);return match&&JSON.parse(match[1]).q.every((v,i)=>Math.abs(v-q[i])<.001);}));

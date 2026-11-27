@@ -224,6 +224,61 @@ test('real service discovery stays authenticated and validates arguments at the 
   assert.equal(daemon.service.recordings.status().recordings.length, 0);
 });
 
+test('MCP learns verified local lessons and injects bounded, project-scoped hints on later workflows', async t => {
+  const f = await fixture(t), daemon = await startDaemon(f.home);
+  f.closers.push(() => daemon.close());
+  daemon.service.skillHome = path.join(f.home, 'skill-profile');
+  daemon.service.skillOptions = { globalRoots: [] };
+  const create = name => daemon.service.projects.create({ directory: path.join(f.home, name), name }, daemon.service.knowledge);
+  const first = await create('project-one'), second = await create('project-two');
+  const client = await mcp(f);
+  const invoke = (name, args) => client.callTool({ name, arguments: args });
+  async function call(name, args) {
+    const response = await invoke(name, args);
+    assert.ok(!response.isError, JSON.stringify(response.content));
+    return JSON.parse(response.content.find(item => item.type === 'text').text);
+  }
+  const tool = 'aiui_local_lessons';
+  assert.ok((await client.listTools()).tools.some(item => item.name === tool));
+  const example = trigger => ({ trigger, guidance: 'Measure the input queue before tuning.', keywords: ['frame', 'input'], source: 'reproduced', evidence: 'Verified with a fixed replay.' });
+  const save = (lesson, projectId) => call(tool, { action: 'save', projectId, lesson });
+  const { item: scoped } = await save(example('Project-only frame stall'), first.id);
+  await Promise.all([save(example('Frame timing')), save(example('Input lag')), save(example('Frame queue'))]);
+  const global = await call(tool, { query: 'frame', limit: 2 });
+  assert.equal(global.items.length, 2);
+  assert.equal(global.nextOffset, 2);
+  assert.equal((await call(tool, { query: 'frame', offset: global.nextOffset })).items.length, 1);
+  assert.equal((await call(tool, { projectId: second.id, lessonId: scoped.id })).items.length, 0);
+  const revised = await save({ ...example(scoped.trigger), guidance: 'Keep the same hardware cadence during replay.' }, first.id);
+  assert.equal(revised.item.id, scoped.id);
+  assert.equal((await call(tool, { projectId: first.id, lessonId: scoped.id })).items[0].guidance, revised.item.guidance);
+
+  const flow = await call('aiui_workflow_start', { projectId: first.id, request: 'Investigate a frame stall in input', target: 'package' });
+  const hints = flow.context.localLessons;
+  assert.equal(hints.length, 2);
+  assert.equal(hints[0].id, scoped.id);
+  assert.ok(hints.every(item => !('evidence' in item)));
+  assert.equal((await call('aiui_context_get', { projectId: first.id, lessonQuery: 'camera' })).localLessons, undefined);
+  assert.ok((await call('aiui_context_get', { projectId: second.id, lessonQuery: 'frame' })).localLessons.every(item => item.projectId === null));
+  assert.ok(!JSON.stringify(await call('aiui_status', {})).includes(scoped.trigger));
+  const generalContext = await call('aiui_context_get', { projectId: first.id });
+  assert.ok(generalContext.officialSkills.some(item => item.name === 'aiui-optimize' && item.revision && !('content' in item)));
+  for (const lessonPath of ['references/asset-optimization.md', 'references/optimization.md', 'references/project-lessons.md']) {
+    const result = await call('aiui_skill_read', { path: lessonPath });
+    assert.ok(result.content.length > 0 && result.content.length < 2200);
+    assert.ok(!JSON.stringify(generalContext).includes(result.content.slice(0, 60)));
+    assert.ok(!result.content.includes(scoped.trigger));
+  }
+  const crossScope = await invoke(tool, { action: 'forget', projectId: second.id, lessonId: scoped.id });
+  assert.equal(crossScope.isError, true);
+  assert.equal((await call(tool, { action: 'forget', projectId: first.id, lessonId: scoped.id })).forgotten, scoped.id);
+  assert.deepEqual((await call(tool, { projectId: first.id, lessonId: scoped.id })).items, []);
+  const stored = JSON.parse(await fs.readFile(path.join(f.home, 'local-lessons.json'), 'utf8'));
+  assert.equal(stored.length, 3);
+  assert.ok(stored.every(item => item.projectId === null));
+  assert.ok(!daemon.service.diagnostics.items.some(item => item.tool === tool));
+});
+
 test('ADB refusal and asynchronous device failures reach MCP with actionable phone debugging recovery', async t => {
   const f = await fixture(t), daemon = await startDaemon(f.home);
   f.closers.push(() => daemon.close());

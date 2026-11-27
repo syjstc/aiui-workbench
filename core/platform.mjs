@@ -16,6 +16,7 @@ const content = agent => Object.fromEntries(contentFields.filter(key => agent[ke
 function canonical(value) { return Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value; }
 const fingerprint = value => sha(JSON.stringify(canonical(value)) ?? 'undefined');
 const savedMaterialFields=['description','prologue','icon','previewMaterials','permissions','permissionsDesc'];
+const sourceDraftLayout = 'studio-project-directory-v1';
 const publicUpload=({metadata,accountId,...record})=>({...record});
 const publicReview=({accountId,...record})=>({...record});
 const uncertain = (message, result) => Object.assign(new Error(message), { result });
@@ -207,7 +208,9 @@ export class Platform {
         const previous=this.state.uploads.find(item=>item.agentId===args.agentId&&item.accountId===identity.accountId&&['dispatching','unknown'].includes(item.stage));
         if(previous&&(!args.resumeUploadId||args.resumeUploadId!==previous.id||previous.projectId!==p.id||previous.sha256!==a.sha256||previous.md5!==digest))throw new Error('上次上传结果待确认，请先核对；显式恢复必须指定同一上传回执和同一 AIX');
         if(previous&&args.version&&args.version!==(previous.requestedVersion||previous.version))throw new Error('恢复时不能改变原上传版本');
-        const last=this.state.uploads.find(item=>item.projectId===p.id&&item.accountId===identity.accountId&&item.agentId===args.agentId&&item.md5===digest&&item.stage==='verified');
+        const last = this.state.uploads.find(item => item.projectId === p.id && item.accountId === identity.accountId &&
+          item.agentId === args.agentId && item.md5 === digest && item.stage === 'verified' &&
+          item.sourceObject?.layout === sourceDraftLayout && item.sourceObject.md5 === target.codeFileMd5?.toLowerCase());
         const version=args.version||previous?.requestedVersion||previous?.version||(last&&this.matches(last,target)?last.requestedVersion||last.version:semver.inc(target.nativeVersion||'1.0.0','patch'));
         const metadata=previous?.metadata||{agentId:target.agentId,agentName:target.agentName,version,description:args.description||target.description||p.description,iconUrl:mediaUrl(target.icon),category:args.category||target.category,permissions:p.permissions.join(','),tools:this.packageTools(bytes,p)};
         if(!metadata.agentName||!metadata.description||!metadata.category||!metadata.tools.length)throw new Error('目标草稿缺少名称、介绍、图标、分类或入口，请先完善');
@@ -222,10 +225,12 @@ export class Platform {
         if(!attempt.sourceObject){
           const entries=unzipSync(bytes),files=Object.fromEntries(Object.entries(entries).filter(([name])=>name!=='VERSION'&&!name.startsWith('META-INF/')&&!name.endsWith('/')));
           if(!files['app.json'])throw new Error('AIX 缺少应用清单，未保存云端草稿');
-          const source=zipSync(files,{level:6}),old=String(target.codeFilePath||'').match(/-cache-v(\d+)-/),revision=(old?Number(old[1]):0)+1;
+          const source=zipSync({project:files},{level:6}),old=String(target.codeFilePath||'').match(/-cache-v(\d+)-/),revision=(old?Number(old[1]):0)+1;
           if(!Number.isSafeInteger(revision))throw new Error('云端代码草稿版本无效');
           const timestamp=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z'),name=`${target.agentId}-cache-v${revision}-${timestamp}-${id().replaceAll('-','').slice(0,10)}.zip`,objectKey=sts.directory.replace(/\/$/,'')+'/cache/'+name;
-          context.progress('上传与 AIX 一致的代码草稿');attempt.sourceObject=await putMedia(sts,{bytes:source,md5:md5(source),extension:'.zip',mime:'application/zip',type:'source'},{fetcher:this.fetcher,signal,objectKey});await this.save();
+          context.progress('上传与 AIX 一致的代码草稿');attempt.sourceObject=await putMedia(sts,{bytes:source,md5:md5(source),extension:'.zip',mime:'application/zip',type:'source'},{fetcher:this.fetcher,signal,objectKey});
+          attempt.sourceObject.layout = sourceDraftLayout;
+          await this.save();
         }
         await this.artifact(p.id);this.current(identity);signal.throwIfAborted();
         const latest=await this.target(target.agentId,identity,signal);

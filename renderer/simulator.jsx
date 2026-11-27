@@ -5,6 +5,7 @@ import { Activity, ArrowLeft, ArrowRight, Camera, ChevronRight, Glasses, HelpCir
 import { DEFAULT_MOUSE, DEFAULT_MOTION, NEUTRAL_POSE, POSE_AXES, updatePose } from '../shared/pose.mjs';
 import { DesktopNavigation } from './desktop-navigation.mjs';
 import { ProjectIcon } from './project-icon.jsx';
+import { PreviewAudioButton, PreviewFrame } from './preview-frame.jsx';
 import { HeadModel } from './head-model.jsx';
 import './simulator.css';
 
@@ -13,7 +14,7 @@ function Button({ children, icon: Icon, className = '', ...props }) {
   return <button className={'button ' + className} {...props}>{Icon && <Icon size={15}/>} {children}</button>;
 }
 
-export function Simulator({ projects, project, preview, session, onOpen, onHome, onImport, onCapture, capturing, act, choosePhoto }) {
+export function Simulator({ projects, project, preview, session, onOpen, onHome, onImport, onCapture, capturing, act, choosePhoto, previewMuted, onTogglePreviewMute }) {
   const frame = useRef(null), home = useRef(onHome);
   const [live, setLive] = useState(null);
   home.current = onHome;
@@ -50,7 +51,10 @@ export function Simulator({ projects, project, preview, session, onOpen, onHome,
       <div className="stage-toolbar">
         <span><span className={'dot ' + (current.status === 'failed' ? 'error' : '')}/>{preview ? status : t("模拟器桌面")}</span>
         <span>Rokid Glasses <span className="stage-divider">/</span> {preview?.width || 480} × {preview?.height || 352}</span>
-        {preview ? <Button icon={Home} onClick={() => act('exit')}>{t("回到桌面")}</Button> : <span className="pill">{t("本地应用")}</span>}
+        {preview ? <div className="stage-toolbar-actions">
+          <PreviewAudioButton muted={previewMuted} onToggle={onTogglePreviewMute}/>
+          <Button icon={Home} onClick={() => act('exit')}>{t("回到桌面")}</Button>
+        </div> : <span className="pill">{t("本地应用")}</span>}
       </div>
       {preview && <div className="mouse-toolbar">
         <button className={'mouse-mode ' + (mouse.enabled ? 'active' : '')} aria-label={t("鼠标模拟 3DoF")} aria-pressed={mouse.enabled} disabled={!ready} onClick={() => direct('mouse', {enabled:!mouse.enabled})}><MousePointer2 size={14}/>{t("鼠标 3DoF")}</button>
@@ -61,7 +65,7 @@ export function Simulator({ projects, project, preview, session, onOpen, onHome,
       <div className="device-mat"><div className="screen-device">
         <div className="device-top"><span/><small>AIUI DISPLAY</small><span/></div>
         <div className="screen-wrap">{preview
-          ? <iframe ref={frame} title={t("AIUI 官方运行时")} key={preview.id} src={preview.url} width={preview.width || 480} height={preview.height || 352} allow="autoplay; camera" onLoad={() => direct('sync')}/>
+          ? <PreviewFrame ref={frame} title={t("AIUI 官方运行时")} key={preview.url} preview={preview} muted={previewMuted} width={preview.width || 480} height={preview.height || 352} allow="autoplay; camera" onLoad={() => direct('sync')}/>
           : <Desktop projects={projects} initialSelected={project?.id} onOpen={onOpen} onImport={onImport}/>}</div>
         <div className="device-bottom"><span>ROKID</span><span>SIMULATION</span></div>
       </div></div>

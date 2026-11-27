@@ -6,9 +6,13 @@ import { documentCatalog, documentLink, resolveDocumentLink } from './document-l
 import { DocumentSearch } from './document-search.mjs';
 import { documentNavigation } from './document-navigation.mjs';
 import { documentImagePath, documentImages, isDocumentImage, imageMime } from './document-images.mjs';
+import { officialSkillFile } from './official-skills.mjs';
 
 const REPO = 'yodaos-project/AIUI';
-const wanted = p => /^(documentation\/.*\.(md|json)|skills\/aiui-dev\/.*\.(md|ink|js)|README(?:\.zh-CN)?\.md|LICENSE(?:\.md)?)$/.test(p);
+const wanted = p => /^(documentation\/.*\.(md|json)|README(?:\.zh-CN)?\.md|LICENSE(?:\.md)?)$/.test(p);
+const skillAsset = /\.(?:md|ink|js|mjs|cjs|ts|py|json|ya?ml|txt|css|wxss|svg)$/i;
+const SKILLS_SYNC_VERSION = 1;
+const gitBlobHash = bytes => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
 const HOUR = 3600000;
 async function fetchOk(url, signal, fetcher) {
   const response = await fetcher(url, { signal: AbortSignal.any([signal, AbortSignal.timeout(90000)]), headers: { 'User-Agent': 'AIUI-Workbench/0.1', Accept: 'application/vnd.github+json' } });
@@ -24,16 +28,18 @@ export class Knowledge {
   }
   async init() {
     this.meta = await readJson(path.join(this.dir, 'current.json'), this.meta);
-    if (!this.meta.revision) {
-      const bundled = await readJson(path.join(ROOT, 'vendor/official/current.json'), null);
-      if (bundled) {
-        await fs.mkdir(this.dir, { recursive: true });
-        await fs.cp(path.join(ROOT, 'vendor/official', bundled.revision), path.join(this.dir, bundled.revision), { recursive: true });
-        this.meta = { ...bundled, bundled: true };
-        await atomicJson(path.join(this.dir, 'current.json'), this.meta);
-      }
+    const bundled = await readJson(path.join(ROOT, 'vendor/official/current.json'), null);
+    const newerBundle = Date.parse(bundled?.upstreamDate) > Date.parse(this.meta.upstreamDate);
+    const fullerBundle = bundled?.revision === this.meta.revision &&
+      (bundled?.skillsSyncVersion ?? 0) > (this.meta.skillsSyncVersion ?? 0);
+    if (bundled && (!this.meta.revision || newerBundle || fullerBundle)) {
+      await fs.mkdir(this.dir, { recursive: true });
+      await fs.cp(path.join(ROOT, 'vendor/official', bundled.revision), path.join(this.dir, bundled.revision), { recursive: true });
+      this.meta = { ...bundled, bundled: true };
+      await atomicJson(path.join(this.dir, 'current.json'), this.meta);
     }
     this.updates = { ...this.updates, ...await readJson(path.join(this.dir, 'updates.json'), {}) };
+    if (this.meta.skillsSyncVersion !== SKILLS_SYNC_VERSION && this.updates.attemptedSkillsSyncVersion !== SKILLS_SYNC_VERSION) this.updates.nextCheckAt = null;
     this.updates.autoUpdate = this.updates.autoUpdate !== false;
     this.updates.intervalHours = [24, 168].includes(this.updates.intervalHours) ? this.updates.intervalHours : 24;
     return this;
@@ -71,6 +77,7 @@ export class Knowledge {
     const combined = AbortSignal.any([this.controller.signal, signal || this.controller.signal]);
     this.syncing = (async () => {
       this.updates.attemptedAt = new Date(this.now()).toISOString();
+      this.updates.attemptedSkillsSyncVersion = SKILLS_SYNC_VERSION;
       await this.saveUpdates();
       try {
         await this.doSync(combined, progress);
@@ -90,7 +97,7 @@ export class Knowledge {
     const commit = await (await fetchOk(`https://api.github.com/repos/${REPO}/commits/main`, signal, this.fetcher)).json();
     const revision = commit.sha;
     if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('官方资料版本校验失败');
-    if (this.meta.revision === revision) {
+    if (this.meta.revision === revision && this.meta.skillsSyncVersion === SKILLS_SYNC_VERSION) {
       const images = await this.cacheImages(await this.index(revision), revision, signal, progress);
       this.meta = { ...this.meta, images, checkedAt: new Date(this.now()).toISOString() };
       await atomicJson(path.join(this.dir, 'current.json'), this.meta); return this.status();
@@ -98,22 +105,37 @@ export class Knowledge {
     progress('正在读取官方文档目录');
     const tree = await (await fetchOk(`https://api.github.com/repos/${REPO}/git/trees/${revision}?recursive=1`, signal, this.fetcher)).json();
     if (tree.truncated) throw new Error('官方目录返回不完整，保留现有资料版本');
-    const entries = tree.tree.filter(f => f.type === 'blob' && wanted(f.path) && f.size < 2 * 1024 * 1024);
+    const files = tree.tree.filter(f => f.type === 'blob' && f.mode !== '120000' && f.size < 2 * 1024 * 1024);
+    const skillNames = new Set(files.flatMap(file => {
+      const skill = officialSkillFile(file.path);
+      return skill?.relative === 'SKILL.md' ? [skill.name] : [];
+    }));
+    const entries = files.filter(file => wanted(file.path) || (skillAsset.test(file.path) && skillNames.has(officialSkillFile(file.path)?.name)));
     if (entries.length > 1800) throw new Error('官方资料目录超过同步上限');
     const snapshot = path.join(this.dir, revision), index = [];
+    // Older installers cached only aiui-dev, even at the current revision.
+    // Reuse their verified blobs while filling in the newly discoverable files.
+    const cached = new Map((await this.index(revision)).map(doc => [doc.path, doc]));
     await fs.mkdir(snapshot, { recursive: true });
     let completed = 0, cursor = 0;
     const workers = Array.from({ length: Math.min(8, entries.length) }, async () => {
       while (cursor < entries.length) {
         const entry = entries[cursor++], relative = entry.path; safeRelative(relative);
-        let content;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try { content = await (await fetchOk(`https://raw.githubusercontent.com/${REPO}/${revision}/${relative}`, signal, this.fetcher)).text(); break; }
-          catch(e) { if (signal?.aborted || attempt) throw e; }
+        const previous = cached.get(relative);
+        const cachedBytes = previous ? Buffer.from(previous.content) : null;
+        let value = cachedBytes && gitBlobHash(cachedBytes) === entry.sha ? cachedBytes : null;
+        if (!value) {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const response = await fetchOk(`https://raw.githubusercontent.com/${REPO}/${revision}/${relative}`, signal, this.fetcher);
+              value = Buffer.from(await response.arrayBuffer());
+              break;
+            } catch (error) { if (signal?.aborted || attempt) throw error; }
+          }
         }
-        const value = Buffer.from(content);
-        const gitBlob = createHash('sha1').update(`blob ${value.length}\0`).update(value).digest('hex');
-        if (gitBlob !== entry.sha) throw new Error(`官方资料完整性核对失败：${relative}`);
+        if (gitBlobHash(value) !== entry.sha) throw new Error(`官方资料完整性核对失败：${relative}`);
+        const content = value.toString('utf8');
+        if (!Buffer.from(content).equals(value)) throw new Error(`官方资料不是有效的 UTF-8：${relative}`);
         await fs.mkdir(path.dirname(path.join(snapshot, relative)), { recursive: true });
         await fs.writeFile(path.join(snapshot, relative), value);
         index.push({ path: relative, title: content.match(/^#\s+(.+)$/m)?.[1] || path.basename(relative), sha256: sha(value), content });
@@ -126,7 +148,7 @@ export class Knowledge {
     await atomicJson(path.join(snapshot, 'index.json'), index);
     const images = await this.cacheImages(index, revision, signal, progress, tree.tree);
     this.indexes.delete(revision); this.searchIndexes.delete(revision);
-    const updated = { status: 'ready', source: `https://github.com/${REPO}`, revision, documents: index.length, images, syncedAt: new Date(this.now()).toISOString(), checkedAt: new Date(this.now()).toISOString(), upstreamDate: commit.commit?.committer?.date, license: 'Apache-2.0' };
+    const updated = { status: 'ready', source: `https://github.com/${REPO}`, revision, documents: index.length, skillsSyncVersion: SKILLS_SYNC_VERSION, images, syncedAt: new Date(this.now()).toISOString(), checkedAt: new Date(this.now()).toISOString(), upstreamDate: commit.commit?.committer?.date, license: 'Apache-2.0' };
     await atomicJson(path.join(this.dir, 'current.json'), updated);
     this.meta = updated;
     progress(`已同步 ${index.length} 份官方资料`);

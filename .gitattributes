@@ -8,7 +8,7 @@ vendor/official/**/documentation/image/** -text
 *.icns binary
 *.ico binary
 # Preserve the exact upstream snapshot, including original Markdown whitespace.
-vendor/official/** -whitespace
+vendor/official/** -text -whitespace
 # Keep the recorded helper source digest stable on every checkout.
 assets/android/AppInfo.java text eol=lf
 assets/android/app-info.dex -text
