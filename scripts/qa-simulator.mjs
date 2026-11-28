@@ -13,7 +13,7 @@ const home=path.join(root,'.local/simulator-qa',String(Date.now())),output=path.
 await fs.mkdir(output,{recursive:true});
 const report={checks:[],errors:[],simulated:true,deviceAcceptance:false};
 const daemon=await startDaemon(home);
-const call=(tool,args={})=>daemon.service.call(tool,args,'qa');
+const call=(tool,args={},actor='qa')=>daemon.service.call(tool,args,actor);
 const app=await electron.launch({args:[root],cwd:root,env:{...process.env,AIUI_WORKBENCH_HOME:home,ELECTRON_RUN_AS_NODE:''}});
 let page=await app.firstWindow(),gateway;await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.webContents.setBackgroundThrottling(false);w.hide();});
 if(webMode){gateway=await startWeb({home,client:{connection:daemon.connection,call}});const next=app.waitForEvent('window');await app.evaluate(async({BrowserWindow},url)=>{const w=new BrowserWindow({show:false,width:1440,height:940,webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true}});w.webContents.setBackgroundThrottling(false);await w.loadURL(url);},gateway.url);page=await next;}
@@ -22,10 +22,16 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,ms=20000){const end=Date.now()+ms;while(Date.now()<end){const value=await fn();if(value)return value;await pause(100);}throw new Error('等待模拟器状态超时');}
 async function check(name,fn){await fn();report.checks.push({name,passed:true});console.log('PASS',name);}
 let preview;
+async function openProject(name) {
+ const switcher=page.getByRole('combobox',{name:'切换项目',exact:true});
+ if(await switcher.count())await switcher.selectOption({label:name});
+ else await page.getByRole('heading',{name,exact:true}).click();
+ await page.getByRole('button',{name:'模拟器',exact:true}).click();
+}
 const state=async()=>call('aiui_preview_state',{sessionId:preview.id});
 const act=(action,parameters={})=>call('aiui_preview_action',{sessionId:preview.id,action,parameters});
 const logs=async()=> (await call('aiui_preview_logs',{sessionId:preview.id,limit:300})).logs;
-async function running(){await page.frameLocator('iframe').locator('#status').waitFor({state:'hidden',timeout:45000});await page.getByRole('button',{name:'鼠标模拟 3DoF',exact:true}).waitFor();await until(async()=>!(await page.getByRole('button',{name:'鼠标模拟 3DoF',exact:true}).isDisabled()));preview=(await call('aiui_status')).previews.find(s=>s.status==='ready');assert.ok(preview);}
+async function running(){await page.frameLocator('iframe').locator('#status').waitFor({state:'hidden',timeout:45000});await page.getByRole('button',{name:'鼠标模拟 3DoF',exact:true}).waitFor();await until(async()=>!(await page.getByRole('button',{name:'鼠标模拟 3DoF',exact:true}).isDisabled()));const id=new URL(await page.locator('iframe').getAttribute('src')).searchParams.get('session');preview=await until(async()=>(await call('aiui_status')).previews.find(s=>s.id===id&&s.status==='ready'));}
 async function drag(locator,dx,dy,{shift=false,button=null}={}){
   await page.mouse.move(100,400);await locator.scrollIntoViewIfNeeded();const box=await locator.boundingBox();assert.ok(box);
   const x=box.x+box.width/2,y=box.y+box.height/2;
@@ -47,34 +53,36 @@ export default {
 </script><page><view class="root" bindtap="tap"><text class="title">3DoF 姿态测试</text><text>移动鼠标，观察姿态传感器</text><text>{{readout}}</text><text>确认次数 {{taps}} · 长按次数 {{holds}}</text><text>返回键退出到桌面</text></view></page><style>.root{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#000;color:#b6ef9f;font-size:14px}.title{font-size:26px;}</style>`;
 try{
  await page.getByRole('button',{name:'切换到中文',exact:true}).click();
- await page.getByRole('button',{name:'模拟器',exact:true}).click();
- await check('空桌面提供导入入口',async()=>{await page.getByText('桌面还没有应用',{exact:true}).waitFor();});
- let probe;
- await check('桌面自动显示项目库，长列表可滚动',async()=>{
-  for(let i=0;i<10;i++){
-   const directory=path.join(home,'projects','probe-'+i);await fs.mkdir(path.join(directory,'pages/index'),{recursive:true});
-   await fs.writeFile(path.join(directory,'app.json'),JSON.stringify({name:i===9?'姿态测试':'示例应用 '+(i+1),version:'1.0.0',pages:['pages/index/index'],permissions:[]}));
-   await fs.writeFile(path.join(directory,'pages/index/index.ink'),fixture);
-   const p=await call('aiui_project_import',{directory});if(i===9)probe=p;
-  }
-  await until(async()=>await page.locator('.launcher-app').count()===10);
-  await page.screenshot({path:path.join(output,'01-desktop.png')});
+ await check('项目列表不显示尚未选中的项目操作',async()=>{
+  await page.getByRole('heading',{name:'我的项目',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'模拟器',exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'构建与上传',exact:true}).count(),0);
  });
- await check('桌面方向键连发和长按只移动一项，停顿、反向和跨行滚动正常',async()=>{
-  const desktop=page.getByRole('region',{name:'模拟器桌面'});await desktop.focus();
-  const selection=()=>page.locator('.launcher-app[aria-pressed="true"]').getAttribute('data-project-id');
-  const start=await selection();for(let i=0;i<8;i++)await page.keyboard.press(i%2?'ArrowDown':'ArrowRight');
-  const first=await selection();assert.notEqual(first,start);
-  const ids=await page.locator('.launcher-app').evaluateAll(nodes=>nodes.map(n=>n.dataset.projectId));assert.equal(first,ids[(ids.indexOf(start)+1)%ids.length]);
-  await pause(400);await page.keyboard.press('ArrowRight');const second=await selection();assert.equal(second,ids[(ids.indexOf(first)+1)%ids.length]);
-  await page.keyboard.press('ArrowLeft');assert.equal(await selection(),first);
-  await pause(400);await page.keyboard.down('ArrowRight');for(let i=0;i<15;i++){await page.keyboard.down('ArrowRight');await pause(60);}await page.keyboard.up('ArrowRight');assert.equal(await selection(),second);
-  for(let i=0;i<7;i++){await pause(380);await page.keyboard.press('ArrowRight');}
-  assert.ok(await page.locator('.launcher-grid').evaluate(node=>node.scrollTop>0));
+ const directory=path.join(home,'projects','probe');
+ await fs.mkdir(path.join(directory,'pages/index'),{recursive:true});
+ await fs.writeFile(path.join(directory,'app.json'),JSON.stringify({name:'姿态测试',version:'1.0.0',pages:['pages/index/index'],permissions:[]}));
+ await fs.writeFile(path.join(directory,'pages/index/index.ink'),fixture);
+ const probe=await call('aiui_project_import',{directory});
+ await check('项目内运行真实 Ink 应用',async()=>{
+  await openProject(probe.name);await running();assert.equal(preview.projectId,probe.id);
+  await until(async()=>(await state()).state.sensorSessions===1);
+  await page.screenshot({path:path.join(output,'01-project-simulator.png')});
  });
- await check('桌面点击启动真实 Ink 应用',async()=>{await page.getByRole('button',{name:'运行 姿态测试',exact:true}).click();await running();await page.frameLocator('iframe').locator('#screen').evaluate(node=>{window.pointerEvents=[];for(const type of ['pointerenter','pointerleave','pointermove'])document.addEventListener(type,e=>{window.pointerEvents.push({type,x:e.clientX,y:e.clientY,shift:e.shiftKey,buttons:e.buttons,target:e.target.tagName});window.pointerEvents=window.pointerEvents.slice(-80);},true);});await page.locator('.head-model canvas').evaluate(node=>{window.headEvents=[];for(const type of ['pointerenter','pointermove','pointerdown','pointerup','pointerleave'])node.addEventListener(type,e=>{window.headEvents.push({type,x:e.clientX,y:e.clientY,buttons:e.buttons,pose:document.querySelector('[data-axis=yaw]').textContent});},true);});assert.equal(preview.projectId,probe.id);await until(async()=>(await state()).state.sensorSessions===1);});
+ await check('切到工坊工具再返回，保留项目页签和同一个 Ink 画面',async()=>{
+  const frame=await page.locator('iframe').elementHandle();
+  const sidebar=page.locator('.sidebar');
+  await page.getByRole('button',{name:'相机',exact:true}).click();
+  await sidebar.getByRole('button',{name:'连接 AI 工具',exact:true}).click();
+  assert.equal(await sidebar.getByRole('combobox',{name:'切换项目',exact:true}).inputValue(),probe.id);
+  await sidebar.getByRole('button',{name:'我的项目',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'模拟器',exact:true}).getAttribute('aria-current'),'page');
+  assert.equal(await page.getByRole('button',{name:'相机',exact:true}).getAttribute('aria-pressed'),'true');
+  assert.equal(await frame.evaluate(node=>node===document.querySelector('iframe')),true);
+  assert.equal((await state()).id,preview.id);
+  await page.getByRole('button',{name:'镜腿',exact:true}).click();
+ });
  const screen=()=>page.frameLocator('iframe').locator('#screen');
- await check('静音切换保留正在运行的预览，项目页与完整模拟器共用设置',async()=>{
+ await check('静音切换保留运行进度，重新打开项目模拟器时保留设置',async()=>{
   const mute=page.getByRole('button',{name:'预览静音',exact:true});
   const outputLevel=()=>screen().evaluate(()=>window.previewAudioProbe.gain.gain.value);
   await screen().evaluate(()=>{
@@ -94,13 +102,13 @@ try{
   assert.equal((await state()).id,preview.id);
   await screen().evaluate(()=>window.previewAudioProbe.context.close());
   await mute.click();
-  await page.getByRole('button',{name:'项目概览',exact:true}).click();
-  await mute.waitFor();
+  await page.getByRole('navigation',{name:'当前项目'}).getByRole('button',{name:'概览',exact:true}).click();
+  assert.equal(await page.locator('iframe').count(),0);
+  await page.getByRole('button',{name:'运行项目',exact:true}).click();
+  await running();
   assert.equal(await mute.getAttribute('aria-pressed'),'true');
   assert.equal(new URL(await page.locator('iframe').getAttribute('src')).searchParams.get('muted'),'1');
   await mute.click();
-  await page.getByRole('button',{name:'打开完整模拟器',exact:true}).click();
-  await running();
   assert.equal(await mute.getAttribute('aria-pressed'),'false');
  });
  await check('画面内无按键移动同时改变 yaw/pitch，且不误触确认',async()=>{
@@ -108,15 +116,16 @@ try{
   const q=poseQuaternion({yaw:20,pitch:10,roll:0});await until(async()=>(await logs()).some(l=>{const match=l.message.match(/POSE_PROBE (\{.*\})/);return match&&JSON.parse(match[1]).q.every((v,i)=>Math.abs(v-q[i])<.001);}));
  });
  await check('Shift 移动和右键移动独立控制侧倾',async()=>{await drag(screen(),40,20,{shift:true});await poseMatches({yaw:20,pitch:10,roll:10});await drag(screen(),-20,0,{button:'right'});await poseMatches({yaw:20,pitch:10,roll:5});});
- await check('头部模型可无按键移动控制，应用与角度读数同步',async()=>{await drag(page.locator('.head-model canvas'),40,0);await poseMatches({yaw:30,pitch:10,roll:5});assert.equal(await page.locator('[data-axis="yaw"]').textContent(),'30.0°');await page.screenshot({path:path.join(output,'02-head-model-pose.png')});});
+ await check('头部模型可无按键移动控制，应用与角度读数同步',async()=>{await page.getByRole('button',{name:'头部动作',exact:true}).click();await drag(page.locator('.head-model canvas'),40,0);await poseMatches({yaw:30,pitch:10,roll:5});assert.equal(await page.locator('[data-axis="yaw"]').textContent(),'30.0°');await page.screenshot({path:path.join(output,'02-head-model-pose.png')});});
  await check('回正、灵敏度、精确滑条和外部姿态同步',async()=>{
   await page.getByRole('button',{name:'姿态回正',exact:true}).click();await poseMatches({yaw:0,pitch:0,roll:0});
+  await page.getByText('精确姿态',{exact:true}).click();
   await page.getByRole('slider',{name:'鼠标灵敏度',exact:true}).fill('0.5');await until(async()=>(await state()).state.mouse.sensitivity===.5);await drag(screen(),40,0);await poseMatches({yaw:20});
   await page.getByRole('slider',{name:'左右转头',exact:true}).fill('-12');await poseMatches({yaw:-12});
   await act('pose',{yaw:8,pitch:-5,roll:12});await until(async()=>await page.getByRole('slider',{name:'左右转头',exact:true}).inputValue()==='8');
  });
  await check('自动演示幅度与周期生效，画面内无按键鼠标可立即接管',async()=>{
-  await act('pose',{yaw:0,pitch:0,roll:0});await page.getByRole('button',{name:'演示',exact:true}).click();
+  await act('pose',{yaw:0,pitch:0,roll:0});await page.getByText('自动演示头部动作',{exact:true}).click();
   await page.getByRole('button',{name:'组合动作',exact:true}).click();await page.getByRole('slider',{name:'动作幅度',exact:true}).fill('25');await page.getByRole('slider',{name:'演示周期',exact:true}).fill('2');
   await page.getByRole('button',{name:'开始演示',exact:true}).click();await until(async()=>{const s=(await state()).state;return s.motion.enabled&&Math.abs(s.pose.yaw)>3&&Math.abs(s.pose.pitch)>1;});
   await page.screenshot({path:path.join(output,'03-auto-motion.png')});await drag(screen(),20,0);await until(async()=>(await state()).state.motion.enabled===false);await pause(220);const p=(await state()).state.pose;await pause(350);assert.deepEqual((await state()).state.pose,p);
@@ -133,12 +142,13 @@ try{
   await page.getByRole('button',{name:'鼠标模拟 3DoF',exact:true}).click();await until(async()=>(await state()).state.mouse.enabled);await screen().click();await until(async()=>(await logs()).filter(l=>l.message.includes('PROBE_TAP')).length===before+2);
  });
  await check('长按按钮使用所选时长，只触发一次且释放不产生单击',async()=>{
-  await page.getByRole('button',{name:'交互',exact:true}).click();
+  await page.getByRole('button',{name:'镜腿',exact:true}).click();
+  await page.getByText('长按设置与事件测试',{exact:true}).click();
   await page.getByRole('slider',{name:'长按时长',exact:true}).fill('1.1');
   const sequence=(await logs()).at(-1)?.sequence||0;
   await page.getByRole('button',{name:'长按镜腿',exact:false}).click();
   assert.ok(await page.getByRole('button',{name:'正在长按…',exact:false}).isDisabled());
-  assert.ok(await page.getByRole('button',{name:'单击确认',exact:false}).isDisabled());
+  assert.ok(await page.getByRole('button',{name:'点按确认',exact:true}).isDisabled());
   await until(async()=>(await logs()).some(l=>l.sequence>sequence&&l.message.includes('PROBE_CONFIRM_RELEASE')));
   const fresh=(await logs()).filter(l=>l.sequence>sequence);
   for(const marker of ['PROBE_CONFIRM_DOWN','PROBE_LONGPRESS','PROBE_CONFIRM_RELEASE'])assert.equal(fresh.filter(l=>l.message.includes(marker)).length,1,marker);
@@ -168,15 +178,15 @@ try{
  });
  await check('应用主动退出返回桌面，可以再次启动',async()=>{
   await screen().press('Backspace');await page.getByRole('region',{name:'模拟器桌面'}).waitFor();assert.equal((await state()).status,'closed');
-  await page.getByRole('button',{name:'运行 姿态测试',exact:true}).click();await running();await until(async()=>(await state()).state.sensorSessions===1);
+  await page.getByRole('button',{name:'运行应用',exact:true}).click();await running();await until(async()=>(await state()).state.sensorSessions===1);
  });
  await check('固定回桌面入口停止实例、清理输入和自动演示',async()=>{
   await act('pose_motion',{enabled:true});await page.getByRole('button',{name:'回到桌面',exact:true}).click();await page.getByRole('region',{name:'模拟器桌面'}).waitFor();
   const s=(await state()).state;assert.equal(s.running,false);assert.equal(s.sensorSessions,0);assert.equal(s.motion.enabled,false);assert.equal(s.mouse.dragging,false);
  });
- await check('公开姿态示例可从桌面启动并接收鼠标姿态',async()=>{
+ await check('公开姿态示例可在项目内启动并接收鼠标姿态',async()=>{
   const p=await call('aiui_project_import',{directory:path.resolve(root,'examples/motion-lab')});report.projectRevision=p.revision;
-  await page.getByRole('button',{name:'运行 Motion Lab',exact:true}).click();await running();assert.equal(preview.projectId,p.id);
+  await openProject(p.name);await running();assert.equal(preview.projectId,p.id);
   await act('tap');await drag(screen(),48,-16);await poseMatches({yaw:12,pitch:4});
   await until(async()=>(await logs()).some(l=>l.message.includes('MOTION_READING')));
   await page.screenshot({path:path.join(output,'04-motion-lab.png')});

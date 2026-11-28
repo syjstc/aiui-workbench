@@ -1,5 +1,5 @@
 let createInkView, satisfiesInkEngine, getInkVersion, getInkBundleVersion;
-import { DEFAULT_MOUSE, DEFAULT_MOTION, NEUTRAL_POSE, motionPose, poseQuaternion, updatePose } from '../shared/pose.mjs';
+import { DEFAULT_MOUSE, DEFAULT_MOTION, NEUTRAL_POSE, motionPose, updatePose } from '../shared/pose.mjs';
 import { bindMousePose } from './mouse-pose.mjs';
 import { SimulatorCamera } from './camera.mjs';
 import mediaRuntime from './media-runtime.js?raw';
@@ -8,11 +8,24 @@ import imageCodecRuntime from './image-codec.js?raw';
 import fflateRuntime from '../node_modules/fflate/esm/browser.js?raw';
 import { CanvasRecording } from './recording.mjs';
 import { installAudioOutput } from './audio-output.mjs';
+import { SimulatorImu } from './imu.mjs';
 import './style.css';
 
 const query = new URLSearchParams(location.search), sessionId = query.get('session'), key = query.get('key');
 const setMuted = installAudioOutput(query.get('muted') === '1');
 const canvas = document.querySelector('#screen'), notice = document.querySelector('#status');
+let screenInViewport = true;
+const screenObserver = new IntersectionObserver(([entry]) => { screenInViewport = entry.isIntersecting; });
+screenObserver.observe(canvas);
+// Ink exposes the display capability to apps but renders an RGB canvas in both modes.
+const greenFilter = 'url(#green-display)';
+let displayMode = query.get('display') === 'color' ? 'color' : 'monochrome';
+function drawDisplayFrame(output) {
+  const context = output.getContext('2d');
+  context.clearRect(0,0,output.width,output.height);
+  context.filter = displayMode === 'monochrome' ? greenFilter : 'none';
+  context.drawImage(canvas,0,0);
+}
 let view, current, dead = false, reloading = false, currentStatus = 'loading', logEntries = [], logGeneration = null, pendingCommands = Promise.resolve(), logFlush = Promise.resolve(), runId = crypto.randomUUID();
 let pose = { ...NEUTRAL_POSE, connected: true }, mouse = { ...DEFAULT_MOUSE, dragging:false }, battery = { level:.85, charging:false, chargingTime:0, dischargingTime:28800 };
 let poseFrame = 0, posePublishTimer = 0, publishQueue = Promise.resolve(), commandActive = false;
@@ -22,7 +35,8 @@ async function flushStorage(){while(storagePending.length){await request('storag
 let motion = { ...DEFAULT_MOTION }, motionOrigin = { ...pose }, motionStart = 0;
 let networkOnline = true, focused = true, target = '_blank';
 let aiInfo={enabled:false};
-const sensorSessions = new Map(), batterySessions = new Map(), readings = { orientation:0, photos:0 };
+const batterySessions = new Map(), readings = { photos:0 };
+const imu = new SimulatorImu(event,()=>publish().catch(()=>{}));
 const camera = new SimulatorCamera({ emit:event, changed:()=>{if(currentStatus==='ready')publish().catch(()=>{});}, onPhoto:()=>readings.photos++ });
 const recording = new CanvasRecording(canvas,async(id,blob,metadata)=>{const response=await fetch(`/session/${sessionId}/recording/${id}`,{method:'POST',headers:{'X-Preview-Key':key,'Content-Type':blob.type,'X-Recording-Metadata':JSON.stringify(metadata)},body:blob});const result=await response.json();if(!response.ok)throw new Error(result.error||'视频保存失败');return result.result;},()=>publish().catch(()=>{}));
 camera.installBrowserMedia();
@@ -39,7 +53,7 @@ for(const level of ['log','info','warn','error','debug']) {
 window.addEventListener('error',e=>console.error('RUNTIME_ERROR',e.message));
 window.addEventListener('unhandledrejection',e=>console.error('UNHANDLED_REJECTION',String(e.reason?.stack||e.reason)));
 function flushLogs() { logFlush=logFlush.catch(()=>{}).then(async()=>{while(logEntries.length){const entries=logEntries.splice(0,80);try{await request('log',{entries});}catch(error){logEntries=[...entries,...logEntries].slice(-500);throw error;}}});return logFlush; }
-function state() { return { runId, running:view?.isRunning()||false, rendering:view?.isRendering()||false, inputEnabled:view?.isInputEnabled()||false, recording:recording.state(), focused, target, network:{online:networkOnline}, pose:{...pose}, mouse:{...mouse}, motion:{...motion}, sensorSessions:sensorSessions.size, readings:{...readings}, camera:camera.state(), battery, ai:{...aiInfo}, sdkVersion:current?.session?.webSdkVersion, runtime:view?getInkVersion():null, bundleVersion:view?getInkBundleVersion():null, sourceUnmodified:true, runtimePolyfills:{imageEncoding:'image/png',imageCapturePhoto:'preview-frame',storage:'project-persistent-simulation'}, capabilities:{temple:'simulated',orientation:'simulated',camera:camera.source==='webcam'?'computer-camera':'photo-fixture-stream',battery:'simulated',bluetooth:'unsupported',languageModel:aiInfo.enabled?'active-ai-automation':'device-test-required',network:'status-events-only'} }; }
+function state() { const imuState=imu.state();return { runId, running:view?.isRunning()||false, rendering:view?.isRendering()||false, inputEnabled:view?.isInputEnabled()||false, recording:recording.state(), focused, target, network:{online:networkOnline}, pose:{...pose}, mouse:{...mouse}, motion:{...motion}, sensorSessions:imuState.subscriptions.orientation, readings:{...imuState.readings,...readings}, imu:imuState, camera:camera.state(), battery, ai:{...aiInfo}, sdkVersion:current?.session?.webSdkVersion, runtime:view?getInkVersion():null, bundleVersion:view?getInkBundleVersion():null, sourceUnmodified:true, runtimePolyfills:{imageEncoding:'image/png',imageCapturePhoto:'preview-frame',storage:'project-persistent-simulation'}, capabilities:{temple:'simulated',orientation:'simulated',imu:'simulated',camera:camera.source==='webcam'?'computer-camera':'photo-fixture-stream',battery:'simulated',bluetooth:'unsupported',languageModel:aiInfo.enabled?'active-ai-automation':'device-test-required',network:'status-events-only'} }; }
 function notifyParent(allowClosed=false) { if(window.parent!==window&&!(currentStatus==='closed'&&(!allowClosed||commandActive)))window.parent.postMessage({channel:'aiui-preview-state',sessionId,status:currentStatus,state:state()},'*'); }
 function publish(status=currentStatus) {
   notifyParent();
@@ -63,26 +77,39 @@ window.addEventListener('message',e=>{
   if(e.source!==window.parent||(e.origin!=='null'&&!/^http:\/\/127\.0\.0\.1:\d+$/.test(e.origin))||e.data?.channel!=='aiui-preview-control'||e.data.sessionId!==sessionId||e.data.key!==key)return;
   const {action,parameters}=e.data;
   if(action==='audio_mute'){if(typeof parameters?.muted==='boolean')setMuted(parameters.muted);return;}
+  if(action==='display_mode'){
+    const mode=parameters?.mode;
+    if(mode!=='color'&&mode!=='monochrome')return;
+    pendingCommands=pendingCommands.catch(()=>{}).then(async()=>{
+      if(mode===displayMode||dead||currentStatus==='closed'||currentStatus==='closing')return;
+      try{await load({mode,stopReason:'display-changed'});}catch(error){failed(error);}
+    });
+    return;
+  }
   if(action==='sync'){notifyParent();return;}
   if(action==='mouse_leave'){mouseInput.cancel();return;}
   if(action==='pose') { if(currentStatus!=='ready')return;try{mouseInput.cancel();manualPose(updatePose(pose,parameters||{}));}catch(error){console.error(error);}return; }
   if(!['mouse','pose_motion'].includes(action))return;
   execute(action,parameters).catch(error=>console.error(error));
 });
-function failed(error){currentStatus='failed';reloading=false;notice.hidden=false;notice.textContent=error.message;console.error(error);publish('failed').catch(()=>{});}
+function failed(error){currentStatus='failed';reloading=false;imu.reset();notice.hidden=false;notice.textContent=error.message;console.error(error);publish('failed').catch(()=>{});}
 function event(name,detail) { if(view&&!view.isDestroyed())view.getHostCapabilitiesTarget().dispatchEvent(new CustomEvent(name,{detail})); }
-function sensorSample() { if(!pose.connected||reloading||currentStatus!=='ready')return; const [x,y,z,w]=poseQuaternion(pose); for(const request of sensorSessions.values()) {event('absoluteOrientation.reading',{...request,x,y,z,w,timestamp:performance.now()});readings.orientation++;} }
+function sensorSample() {
+  if (reloading || currentStatus !== 'ready') return;
+  // A narrow layout puts the IMU controls below the cross-origin canvas.
+  // Chromium pauses its animation frames when it scrolls out of the viewport.
+  const renderOffscreen = !screenInViewport && !document.hidden && imu.driving;
+  imu.tick(pose, performance.now());
+  if (renderOffscreen) view.render();
+}
 const timer=setInterval(()=>{
   if(motion.enabled&&currentStatus==='ready'&&!reloading){changedPose(motionPose(motionOrigin,motion,performance.now()-motionStart));}
   sensorSample();
 },1000/60);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){motion.enabled=false;mouseInput.cancel();camera.stopAll();publish().catch(()=>{});}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){motion.enabled=false;mouseInput.cancel();camera.stopAll();imu.stopReplay();publish().catch(()=>{});}});
 function capabilities() {
   return {
-    absoluteOrientation: {
-      start(req){sensorSessions.set(req.targetId,req);console.info('SDK absoluteOrientation.start',JSON.stringify(req));setTimeout(()=>{event('absoluteOrientation.activate',{...req,timestamp:performance.now()});sensorSample();},0);},
-      stop(req){sensorSessions.delete(req.targetId);console.info('SDK absoluteOrientation.stop',req.targetId);},
-    },
+    ...imu.capabilities(),
     battery:{start(req){batterySessions.set(req.targetId,req);return battery;},stop(req){batterySessions.delete(req.targetId);}},
     media:camera.capabilities(),
     languageModel:{async getConfig(){if(!networkOnline)throw new Error('NetworkError: 模拟网络已断开');return request('ai-config');}},
@@ -90,11 +117,13 @@ function capabilities() {
     speech:{async speak(req){console.info('SDK speech.speak',JSON.stringify(req));throw new Error('NotSupportedError: 首版未接入语音合成服务');},cancelSpeak(){}},
   };
 }
-async function load() {
+async function load({mode=displayMode,stopReason='source-reloaded'}={}) {
   await storageQueue; await flushStorage();
-  await recording.stop('source-reloaded');
+  await recording.stop(stopReason);
+  displayMode=mode;
   reloading=true;currentStatus='loading';notice.hidden=false;notice.textContent='正在加载官方运行时…';
-  motion.enabled=false;mouseInput.cancel();camera.stopAll();sensorSessions.clear();batterySessions.clear();if(view){view.setOnClosed(()=>{});view.destroy();view=null;}
+  notifyParent();
+  motion.enabled=false;mouseInput.cancel();camera.stopAll();imu.reset();batterySessions.clear();if(view){view.setOnClosed(()=>{});view.destroy();view=null;}
   runId=crypto.randomUUID();
   const restore=!current;
   current=await request('bundle');
@@ -106,7 +135,8 @@ async function load() {
   if (session.sdkError || !session.sdkUrl) throw new Error(session.sdkError || '项目 SDK 未配置');
   ({ createInkView, satisfiesInkEngine, getInkVersion, getInkBundleVersion } = await import(/* @vite-ignore */ session.sdkUrl));
   canvas.style.width=session.width+'px';canvas.style.height=session.height+'px';canvas.width=session.width;canvas.height=session.height;
-  view=await createInkView({width:session.width,height:session.height,layoutMode:'bounded',scaleFactor:1,appFps:60,displayColor:{mode:'monochrome',bits:1},surface:{type:'html-canvas',canvas},permissionChecks:true});
+  canvas.style.filter=displayMode==='monochrome'?greenFilter:'';
+  view=await createInkView({width:session.width,height:session.height,layoutMode:'bounded',scaleFactor:1,appFps:60,displayColor:{mode:displayMode,bits:displayMode==='color'?8:1},surface:{type:'html-canvas',canvas},permissionChecks:true});
   console.info('INK_RUNTIME_VERSION',JSON.stringify({sdk:session.webSdkVersion,engine:getInkVersion(),bundle:getInkBundleVersion()}));
   if(!satisfiesInkEngine(project.engine))throw new Error(`项目要求 ${project.engine}，当前引擎为 ${getInkVersion()}（Web SDK ${session.webSdkVersion}）`);
   view.setHostCapabilities(capabilities());
@@ -115,7 +145,7 @@ async function load() {
       storagePending.push(message.data.change);storageQueue=storageQueue.catch(()=>{}).then(flushStorage).catch(error=>{storageError=error;console.error('SIMULATOR_STORAGE_ERROR',error.message);});
     }else console.info('APP_MESSAGE',JSON.stringify(message));
   });
-  view.setOnClosed(async()=>{currentStatus='closing';await recording.stop('application-closed').catch(console.error);currentStatus='closed';motion.enabled=false;mouseInput.cancel();camera.stopAll();sensorSessions.clear();batterySessions.clear();console.info('APP_CLOSED');publish().catch(()=>{});});
+  view.setOnClosed(async()=>{currentStatus='closing';await recording.stop('application-closed').catch(console.error);currentStatus='closed';motion.enabled=false;mouseInput.cancel();camera.stopAll();imu.reset();batterySessions.clear();console.info('APP_CLOSED');publish().catch(()=>{});});
   const files=new Map(current.files.map(f=>[f.path,Uint8Array.from(atob(f.base64),c=>c.charCodeAt(0))]));
   const polyfillRoot='__aiui_workbench_media__', encode=new TextEncoder();
   for(const file of ['media-runtime.js','image-codec.js','fflate.js','storage-runtime.js','storage-init.js'])if(files.has(`${polyfillRoot}/${file}`))throw new Error('项目占用了模拟器媒体适配目录');
@@ -135,7 +165,7 @@ async function rawKey(type,code,timestamp) { view.notifyUserInteraction();view.d
 async function execute(action,args={}) {
   if(!['reload','exit','observe','record_stop'].includes(action)&&(!view||view.isDestroyed()))throw new Error('运行时尚未就绪');
   switch(action){
-    case 'record_start': view.render();return recording.start({...args,revision:current.project.revision,runId});
+    case 'record_start': view.render();return recording.start({...args,revision:current.project.revision,runId,drawFrame:displayMode==='monochrome'?drawDisplayFrame:undefined});
     case 'record_stop': return recording.stop('stopped');
     case 'observe': break;
     case 'key': {if(!/^(Enter|Backspace|Escape|ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Space)$/.test(args.code)||!['keydown','keyup'].includes(args.type||'keyup'))throw new Error('不支持的按键');await rawKey(args.type||'keyup',args.code,args.timestamp);break;}
@@ -177,6 +207,9 @@ async function execute(action,args={}) {
       canvas.classList.toggle('mouse-look',mouse.enabled);break;
     }
     case 'pose_stream': pose.connected=!!args.enabled;motionOrigin.connected=pose.connected;if(pose.connected)sensorSample();break;
+    case 'imu_set': imu.set(args);sensorSample();break;
+    case 'imu_replay': imu.startReplay(args.frames, performance.now());sensorSample();break;
+    case 'imu_stop': imu.stopReplay();sensorSample();break;
     case 'camera_fixture': await camera.setFixture(args.fixture);console.info('SDK 相机已设置本地模拟照片');break;
     case 'camera_source': camera.setSource(args.source);break;
     case 'camera_permission': camera.setPermission(args.allowed);break;
@@ -184,8 +217,8 @@ async function execute(action,args={}) {
     case 'focus': focused=args.focused!==false;if(!focused){mouseInput.cancel();view.blur();view.setInputEnabled(false);}else{view.setInputEnabled(true);view.focus();}break;
     case 'network': networkOnline=args.online!==false;view.dispatchConnectivityEvent(networkOnline?'online':'offline');break;
     case 'target': mouseInput.cancel();target=args.target==='_current'?'_current':'_blank';view.setTarget(target);break;
-    case 'exit': await recording.stop('application-closed');currentStatus='closed';motion.enabled=false;mouseInput.cancel();camera.stopAll();sensorSessions.clear();batterySessions.clear();if(view){view.setOnClosed(()=>{});view.destroy();view=null;}break;
-    case 'capture': {view.render();const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;copy.getContext('2d').drawImage(canvas,0,0);return{dataUrl:copy.toDataURL('image/png'),width:copy.width,height:copy.height,revision:current.project.revision,runId};}
+    case 'exit': await recording.stop('application-closed');currentStatus='closed';motion.enabled=false;mouseInput.cancel();camera.stopAll();imu.reset();batterySessions.clear();if(view){view.setOnClosed(()=>{});view.destroy();view=null;}break;
+    case 'capture': {view.render();const copy=document.createElement('canvas');copy.width=canvas.width;copy.height=canvas.height;drawDisplayFrame(copy);return{dataUrl:copy.toDataURL('image/png'),width:copy.width,height:copy.height,revision:current.project.revision,runId};}
     case 'reload': try{await load();}catch(error){failed(error);throw error;}break;
     case 'scenario': {
       if(!Array.isArray(args.steps)||args.steps.length>100)throw new Error('测试场景需要 1–100 个步骤');
@@ -198,5 +231,6 @@ async function execute(action,args={}) {
 async function poll(){while(!dead){try{const value=await request('poll');if(JSON.stringify(value.ai)!==JSON.stringify(aiInfo)){aiInfo=value.ai||{enabled:false};notifyParent();}if(value.logGeneration!==logGeneration){logEntries=logEntries.filter(entry=>entry.createdAt>value.logsClearedAt);logGeneration=value.logGeneration;}for(const c of value.commands)pendingCommands=pendingCommands.then(async()=>{commandActive=true;try{await flushLogs();const startedAt=performance.timeOrigin+performance.now(),startedRunId=runId;const result=await execute(c.action,c.args);await storageQueue;if(storageError)throw storageError;await flushLogs();await request('ack',{id:c.id,result,startedAt,runId:startedRunId});}catch(e){console.error(e);await flushLogs().catch(()=>{});await request('ack',{id:c.id,error:e.message});}finally{commandActive=false;notifyParent(true);}});}catch(e){if(!dead)notice.textContent='本地服务连接中断';}await wait(90);}}
 setInterval(()=>flushLogs().catch(()=>{}),250);
 setInterval(()=>{if(view&&!reloading)publish().catch(()=>{});},1000);
-window.addEventListener('beforeunload',()=>{dead=true;clearInterval(timer);clearTimeout(posePublishTimer);cancelAnimationFrame(poseFrame);mouseInput.destroy();camera.destroy();sensorSessions.clear();view?.destroy();});
-load().catch(failed).finally(poll);
+window.addEventListener('beforeunload',()=>{dead=true;clearInterval(timer);clearTimeout(posePublishTimer);cancelAnimationFrame(poseFrame);screenObserver.disconnect();mouseInput.destroy();camera.destroy();imu.reset();view?.destroy();});
+pendingCommands=load().catch(failed);
+pendingCommands.finally(poll);

@@ -1,5 +1,6 @@
 // The desktop preload and authenticated Web gateway expose the same local tools.
 export const UI_TOOLS = new Set([
+  'ui_skill_catalog', 'aiui_skill_read',
   'ui_wireless_setup',
   'aiui_adb_pair_qr','aiui_connection_guide',
   'aiui_feedback_status','aiui_feedback_prepare',

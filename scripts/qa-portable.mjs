@@ -46,7 +46,7 @@ async function launch() {
   page.on('console', message => { if (message.type() === 'error') { (report.rendererErrors ||= []).push(message.text()); console.log('RENDERER', message.text()); } });
   console.log('STAGE desktop window opened', page.url());
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
-  // A fresh 0.6+ profile opens the AI connection guide before any project exists.
+  // Start in the project library before importing the portable test project.
   await page.getByRole('button', { name: 'My projects', exact: true }).click();
   await page.getByRole('heading', { name: 'My projects', exact: true }).waitFor({ timeout: 45000 });
   report.stage = 'desktop UI ready'; console.log('STAGE', report.stage); await atomicJson(path.join(output, 'verification.json'), report);

@@ -94,7 +94,7 @@ GitHub Actions 在 Linux、macOS 和 Windows 运行基础检查；Windows 另构
 
 资料库行为见 [官方资料库](document-library.md)。`npm run qa:documents` 检查完整目录层级、未打开长文的全文搜索与章节定位、更新设置持久化、真实离线配图、阅读历史和内部链接；加 `--desktop` 运行 Electron 验收。`npm run prepare:doc-images` 补齐已固定快照的离线图片。
 
-`npm run qa:screenshots` 复制仓库内公开示例到全新的临时目录，完成实际运行、真实 stdio MCP 连接、断言和截图，更新 `docs/screenshots/`。截图包括中英文项目库与项目页、首次连接和成功连接、想法输入、新手指南、完整模拟器、资料和移除确认框；确认框只展示后取消。不读取日常客户端数据、设备或官方账号会话。报告保存在 `output/qa/documentation.json`。
+`npm run qa:screenshots` 把仓库公开示例复制到独立临时目录，运行 Ink 并验证 stdio MCP 连接，更新 `docs/screenshots/`。截图覆盖项目页、模拟器、AI 连接、Skill 库、上传与提审、新手指南、官方资料和移除确认。脚本使用隔离的示例项目与账号状态，移除操作在确认前取消。报告保存在 `output/qa/documentation.json`。
 
 ## 输入与翻译
 

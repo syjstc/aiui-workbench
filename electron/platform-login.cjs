@@ -34,7 +34,11 @@ class PlatformLogin{
       if(saved.token&&!(await this.official.cookies.get({url:'https://aiui.rokid.com/space',name:SESSION})).length)await this.official.cookies.set({url:'https://aiui.rokid.com/',name:SESSION,value:encodeURIComponent(saved.token),secure:true,path:'/',sameSite:'no_restriction',expirationDate:saved.expiresAt/1000});
       if(!saved.token&&saved.cookies?.length){this.graceUntil=Date.now()+30000;this.renew('restore-official-sso');}
     }
-    await this.sync();this.timer=setInterval(()=>this.sync().catch(()=>{}),5000);this.timer.unref();
+    await this.sync();
+    // A restored cookie can still have been revoked. Check it in the
+    // background so opening the workshop does not wait for the official site.
+    if(this.loggedIn)this.client.call('aiui_platform_agents',{},'desktop').catch(()=>this.sync().catch(()=>{}));
+    this.timer=setInterval(()=>this.sync().catch(()=>{}),5000);this.timer.unref();
     this.official.cookies.on('changed',(_event,cookie,cause,removed)=>{
       if(!/(^|\.)rokid\.com$/.test(cookie.domain.replace(/^\./,'')))return;
       if(this.logoutTask||this.userLoggedOut)return;

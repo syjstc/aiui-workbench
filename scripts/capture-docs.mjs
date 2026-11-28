@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -9,7 +10,7 @@ import { ROOT, atomicJson, sleep } from '../core/util.mjs';
 
 // Always use a new profile and copies of the public examples. No personal
 // project list, platform session, device serial or camera fixture is loaded.
-const home = await fs.mkdtemp('/tmp/aiui-workshop-docs-');
+const home = await fs.mkdtemp(path.join(os.tmpdir(), 'aiui-workshop-docs-'));
 const out = path.join(ROOT, 'docs/screenshots'); await fs.mkdir(out, { recursive: true });
 const report = { version: JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'))).version, source: 'public examples only', simulated: true, deviceVerified: false, screenshots: [], checks: [], errors: [] };
 let daemon, app, mcp;
@@ -19,6 +20,7 @@ try {
   // Keep the bundled documentation/runtime stable throughout this capture.
   daemon.service.sdk.check = async () => daemon.service.sdk.status();
   daemon.service.knowledge.sync = async () => daemon.service.knowledge.status();
+  daemon.service.environmentCheck = async () => ({ devices: [], usbDevices: [], wirelessDevices: [] });
   const call = (tool, args = {}) => daemon.service.call(tool, args, 'MCP');
   const projects = [];
   for (const name of ['motion-lab', 'hello-aiui']) {
@@ -32,12 +34,14 @@ try {
   }
   app = await launchDesktop({ args: [ROOT], cwd: ROOT, env: { ...process.env, AIUI_WORKBENCH_HOME: home, ELECTRON_RUN_AS_NODE: '' } });
   const page = await app.firstWindow(); page.on('pageerror', error => report.errors.push(error.message));
+  await page.emulateMedia({ colorScheme: 'light' });
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 1000));
   await page.getByRole('button', { name: '切换到中文', exact: true }).click();
   await page.getByRole('heading', { name: 'Hello AIUI', exact: true }).waitFor({ timeout: 45000 });
   await page.locator('.sidebar').getByRole('button', { name: '连接 AI 工具', exact: true }).click();
   await page.getByRole('heading', { name: '复制连接指令，发给 AI', exact: true }).waitFor();
-  await page.locator('#setup-idea').fill('做一个三项清单，滑动选择、单击勾选，自动保存进度。');
+  await page.getByLabel('随指令带上想法').check();
+  await page.getByRole('textbox', {name: '有想法，也可以一起告诉 AI'}).fill('做一个三项清单，滑动选择、单击勾选，自动保存进度。');
   await capture('ai-setup-zh.png');
   // Verify the connection through the generated, real stdio MCP launcher.
   const config = (await call('aiui_mcp_config')).mcpServers['aiui-workbench'];
@@ -45,11 +49,15 @@ try {
   await mcp.connect(new StdioClientTransport({ ...config, env: { ...process.env, ...config.env }, stderr: 'pipe' }));
   const context = await mcp.callTool({ name: 'aiui_context_get', arguments: {} });
   assert.ok(!context.isError);
-  await page.getByText('AI 已成功读取工坊', { exact: true }).waitFor();
+  await page.getByText('工坊已收到 AI 的成功调用。', { exact: true }).waitFor();
   await capture('mcp-zh.png');
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await capture('mcp-en.png');
   await page.getByRole('button', { name: '切换到中文', exact: true }).click();
+  await page.getByRole('button', { name: 'Skill 库', exact: true }).click();
+  await page.locator('.skill-list').getByRole('button').nth(1).getByText('aiui-dev', { exact: true }).click();
+  await page.getByRole('button', { name: '复制正文', exact: true }).waitFor();
+  await capture('skills-zh.png');
   await page.getByRole('button', { name: '我的项目', exact: true }).click();
   await capture('projects-zh.png');
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
@@ -60,18 +68,19 @@ try {
   await capture('idea-zh.png');
   await page.getByRole('button', { name: '收起想法', exact: true }).click();
   await page.getByRole('heading', { name: 'Hello AIUI', exact: true }).click();
-  await page.frameLocator('iframe').locator('#screen').waitFor({ state: 'visible', timeout: 45000 });
-  await page.frameLocator('iframe').locator('#status').waitFor({ state: 'hidden', timeout: 45000 });
   await page.getByRole('textbox', { name: '这次想改什么？' }).fill('把选中项再突出一些，并验证长滑只移动一项。');
   await capture('project-zh.png');
   await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   await capture('project-en.png');
   await page.getByRole('button', { name: '切换到中文', exact: true }).click();
-  await page.getByRole('button', { name: '打开完整模拟器', exact: true }).first().click();
-  await page.getByText('预览运行中', { exact: true }).waitFor({ timeout: 45000 });
+  await page.getByRole('button', { name: '模拟器', exact: true }).first().click();
+  await page.getByText('应用运行中', { exact: true }).waitFor({ timeout: 45000 });
   await page.frameLocator('iframe').locator('#screen').waitFor({ state: 'visible', timeout: 45000 });
   await page.frameLocator('iframe').locator('#status').waitFor({ state: 'hidden', timeout: 45000 });
   await capture('simulator-zh.png');
+  await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
+  await capture('simulator-en.png');
+  await page.getByRole('button', { name: '切换到中文', exact: true }).click();
   const hello = projects.find(p => p.name === 'Hello AIUI');
   let result = await call('aiui_preview_test', { projectId: hello.id, steps: [
     { action: 'swipe', parameters: { direction: 'forward', repeats: 24, intervalMs: 65, keyupOnly: true, aliases: true }, expect: { logContains: '"choice":1', logCount: { contains: 'HELLO_NAV', count: 1 } } },
@@ -87,12 +96,18 @@ try {
   const motion = projects.find(p => p.name === 'Motion Lab');
   const preview = await call('aiui_preview_open', { projectId: motion.id });
   await page.getByRole('heading', { name: 'Motion Lab', exact: true }).waitFor();
-  await page.getByRole('button', { name: '打开完整模拟器', exact: true }).first().click();
+  await page.getByRole('button', { name: '头部动作', exact: true }).click();
   await page.frameLocator('iframe').locator('#screen').waitFor({ state: 'visible', timeout: 45000 });
-  await page.getByText('预览运行中', { exact: true }).waitFor({ timeout: 45000 });
+  await page.getByText('应用运行中', { exact: true }).waitFor({ timeout: 45000 });
   await until(async () => (await call('aiui_preview_state', { sessionId: preview.id })).state?.sensorSessions > 0);
   await call('aiui_preview_action', { sessionId: preview.id, action: 'pose', parameters: { yaw: 18, pitch: -8, roll: 3 } });
   await capture('motion-zh.png');
+  await page.getByRole('button', { name: '构建与上传', exact: true }).click();
+  await page.getByText('上传与提审', { exact: true }).click();
+  await page.getByText('未登录官方平台', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '退出官方账号', exact: true }).count(), 0);
+  await page.locator('.publish-platform-disclosure').evaluate(section => section.scrollIntoView({ block: 'start' }));
+  await capture('publish-zh.png');
   await page.getByRole('button', { name: '新手指南', exact: true }).click();
   await page.getByRole('tab', { name: '和 AI 开发', exact: true }).click();
   await capture('guide-zh.png');
@@ -102,7 +117,7 @@ try {
   await page.getByRole('button', { name: '官方资料', exact: true }).click();
   await page.locator('.doc-list button').first().waitFor({ timeout: 15000 });
   await capture('docs-zh.png');
-  await page.getByRole('button', { name: '我的项目', exact: true }).click();
+  await page.getByRole('combobox', { name: '切换项目', exact: true }).selectOption('');
   for (const [operation, name] of [['解绑项目', 'unbind-confirmation.png'], ['删除项目和文件…', 'delete-confirmation.png']]) {
     await page.getByRole('button', { name: '项目操作 Hello AIUI', exact: true }).click();
     await page.getByRole('menuitem', { name: operation, exact: true }).click();
@@ -113,10 +128,16 @@ try {
     await capture(name);
     await modal.getByRole('button', { name: '取消', exact: true }).click();
   }
-  report.checks.push({ realStdioConnectionVerified: true, projectPreviewAndIdeaInput: true, guideLanguages: ['zh-CN', 'en'], removalDialogsCancelled: true });
+  report.checks.push({ realStdioConnectionVerified: true, projectWorkspaceAndIdeaInput: true, nativeSkillReader: true, signedOutPublishControls: true, guideLanguages: ['zh-CN', 'en'], removalDialogsCancelled: true });
   assert.deepEqual(report.errors, []); report.passed = true;
 
   async function capture(name) { await sleep(700); await page.screenshot({ path: path.join(out, name) }); report.screenshots.push(name); console.log('Captured', name); }
   async function until(work) { const deadline = Date.now() + 30000; while (Date.now() < deadline) { if (await work()) return; await sleep(100); } throw new Error('Screenshot workflow timed out'); }
 } catch (error) { report.error = error.stack; if (daemon) { report.previews = daemon.service.previews.list(); for (const p of report.previews) { try { report.runtimeLogs = await daemon.service.call('aiui_preview_logs', { sessionId: p.id, limit: 40 }, 'MCP'); } catch {} } } throw error; }
-finally { await mcp?.close(); await closeDesktop(app); await daemon?.close(); await atomicJson(path.join(ROOT, 'output/qa/documentation.json'), report); }
+finally {
+  await mcp?.close();
+  await closeDesktop(app);
+  await daemon?.close();
+  await fs.rm(home, { recursive: true, force: true });
+  await atomicJson(path.join(ROOT, 'output/qa/documentation.json'), report);
+}

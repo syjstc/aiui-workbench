@@ -39,8 +39,8 @@ const act = (action, parameters = {}) => call('aiui_preview_action', { sessionId
 async function check(name, fn) { await fn(); report.checks.push({ name, passed: true }); console.log('PASS', name); }
 async function hasLog(text) { return until(async () => (await logs()).find(log => log.message.includes(text))); }
 async function open(project) {
+  await page.getByRole('heading', { name: project.name, exact: true }).click();
   await page.getByRole('button', { name: '模拟器', exact: true }).click();
-  await page.getByRole('button', { name: '运行 ' + project.name, exact: true }).click();
   await page.frameLocator('iframe').locator('#status').waitFor({ state: 'hidden', timeout: 45000 });
   preview = await until(async () => (await call('aiui_status')).previews.find(item => item.projectId === project.id && item.status === 'ready'));
 }

@@ -2,6 +2,18 @@ import { z } from 'zod';
 
 const empty = z.object({}).strict();
 const pose = { yaw:z.number().min(-180).max(180).optional(), pitch:z.number().min(-89).max(89).optional(), roll:z.number().min(-180).max(180).optional() };
+const xyz = z.tuple([z.number(), z.number(), z.number()]);
+const quaternion = z.tuple([z.number(), z.number(), z.number(), z.number()])
+  .refine(value => Math.abs(Math.hypot(...value) - 1) <= .02, 'Orientation must be a unit quaternion [x,y,z,w]');
+const channels = { orientation:quaternion, accel:xyz, gyro:xyz, magnetometer:xyz };
+const sample = z.object({ atMs:z.number().nonnegative().max(120000), orientation:quaternion.optional(), accel:xyz.optional(), gyro:xyz.optional(), magnetometer:xyz.optional() })
+  .strict().refine(frame => Object.keys(channels).some(channel => frame[channel] !== undefined), 'An IMU frame must contain at least one channel');
+export const imuParameters = {
+  imu_set: z.object(Object.fromEntries(Object.entries(channels).map(([name, schema]) => [name, schema.nullable().optional()]))).strict(),
+  imu_replay: z.object({ frames:z.array(sample).min(1).max(12000)
+    .refine(frames => frames.every((frame, i) => i === 0 || frame.atMs > frames[i-1].atMs), 'IMU frame times must be strictly increasing') }).strict(),
+  imu_stop: empty,
+};
 export const previewParameters = {
   tap: empty, back: empty, reload: empty, exit: empty,
   longpress: z.object({ durationMs: z.number().int().min(500).max(5000).default(1500) }).strict(),
@@ -10,6 +22,7 @@ export const previewParameters = {
   pose: z.object(pose).strict(),
   pose_stream: z.object({ enabled: z.boolean() }).strict(),
   pose_motion: z.object({ enabled: z.boolean(), pattern: z.enum(['yaw', 'pitch', 'roll', 'orbit']).optional(), amplitude: z.number().min(1).max(60).optional(), periodMs: z.number().min(1000).max(20000).optional() }).strict(),
+  ...imuParameters,
   mouse: z.object({ enabled: z.boolean().optional(), sensitivity: z.number().min(.05).max(1).optional() }).strict(),
   camera_fixture: z.object({ path: z.string().min(1).describe('Absolute local PNG/JPEG/WebP path, at most 10 MB') }).strict(),
   camera_source: z.object({ source: z.enum(['fixture', 'webcam']) }).strict(),
@@ -30,6 +43,9 @@ export const ACTION_HELP = {
   swipe:'{direction?: forward|backward, repeats?: 1..50, intervalMs?: 10..500, keyupOnly?: boolean, aliases?: boolean}; at most 8 seconds',
   pose:'{yaw?: -180..180, pitch?: -89..89, roll?: -180..180} degrees', pose_stream:'{enabled: boolean}',
   pose_motion:'{enabled: boolean, pattern?: yaw|pitch|roll|orbit, amplitude?: 1..60, periodMs?: 1000..20000}', mouse:'{enabled?: boolean, sensitivity?: 0.05..1}',
+  imu_set:'{orientation?: [x,y,z,w], accel?: [x,y,z], gyro?: [x,y,z], magnetometer?: [x,y,z]}; null restores a channel to automatic input',
+  imu_replay:'{frames: [{atMs, orientation?, accel?, gyro?, magnetometer?}]}; same vectors as imu_set, no nulls; increasing offset ms, up to 120s/12000 frames; omitted channels do not emit during replay',
+  imu_stop:'{}; stop replay and resume manual or automatic values',
   camera_fixture:'{path: absolute PNG/JPEG/WebP file <=10MB}', camera_source:'{source: fixture|webcam}; video preview and grabFrame snapshots', camera_permission:'{allowed: boolean}',
   battery:'{level?: 0..1, charging?: boolean, chargingTime?: seconds, dischargingTime?: seconds}', focus:'{focused: boolean}', network:'{online: boolean}',
   target:'{target: _blank|_current}', reload:'{}', exit:'{}', wait:'{}; use waitMs/settleMs and expect',

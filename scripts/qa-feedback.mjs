@@ -38,9 +38,9 @@ try{
   await page.getByRole('button',{name:'切换到中文',exact:true}).click();
   await page.locator('.sidebar').getByRole('button',{name:'连接 AI 工具',exact:true}).click();
   await page.getByRole('heading',{name:'复制连接指令，发给 AI',exact:true}).waitFor();
-  assert.equal(await page.locator('.connect-command blockquote').count(),0);
+  assert.equal(await page.locator('.ai-connect-command blockquote').count(),0);
   assert.equal(await page.getByText('连接 AIUI 工坊，准备好开发环境，然后问我想做什么。',{exact:true}).count(),0);
-  const idea='验证完整连接指令并保留已有项目';await page.locator('#setup-idea').fill(idea);
+  const idea='验证完整连接指令并保留已有项目';await page.getByLabel('随指令带上想法').check();await page.getByRole('textbox',{name:'有想法，也可以一起告诉 AI'}).fill(idea);
   const originalClipboard=await app.evaluate(({clipboard})=>clipboard.readText());let copiedText;
   try{
     await page.getByRole('button',{name:'复制完整连接指令',exact:true}).click();

@@ -31,17 +31,19 @@ export function officialSkillBundles(index) {
   return new Map([...bundles].filter(([, bundle]) => bundle.entry));
 }
 
-export async function officialSkillCatalog(knowledge, pinnedRevision) {
+export async function officialSkillCatalog(knowledge, pinnedRevision, { entries = false } = {}) {
   const current = knowledge.meta.revision;
   const revision = pinnedRevision || current;
   const preferred = officialSkillBundles(await knowledge.index(revision));
   const available = revision === current ? preferred : officialSkillBundles(await knowledge.index(current));
   return [...new Set([...preferred.keys(), ...available.keys()])].sort().map(name => {
     const pinned = preferred.get(name);
-    const entry = (pinned || available.get(name)).entry;
+    const bundle = pinned || available.get(name);
+    const entry = bundle.entry;
     return {
       name, path: entry.path, revision: pinned ? revision : current,
       description: skillMetadata(entry.content).description.slice(0, 250),
+      ...(entries ? { references: bundle.documents.map(doc => doc.path).filter(file => file !== entry.path).sort() } : {}),
     };
   });
 }

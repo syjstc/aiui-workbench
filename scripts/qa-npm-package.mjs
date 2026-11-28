@@ -33,12 +33,11 @@ try {
   report.checks.push('npm exec 自动启动包内服务与 Web，不依赖源码目录的 node_modules 布局');
   browser = await chromium.launch({ executablePath: process.env.AIUI_QA_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 940 } }); const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto(url); await page.getByText('本地服务运行中', { exact: true }).waitFor();
+  await page.goto(url); await page.getByRole('button', { name: '切换到中文', exact: true }).click(); await page.getByText('本地服务已连接', { exact: true }).waitFor();
   const status = await page.evaluate(() => window.workbench.call('aiui_status')); assert.ok(status.knowledge.documents > 100); assert.equal(status.version, APP_VERSION);
   const project = await page.evaluate(directory => window.workbench.call('aiui_project_create', { directory, name: 'npm 安装包验证' }), path.join(home, 'projects/example'));
-  await page.evaluate(projectId => window.workbench.call('aiui_preview_open', { projectId }), project.id);
-  await page.getByRole('button', { name: '模拟器', exact: true }).click(); await page.getByRole('button', { name: '运行 npm 安装包验证', exact: true }).click();
-  await page.getByText('预览运行中', { exact: true }).waitFor({ timeout: 45000 }); await page.frameLocator('iframe').locator('#status').waitFor({ state: 'hidden' });
+  await page.getByRole('heading', { name: project.name, exact: true }).click(); await page.getByRole('button', { name: '模拟器', exact: true }).click();
+  await page.getByText('应用运行中', { exact: true }).waitFor({ timeout: 45000 }); await page.frameLocator('iframe').locator('#status').waitFor({ state: 'hidden' });
   await page.screenshot({ path: path.join(output, 'npm-installed-web.png') }); assert.deepEqual(errors, []);
   report.checks.push('真实 npm 包内离线资料、官方模板创建和 Ink 运行时正常'); report.passed = true;
   console.log('PASS npm 打包产物一条命令启动、依赖提升布局、资料和模拟器');

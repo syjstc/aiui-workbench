@@ -2,7 +2,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { id, redact, sha } from './util.mjs';
 import {PreviewStorage} from './preview-storage.mjs';
-import {previewParameters} from './automation-contract.mjs';
+import {imuParameters, previewParameters} from './automation-contract.mjs';
+
+function parseImu(action, parameters) {
+  return Object.hasOwn(imuParameters, action) ? imuParameters[action].parse(parameters ?? {}) : parameters;
+}
 
 export class Previews {
   constructor(projects, home, emit) { this.projects = projects; this.home = home; this.emit = emit; this.sessions = new Map(); this.storage=new PreviewStorage(home); }
@@ -42,6 +46,10 @@ export class Previews {
     signal?.throwIfAborted();
     const s = this.get(sessionId);
     if(action==='longpress')args=previewParameters.longpress.parse(args);
+    args=parseImu(action,args);
+    if(action==='scenario'&&Array.isArray(args.steps)){
+      args={...args,steps:args.steps.map(step=>Object.hasOwn(imuParameters, step?.action)?{...step,parameters:parseImu(step.action,step.parameters)}:step)};
+    }
     if(['reload','exit'].includes(action))this.ai?.cancelSession(sessionId,action);
     let nextFixture;
     if (action === 'camera_fixture') {

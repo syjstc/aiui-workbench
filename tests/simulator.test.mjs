@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { DesktopNavigation } from '../renderer/desktop-navigation.mjs';
 import { dragPose, updatePose, poseQuaternion, headQuaternion, rotateHeadVector, motionPose, NEUTRAL_POSE } from '../shared/pose.mjs';
 import { bindMousePose } from '../preview/mouse-pose.mjs';
+import { SimulatorImu } from '../preview/imu.mjs';
 import {headScene,rearSkullPoint} from '../renderer/head-scene.mjs';
 
 test('desktop navigation coalesces long swipes, keyup-only aliases, and a held key', () => {
@@ -48,6 +49,31 @@ test('sensor quaternions are normalized with the Android neutral gravity basis',
   for(const p of [{yaw:180,pitch:89,roll:-180},{yaw:-60,pitch:-45,roll:40}]) {
     assert.ok(Math.abs(Math.hypot(...poseQuaternion(p))-1)<1e-12);
   }
+});
+
+test('IMU replay preserves sample times and missing channels through delayed delivery', async () => {
+  const events = [];
+  const imu = new SimulatorImu((type, detail) => events.push({ type, ...detail }), () => {});
+  const { accelerometer, gyroscope } = imu.capabilities();
+  accelerometer.start({ targetId:'a', sessionId:'first', frequency:50 });
+  accelerometer.start({ targetId:'a', sessionId:'second', frequency:50 });
+  accelerometer.stop({ targetId:'a', sessionId:'first' });
+  gyroscope.start({ targetId:'g', sessionId:'gyro' });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(events.map(event => event.sessionId), ['second','gyro']);
+
+  imu.startReplay([{atMs:0,accel:[1,2,3]},{atMs:20,gyro:[4,5,6]},{atMs:75,accel:[7,8,9]}], 1000);
+  imu.tick(NEUTRAL_POSE, 1060);
+  assert.deepEqual(events.slice(2).map(({type,timestamp,x}) => [type,timestamp,x]), [
+    ['accelerometer.reading',1000,1], ['gyroscope.reading',1020,4],
+  ]);
+  imu.tick(NEUTRAL_POSE, 1075);
+  assert.deepEqual(imu.state().replay, {status:'finished',durationMs:75,sent:3,total:3});
+  imu.tick(NEUTRAL_POSE, 1090);
+  assert.ok(Math.abs(imu.state().values.accel[1] - 9.81) < 1e-10);
+  imu.reset();
+  assert.equal(imu.state().subscriptions.accel, 0);
+  assert.equal(imu.state().replay, null);
 });
 
 test('wearer right, up and right tilt agree between the head and Android sensor vectors',()=>{

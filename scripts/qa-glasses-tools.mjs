@@ -66,6 +66,7 @@ public class QaActivity extends Activity {
   app = await electron.launch({ args: [ROOT], cwd: ROOT, env: { ...process.env, AIUI_WORKBENCH_HOME: home, ELECTRON_RUN_AS_NODE: '' } });
   const page = await app.firstWindow(); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: '切换到中文', exact: true }).click();
+  await page.locator('.sidebar').getByRole('button', { name: '连接眼镜', exact: true }).click();
   await page.getByRole('button', { name: '眼镜工具', exact: true }).click();
   await check('实际 Electron 概览展示设备、内存与可用空间', async () => {
     await page.getByRole('heading', { name: '存储空间', exact: true }).waitFor({ timeout: 30000 });
@@ -202,7 +203,8 @@ public class QaActivity extends Activity {
     web = await startWeb({ home }); browser = await chromium.launch({ executablePath: process.env.AIUI_QA_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
     const webPage = await browser.newPage({ viewport: { width: 1440, height: 940 } }); await webPage.goto(web.url);
     await webPage.getByRole('button', { name: '切换到中文', exact: true }).click();
-    await webPage.getByRole('button', { name: '眼镜工具', exact: true }).click();
+    await webPage.locator('.sidebar').getByRole('button', { name: '连接眼镜', exact: true }).click();
+  await webPage.getByRole('button', { name: '眼镜工具', exact: true }).click();
     await webPage.getByRole('heading', { name: '存储空间', exact: true }).waitFor();
     await webPage.getByRole('button', { name: '安装 APK', exact: true }).click();
     const fileChooser = webPage.waitForEvent('filechooser');

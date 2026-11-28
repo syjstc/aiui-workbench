@@ -4,6 +4,7 @@ import { Activity, AlertCircle, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUp,
 import { getLocale, t, translateMessage } from './i18n.jsx';
 import { JobHistory } from './job-history.jsx';
 import { useFileDrop } from './file-drop.jsx';
+import { StatusLabel } from './status-label.jsx';
 import './glasses-tools.css';
 
 const api = window.workbench;
@@ -50,7 +51,7 @@ function FilePreview({ serial, file, onClose, onExport, busy }) {
   return <dialog ref={ref} className="glasses-dialog glasses-file-preview" aria-labelledby="glasses-file-preview-title" onCancel={event => { event.preventDefault(); onClose(); }}><div className="glasses-section-title"><div><h2 id="glasses-file-preview-title">{file.name}</h2><p>{size(file.bytes)} · {t('只读预览')}</p></div><Button icon={X} aria-label={t('关闭文件预览')} onClick={onClose}/></div><ErrorMessage error={error}/>{loading && <Loading/>}{data?.type === 'image' ? <img alt={file.name} src={`data:${data.mime};base64,${data.data}`}/> : data?.type === 'text' ? <pre>{data.content || t('空文件')}</pre> : null}<div className="button-row"><Button disabled={busy} icon={ArrowDownToLine} onClick={() => onExport(file)}>{t('导出到电脑')}</Button><Button onClick={onClose}>{t('关闭')}</Button></div></dialog>;
 }
 
-export function GlassesToolsPage({ aiuiOnly = false, discovery, jobs, refresh, notify, onCancel, onDelete, deleting, goToGuide }) {
+export function GlassesToolsPage({ discovery, jobs, refresh, notify, onCancel, onDelete, deleting, goToGuide }) {
   const [serial, setSerial] = useState('');
   const devices = discovery.environment?.devices || [], device = devices.find(item => item.serial === serial);
   useEffect(() => { setSerial(previous => devices.some(item => item.serial === previous) ? previous : devices.length === 1 ? devices[0].serial : ''); }, [discovery.environment]);
@@ -74,18 +75,17 @@ export function GlassesToolsPage({ aiuiOnly = false, discovery, jobs, refresh, n
     catch (error) { notify(error.message, true); return null; }
   }
   return <>
-    <div className="page-heading glasses-heading"><div><h1>{aiuiOnly?t('眼镜 AIUI 应用'):t('眼镜工具')}</h1><p>{aiuiOnly?t('查看商店与系统应用，管理安装到眼镜的开发版。'):t('文件、应用和设备状态，常用操作都在这里。')}</p></div><div className="glasses-device-picker"><Glasses size={19}/><label><span>{t('当前眼镜')}</span><select aria-label={t('工具目标眼镜')} value={serial} onChange={event => setSerial(event.target.value)}><option value="">{devices.length ? t('请选择一台眼镜') : t('尚未连接')}</option>{devices.map(item => <option key={item.serial} value={item.serial}>{item.name} · {item.serial.slice(-6)}{item.status !== 'device' ? ' · ' + (item.status === 'unauthorized' ? t('等待授权') : t('离线')) : ''}</option>)}</select></label>{ready && <span className="dot"/>}</div></div>
-    {ready ? <ToolWorkspace aiuiOnly={aiuiOnly} key={`${device.serial}:${device.transport}`} serial={serial} device={device} jobs={selectedJobs} startJob={startJob} notify={notify}/> : <section className="panel glasses-disconnected"><Glasses size={38}/><h2>{discovery.error ? t('暂时无法读取连接状态') : device?.status === 'unauthorized' ? t('请先允许 USB 调试') : devices.length > 1 && !serial ? t('选择要使用的眼镜') : t('连接眼镜后即可使用工具')}</h2><p>{device?.status === 'unauthorized' ? t('请在眼镜上确认调试授权，完成后会自动连接。') : t('用专用数据调试线连接眼镜，并在手机 App 中打开“眼镜 ADB 调试”。')}</p><Button icon={Info} onClick={goToGuide}>{t('打开新手指南')}</Button><ErrorMessage error={discovery.error}/></section>}
-    <JobHistory title={t('眼镜工具记录')} jobs={aiuiOnly?selectedJobs.filter(job=>job.type==='glasses-aiui-uninstall'):selectedJobs} onCancel={onCancel} onDelete={onDelete} deleting={deleting} onReveal={file => api.reveal(file).catch(error => notify(error.message, true))}/>
+    <div className="page-heading glasses-heading"><div><h1>{t('眼镜工具')}</h1><p>{t('文件、应用和设备状态，常用操作都在这里。')}</p></div><div className="glasses-device-picker"><Glasses size={19}/><label><span>{t('当前眼镜')}</span><select aria-label={t('工具目标眼镜')} value={serial} onChange={event => setSerial(event.target.value)}><option value="">{devices.length ? t('请选择一台眼镜') : t('尚未连接')}</option>{devices.map(item => <option key={item.serial} value={item.serial}>{item.name} · {item.serial.slice(-6)}{item.status !== 'device' ? ' · ' + (item.status === 'unauthorized' ? t('等待授权') : t('离线')) : ''}</option>)}</select></label>{ready && <StatusLabel tone="ready">{t('已连接')}</StatusLabel>}</div></div>
+    {ready ? <ToolWorkspace key={`${device.serial}:${device.transport}`} serial={serial} device={device} jobs={selectedJobs} startJob={startJob} notify={notify}/> : <section className="panel glasses-disconnected"><Glasses size={38}/><h2>{discovery.error ? t('暂时无法读取连接状态') : device?.status === 'unauthorized' ? t('请先允许 USB 调试') : devices.length > 1 && !serial ? t('选择要使用的眼镜') : t('连接眼镜后即可使用工具')}</h2><p>{device?.status === 'unauthorized' ? t('请在眼镜上确认调试授权，完成后会自动连接。') : t('用专用数据调试线连接眼镜，并在手机 App 中打开“眼镜 ADB 调试”。')}</p><Button icon={Info} onClick={goToGuide}>{t('打开新手指南')}</Button><ErrorMessage error={discovery.error}/></section>}
+    <JobHistory title={t('眼镜工具记录')} jobs={selectedJobs} onCancel={onCancel} onDelete={onDelete} deleting={deleting} onReveal={file => api.reveal(file).catch(error => notify(error.message, true))}/>
   </>;
 }
 
-function ToolWorkspace({ aiuiOnly, serial, device, jobs, startJob, notify }) {
+function ToolWorkspace({ serial, device, jobs, startJob, notify }) {
   const [tab, setTab] = useState('overview');
   const revision = jobs.filter(job => job.status !== 'running').map(job => `${job.id}:${job.status}`).join('|');
   const busy = jobs.some(job => job.status === 'running');
   const common = { serial, revision, notify, busy, startJob };
-  if (aiuiOnly) return <AiuiAppsPane {...common} standalone/>;
   return <div className="glasses-workspace">
     <div className="glasses-tabs" role="tablist" aria-label={t('眼镜工具分类')}>{tabs.map(([key, Icon, label]) => <button key={key} id={`glasses-tab-${key}`} role="tab" aria-selected={tab === key} aria-controls="glasses-tab-content" onClick={() => setTab(key)}><Icon size={16}/>{t(label)}</button>)}</div>
     <div id="glasses-tab-content" role="tabpanel" aria-labelledby={`glasses-tab-${tab}`}>
@@ -206,7 +206,7 @@ function InstalledAppHeading({app,name,identity,badge,copyLabel,notify}) {
 
 const aiuiKey = app => app.source + ':' + (app.fileName || app.agentId);
 
-function AiuiAppsPane({serial,revision,busy,startJob,notify,standalone}) {
+function AiuiAppsPane({serial,revision,busy,startJob,notify}) {
   const {data,loading,error,reload}=useTool('aiui_glasses_aiui_apps',{serial, refresh:true},revision);
   const [query,setQuery]=useState(''),[selected,setSelected]=useState(''),[confirm,setConfirm]=useState(null),[source,setSource]=useState('all');
   const sources={store:t('商店正式版'),developer:t('开发版'),builtin:t('系统内置'),unverified:t('身份待核实')};
@@ -222,7 +222,7 @@ function AiuiAppsPane({serial,revision,busy,startJob,notify,standalone}) {
   }));
   const readOnly=app&&(app.source!=='developer'||!app.removable);
   const permissionNames={CAMERA:t('相机'),GEOLOCATION:t('位置信息'),RECORD_AUDIO:t('麦克风'),INTERNET:t('网络'),STORAGE:t('存储'),BLUETOOTH:t('蓝牙')};
-  return <section className="panel glasses-apps aiui-inventory"><div className="glasses-section-title"><h2>{standalone?t('应用列表'):t('AIUI 应用')}</h2><Button icon={RefreshCw} disabled={loading} busy={loading} onClick={reload}>{t('刷新')}</Button></div>
+  return <section className="panel glasses-apps aiui-inventory"><div className="glasses-section-title"><h2>{t('AIUI 应用')}</h2><Button icon={RefreshCw} disabled={loading} busy={loading} onClick={reload}>{t('刷新')}</Button></div>
     <div className="aiui-source-filters" role="group" aria-label={t('AIUI 应用来源')}>{['all','store','developer','builtin'].map(key=><button key={key} aria-pressed={source===key} onClick={()=>{setSource(key);setSelected('');}}>{key==='all'?t('全部'):sources[key]}{counts[key]!=null&&<span>{counts[key]}</span>}</button>)}</div>
     {showStore && <p className="aiui-source-status" role="status"><Info size={15}/>{store.status==='snapshot'
       ? t('商店应用来自眼镜 {0} 的同步记录，当前安装总数未知。',{0:date(store.observedAt)})

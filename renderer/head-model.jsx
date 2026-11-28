@@ -128,5 +128,5 @@ export function HeadModel({pose,sensitivity,ready,onPose,onInteract,motion}) {
     return()=>{input.destroy();resize.disconnect();};
   },[]);
   useEffect(()=>{draw(canvas.current,pose);},[pose.yaw,pose.pitch,pose.roll,theme]);
-  return <div className="head-model"><div className="head-model-label"><span>{t("背面视角 · 面向模拟屏幕")}</span><span>{motion?t("自动演示中"):dragging?t("跟随鼠标"):'3 DoF'}</span></div><canvas ref={canvas} className="mouse-look" tabIndex={0} aria-label={t("鼠标跟随的三维头部模型")}/><div className="head-model-hint">{t("向右转头 · 向上抬头 · Shift 向右侧倾")}</div></div>;
+  return <div className="head-model"><div className="head-model-label"><span>{t("背面视角 · 面向模拟屏幕")}</span><span>{motion?t("自动演示中"):dragging?t("跟随鼠标"):'3 DoF'}</span></div><canvas ref={canvas} className="mouse-look" tabIndex={0} aria-label={t("鼠标跟随的三维头部模型")}/><div className="head-model-hint">{t("移动鼠标转头，按住 Shift 侧倾")}</div></div>;
 }

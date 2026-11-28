@@ -83,7 +83,7 @@ npm run release:manifest -- \
 
 将本次版本说明保存到 `output/release/RELEASE_NOTES.md`，只包含当前版本内容。创建指向已验证 commit 的 `v0.6.0` tag 和草稿 GitHub Release，上传安装包、`workbench-update.json` 和 `SHA256SUMS.txt`。Windows 使用 CI 原生验收通过后留存的同一个 ZIP；macOS 包的 build-info 与 CI commit 均须对应 tag。校验附件字节数、摘要和 tag/清单版本一致后再公开发布。
 
-发布后等待 `Real GitHub upgrade` 的 macOS 和 Windows 验收完成：从上一稳定版发现新版、下载校验、启动、保留项目并连接 MCP。真实 GitHub 升级脚本同时识别旧版“Projects”和新版“My projects”，便携包验收覆盖新版首次连接页和项目内预览。记录留在 CI 和本地，不追加到发行说明。
+发布后的 `Real GitHub upgrade` 在 macOS 和 Windows 上验证从上一稳定版发现新版、下载校验、启动、保留项目和连接 MCP。真实 GitHub 升级脚本同时识别“Projects”和“My projects”。便携包验收覆盖项目入口和实际 Ink 模拟器。验证记录保存在 CI 和本地。
 
 公证完成后运行 `node scripts/create-dmg.mjs --app '/path/AIUI Workshop.app' --out output/release` 生成 DMG。DMG 内包含应用和“应用程序”快捷方式；同一版本的 ZIP 仍用于应用内升级。更新清单每个平台只列一个安装包，DMG 作为额外的手动安装附件提供，不与 ZIP 重复登记同一个平台。
 

@@ -4,15 +4,15 @@
 
 AI prepares code, store text, icons and preview media, then calls Workshop through MCP or CLI. Workshop builds and uploads drafts, verifies official results and presents materials for the user's native desktop confirmation.
 
-> **Experimental in 0.5.8:** this integration follows current Studio endpoints, which may change. Both tabs show a warning. Real-account draft upload and digest verification have been checked; real review submission, approval and store availability remain unverified. Read back uncertain results before attempting further writes.
+> **Experimental integration.** Studio endpoints may change. Real-account draft uploads and digest checks have been verified. Review submission, approval, and store availability are separate milestones. Refresh the cloud record when an outcome is uncertain.
 
 ## First complete workflow
 
-1. On desktop, open **Build & upload → Sign in to Rokid** and complete the official sign-in flow. The main window updates immediately and the sign-in window closes automatically. Valid encrypted sessions are reused after restart. Keep desktop Workshop running when using Web, CLI or MCP; signing in through an ordinary browser does not authorize Workshop.
-2. In the build/upload tab, select one local app and set its official binding. Verify the formal name and full highlighted **Official Agent ID**. Existing apps use their existing official identity; use **Create official agent** for a new identity. All stages share this binding, and MCP cannot change it.
+1. Open your project on desktop, then expand **Build & upload → Upload and review**. Workshop checks the official sign-in state. Select **Sign in to Rokid** if prompted. Once the session is verified, the sign-in window closes and Workshop displays the connected state. Keep the desktop app running to share its session with Web, CLI, or MCP.
+2. Under **Publishing**, set the official binding for this project. Verify the name and the full **Official Agent ID**. You can also create and link a new official agent. Uploads and review drafts use the same binding.
 3. Check/build the AIX, then upload it as a cloud draft. Workshop reports success after reading back and verifying the official target, version and package/code digests. Local and cloud version numbers are separate; official draft/material saves may increment the cloud version.
-4. Use `aiui_platform_review_prepare` to prepare text, icon, previews and permission purposes. The desktop form also supports text and preview-file paths; icon replacement and permission purposes use MCP parameters. Saving materials does not submit a review.
-5. AI requests confirmation with `aiui_platform_review_request`, or you use the desktop confirmation button. Check the target, version, package hash, text, permissions and media, then confirm in the native dialog. Cancelling does not submit.
+4. Under **Prepare review materials**, enter the description, greeting, change log, and permission purposes, then choose preview files and save the draft. AI can use `aiui_platform_review_prepare` to save materials and optionally replace the icon.
+5. Under **Review and submit**, check the target, version, text, permissions, and media. Expand **Verification details** for the package hash. Select the confirmation button and confirm in the native dialog. AI can also request your attention with `aiui_platform_review_request`.
 6. Open **Official apps** and refresh the official status. Check draft, review and published versions separately. **Only confirm when the version and materials are ready for public release: store availability after approval follows official rules, and Workshop does not guarantee another publication confirmation.**
 
 An app can have an older published version and a newer draft at the same time. A published status does not mean that the newest draft has been reviewed or released.
@@ -38,6 +38,8 @@ MCP may still upload new drafts and prepare materials. The official record viewe
 ## Sessions and sign-out
 
 Official sign-in uses a separate in-memory browser session, isolated from previews. Cookies and SSO state are persisted only as an OS-encrypted snapshot using Electron `safeStorage`. macOS uses Keychain; Windows uses system protection. A Linux `basic_text` backend is treated as insecure and uses memory-only sessions. Passwords are not stored, and official tokens, STS credentials and native-confirmation secrets are not returned to AI or included in task logs or packages.
+
+Workshop checks sign-in at desktop startup and when you open **Upload and review**. The verified sign-in state exposes account and refresh actions. If verification is unavailable, you can check again from the same page.
 
 Sign-out closes official and renewal windows, clears cookies/SSO/cache and the encrypted snapshot, revokes pending confirmations and stops platform tasks. It preserves local projects, materials and receipts. Account records are hidden until the same account signs in again. Requests already sent cannot be recalled by signing out.
 

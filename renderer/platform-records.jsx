@@ -8,7 +8,7 @@ function Icon({agent,large=false}){
   useEffect(()=>setFailed(false),[agent.icon]);
   return agent.icon&&!failed?<img className={'official-app-icon'+(large?' large':'')} src={agent.icon} alt={t('应用图标 {0}',{0:agent.agentName})} loading="lazy" onError={()=>setFailed(true)}/>:<span className={'official-app-icon fallback'+(large?' large':'')}><Package size={large?28:19}/></span>;
 }
-function purposes(agent){
+export function permissionPurposes(agent){
   for(const value of [agent.permissionsDesc,agent.needParam]){
     try{const result=typeof value==='string'?JSON.parse(value):value;if(result&&typeof result==='object'&&!Array.isArray(result)&&Object.keys(result).length)return result;}catch{}
   }
@@ -23,7 +23,7 @@ function ImagePreview({image,onClose}){
   </dialog>;
 }
 function AgentContent({agent,onImage,onCopy}){
-  const usage=purposes(agent),permissions=Array.isArray(agent.permissions)?agent.permissions.join('、'):agent.permissions;
+  const usage=permissionPurposes(agent),permissions=Array.isArray(agent.permissions)?agent.permissions.join('、'):agent.permissions;
   return <div className="official-agent-detail">
     <div className="official-agent-profile"><Icon agent={agent} large/><div><strong>{agent.agentName}</strong><p>{agent.categoryName||agent.category||'—'}</p><OfficialAgentId agentId={agent.agentId} onCopy={onCopy}/></div></div>
     <div className="official-agent-content"><section><dl>

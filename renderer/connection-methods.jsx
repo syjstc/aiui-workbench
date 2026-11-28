@@ -3,15 +3,18 @@ import { Cable, CheckCircle2, Wifi } from 'lucide-react';
 import { t } from './i18n.jsx';
 
 const preferenceKey = 'aiui-workbench.connection-method';
-export function useConnectionMethod() {
-  const [method, setMethod] = useState(() => {
-    try { return localStorage.getItem(preferenceKey) === 'usb' ? 'usb' : 'wireless'; } catch { return 'wireless'; }
+export function useConnectionMethod(preferred = 'wireless') {
+  const [selection, setMethod] = useState(() => {
+    try {
+      const saved = localStorage.getItem(preferenceKey);
+      return saved === 'usb' || saved === 'wireless' ? saved : null;
+    } catch { return null; }
   });
   function choose(value) {
     setMethod(value);
     try { localStorage.setItem(preferenceKey, value); } catch {}
   }
-  return [method, choose];
+  return [selection || preferred, choose];
 }
 
 export function ConnectionMethodTabs({ method, onChange, id, wirelessConnected, usbConnected }) {

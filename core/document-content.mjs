@@ -31,3 +31,16 @@ export function documentHeadings(content) {
   }
   return headings;
 }
+
+const headingText = node => typeof node?.value === 'string' ? node.value : (node?.children || []).map(headingText).join('');
+export function remarkHeadingAnchors({ title, removedTitle } = {}) {
+  return tree => {
+    const slug = headingSlugger();
+    if (removedTitle) slug(plainHeading(title));
+    function walk(node) {
+      if (node.type === 'heading') node.data = { ...node.data, hProperties: { id: slug(plainHeading(headingText(node))) } };
+      for (const child of node.children || []) walk(child);
+    }
+    walk(tree);
+  };
+}

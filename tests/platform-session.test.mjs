@@ -7,6 +7,11 @@ import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 const {PlatformSessionVault,validSession}=createRequire(import.meta.url)('../electron/platform-session.cjs');
 const token=exp=>'header.'+Buffer.from(JSON.stringify({accountId:'fixture-account',exp})).toString('base64url')+'.signature';
+test('an empty official session vault does not request access to OS encryption',async t=>{
+  const home=await fs.mkdtemp(path.join(os.tmpdir(),'official-empty-'));t.after(()=>fs.rm(home,{recursive:true,force:true}));
+  const vault=new PlatformSessionVault(home,{isEncryptionAvailable(){assert.fail('An absent session needs no decryption');}});
+  assert.equal(await vault.load(),null);
+});
 test('official session persists only OS-encrypted bytes with private permissions, restores and clears',async t=>{
   const home=await fs.mkdtemp(path.join(os.tmpdir(),'official-session-'));t.after(()=>fs.rm(home,{recursive:true,force:true}));
   const key=crypto.randomBytes(32),iv=crypto.randomBytes(12);
@@ -28,6 +33,38 @@ test('Rokid tokens without exp use the official cookie expiry, and cannot outliv
   const now=Date.now(),session='header.'+Buffer.from(JSON.stringify({accountId:'fixture',iss:'Rokid',type:'session',timestamp:now})).toString('base64url')+'.signature';
   assert.equal(validSession(session,now),null);assert.equal(validSession(session,now,now+3600000).expiresAt,now+3600000);assert.equal(validSession(session,now,now-1),null);
   assert.equal(validSession(token(Math.floor(now/1000)+60),now,now+3600000).expiresAt,(Math.floor(now/1000)+60)*1000);
+});
+test('desktop startup checks a restored session without waiting for the official service and clears revoked sign-in',async t=>{
+  const {EventEmitter}=await import('node:events');
+  const {PlatformLogin}=createRequire(import.meta.url)('../electron/platform-login.cjs');
+  const home=await fs.mkdtemp(path.join(os.tmpdir(),'studio-startup-check-'));
+  t.after(()=>fs.rm(home,{recursive:true,force:true}));
+  const expires=Math.floor(Date.now()/1000)+3600;
+  const cookie={name:'ROKID_ACCOUNT_SESSION',value:token(expires),expirationDate:expires,domain:'aiui.rokid.com',path:'/'};
+  const officialCookies=Object.assign(new EventEmitter(),{get:async()=>[cookie]});
+  const legacyCookies={get:async()=>[]};
+  const session={fromPartition:name=>({cookies:name.startsWith('persist:')?legacyCookies:officialCookies})};
+  let revoked=false,releaseCheck,invalidated;
+  const checking=new Promise(resolve=>{releaseCheck=resolve;});
+  const signedOut=new Promise(resolve=>{invalidated=resolve;});
+  const calls=[];
+  const client={call:async(name,args)=>{
+    calls.push(name);
+    if(name==='aiui_platform_agents'){await checking;revoked=true;throw new Error('Session revoked');}
+    return {loggedIn:!!args.token&&!revoked,rejected:!!args.token&&revoked};
+  }};
+  const login=new PlatformLogin({home,session,client,safeStorage:{isEncryptionAvailable:()=>false},
+    desktopKey:'d'.repeat(64),getLocale:()=> 'en',onStatus:value=>{if(!value.loggedIn)invalidated();}});
+  const renewals=[];
+  login.renew=value=>renewals.push(value);
+  await login.init();
+  t.after(()=>login.close());
+  assert.ok(calls.includes('aiui_platform_agents'));
+  assert.equal(login.loggedIn,true);
+  releaseCheck();
+  await signedOut;
+  assert.equal(login.loggedIn,false);
+  assert.deepEqual(renewals,[cookie.value]);
 });
 test('legacy official login migrates to a memory partition and only an encrypted cookie snapshot survives restart',async t=>{
   const {EventEmitter}=await import('node:events'),{PlatformLogin}=createRequire(import.meta.url)('../electron/platform-login.cjs');

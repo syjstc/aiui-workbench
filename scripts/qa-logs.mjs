@@ -24,6 +24,8 @@ const daemon = await startDaemon(home), service = daemon.service;
 service.knowledge.sync = async ({ progress }) => { progress('离线资料已就绪'); return service.knowledge.status(); };
 await service.sdk.settings({ autoCheck: false });
 const project = await service.projects.create({ directory: path.join(home, 'fixture-project'), name: '日志验证应用' }, service.knowledge);
+for (const job of service.jobs.items) if (['launch','deploy','check','pack','platform-prepare'].includes(job.type)) job.projectId=project.id;
+await service.jobs.save();
 let finishActive;
 const active = service.jobs.start('pack', project.id, ({ progress }) => new Promise(resolve => { finishActive = resolve; progress('等待验证完成'); }));
 const activePromise = service.jobs.items.find(job => job.id === active.id).promise;
@@ -81,13 +83,16 @@ try {
     await page.getByRole('button', { name: 'SDK 更新', exact: true }).click();
     await row('qa-sdk-prepare').getByRole('button', { name: '删除SDK 兼容性检查记录', exact: true }).click();
     await row('qa-sdk-prepare').waitFor({ state: 'detached' });
-    await page.getByRole('button', { name: '连接眼镜', exact: true }).click();
+    await page.locator('.sidebar').getByRole('button', { name: '我的项目', exact: true }).click();
+    await page.getByRole('heading', { name: project.name, exact: true }).click();
+    await page.getByRole('navigation', { name: '当前项目' }).getByRole('button', { name: '安装到眼镜', exact: true }).click();
     await row('qa-launch').getByRole('button', { name: '删除启动眼镜页面记录', exact: true }).click();
     await row('qa-launch').waitFor({ state: 'detached' });
   });
   await check('构建页清空已结束记录，保留正在构建的任务', async () => {
     await page.getByRole('button', { name: '构建与上传', exact: true }).click();
-    await page.getByRole('region', { name: '构建与检查记录', exact: true }).getByRole('button', { name: '清空已结束记录', exact: true }).click();
+    await page.locator('summary').filter({ hasText: '本机构建与上传记录' }).click();
+    await page.getByRole('region', { name: '项目任务记录', exact: true }).getByRole('button', { name: '清空已结束记录', exact: true }).click();
     await row('qa-pack').waitFor({ state: 'detached' });
     await row(active.id).waitFor();
     assert.throws(() => service.jobs.get('qa-platform-prepare'), /不存在/);
@@ -120,6 +125,7 @@ try {
     assert.ok(frame);
     await frame.evaluate(() => console.info('QA_BEFORE_CLEAR'));
     await waitFor(async () => (await tool('aiui_preview_logs', { sessionId: preview.id })).logs.some(log => log.message.includes('QA_BEFORE_CLEAR')));
+    await page.locator('.project-console>summary').click();
     await page.getByRole('button', { name: '清空运行日志', exact: true }).click();
     await waitFor(async () => !(await tool('aiui_preview_logs', { sessionId: preview.id })).logs.length);
     await frame.evaluate(() => console.info('QA_AFTER_CLEAR'));

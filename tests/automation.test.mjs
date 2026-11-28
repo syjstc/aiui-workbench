@@ -41,6 +41,23 @@ test('longpress is discoverable and bounds the real Enter hold duration',()=>{
   assert.equal(z.object(definition[2]).parse({sessionId:'s',action:'longpress'}).action,'longpress');
 });
 
+test('IMU actions validate raw channels and ordered replay times before dispatch', async t => {
+  const {service,project}=await fixture(t), preview=service.previews.open(project.id,'http://127.0.0.1:1');
+  const session=service.previews.get(preview.id);
+  const set={action:'imu_set',parameters:{accel:[1,9.81,-2],gyro:null,orientation:[0,0,0,1]}};
+  const replay={action:'imu_replay',parameters:{frames:[{atMs:0,gyro:[0,0,1]},{atMs:20,accel:[0,9.81,0]}]}};
+  const invalid=[{action:'imu_set',parameters:{orientation:[0,0,0,0]}},
+    {action:'imu_replay',parameters:{frames:[{atMs:20,accel:[0,9.81,0]},{atMs:20,gyro:[0,0,0]}]}},
+    {action:'imu_replay',parameters:{frames:[{atMs:120001,gyro:[0,0,0]}]}},
+    {action:'imu_replay',parameters:{frames:[{atMs:0}]}}];
+  for(const step of invalid){
+    assert.equal(previewTestSchema.safeParse({projectId:project.id,steps:[step]}).success,false);
+    await assert.rejects(service.call('aiui_preview_action',{sessionId:session.id,...step}));
+  }
+  assert.equal(session.queue.length,0);
+  assert.deepEqual(previewTestSchema.parse({projectId:project.id,steps:[set,replay]}).steps.map(s=>s.parameters),[set.parameters,replay.parameters]);
+});
+
 test('direct longpress rejects invalid parameters before enqueueing any input',async t=>{
   const {service,project}=await fixture(t),preview=service.previews.open(project.id,'http://127.0.0.1:1');
   for(const parameters of [{durationMs:0},{durationMs:6000},{durationMs:'1500'},{typo:true}])await assert.rejects(service.call('aiui_preview_action',{sessionId:preview.id,action:'longpress',parameters}));

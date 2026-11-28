@@ -21,9 +21,12 @@ class PlatformSessionVault{
   constructor(home,safeStorage){this.file=path.join(home,'official-session.enc');this.safeStorage=safeStorage;this.queue=Promise.resolve();}
   available(){return this.safeStorage.isEncryptionAvailable()&&this.safeStorage.getSelectedStorageBackend?.()!=='basic_text';}
   async load(){
+    let encrypted;
+    try{encrypted=await fs.readFile(this.file);}
+    catch(error){if(error.code!=='ENOENT')await this.clear();return null;}
     if(!this.available())return null;
     try{
-      const plaintext=this.safeStorage.decryptString(await fs.readFile(this.file));let record;
+      const plaintext=this.safeStorage.decryptString(encrypted);let record;
       try{record=JSON.parse(plaintext);}catch{record={token:plaintext};}
       const valid=validSession(record.token,Date.now(),record.expiresAt);
       const cookies=officialCookies(Array.isArray(record.cookies)?record.cookies:[]).filter(c=>c.expirationDate?c.expirationDate*1000>Date.now():Number.isFinite(record.savedAt)&&Date.now()-record.savedAt<30*86400000);

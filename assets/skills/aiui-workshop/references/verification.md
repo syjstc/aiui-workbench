@@ -12,6 +12,18 @@ Simulator controls use wearer directions: positive yaw turns right, positive pit
 
 Test each axis both ways, reset, and a combined rotation through `pose`, `pose_stream` and `pose_motion`. Assert the app's gaze/view behavior, not only the slider numbers. Stationary world objects move opposite to the view when the wearer turns. Do not fix an application's inverse camera transform by reversing simulator sensor axes. Confirm actual device directions with a worn left/right, up/down and tilt check before claiming hardware parity.
 
+## IMU values and replay
+
+The simulator's IMU tab shows each channel's subscriptions and delivered samples. Use `imu_set` to supply fixed values or set a channel to `null` to restore automatic values. The automatic accelerometer includes gravity in device coordinates, the automatic gyroscope is zero, and the magnetic field is synthetic. Use a timestamped trace when angle, acceleration and angular velocity must change together.
+
+Load a local JSON file in the IMU tab or pass the same object to `imu_replay` through `aiui_preview_action` or `aiui_preview_test`:
+
+```json
+{"frames":[{"atMs":0,"orientation":[0.707107,0,0,0.707107],"accel":[0,9.81,0],"gyro":[0,0,0]},{"atMs":20,"accel":[0.4,9.81,0]}]}
+```
+
+`atMs` is a strictly increasing offset in milliseconds. Supply device-axis values for `accel` in m/s², `gyro` in rad/s and `magnetometer` in µT. Orientation is a unit `[x,y,z,w]` quaternion. During replay, only the supplied channels emit for each frame. The simulator keeps the relative timestamps, with event delivery subject to browser scheduling. Starting a replay returns immediately. Assert fresh application logs while it runs or wait for `imu.replay.status` to equal `finished`. On completion or `imu_stop` the simulator resumes manual or automatic values. Keep raw wearer recordings local and distinguish replay results from worn-device behavior.
+
 ## Camera and recording
 
 Use `camera_fixture` with a known local image for repeatable frames. `camera_source=webcam` requires the computer's real permission and exposes computer-camera frames. Test denied permission and cleanup on hide/exit. Captured PNGs are preview frames, not the glasses' native photo modes. Record a bounded clip using `aiui_record_clip` or a preview test with `record=true`; report simulated rendering separately from glasses screen capture and worn optical footage.

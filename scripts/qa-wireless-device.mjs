@@ -92,7 +92,7 @@ try {
     assert.ok(JSON.stringify(discovered).includes(serial));
   });
   await check('embedded mirroring receives and renders live frames over Wi-Fi', async () => {
-    await page.locator('.sidebar').getByRole('button', { name: '眼镜工具', exact: true }).click();
+    await page.getByRole('button', { name: '眼镜工具', exact: true }).click();
     await page.getByRole('tab', { name: '真机投屏', exact: true }).click();
     // Opening this tab starts the stream automatically.
     await waitFor(async () => { const state = await call('aiui_glasses_mirror_embed_status', { serial }); report.frames = state.session?.frames || 0; return state.session?.status === 'running' && state.session.frames >= 2; });

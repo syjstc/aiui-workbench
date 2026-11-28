@@ -30,19 +30,21 @@ try {
   await check('a permanent bilingual language switch is visible and switches immediately', async () => {
     await page.getByRole('group', { name: 'Language / 语言' }).waitFor();
     await page.getByRole('button', { name: '切换到中文', exact: true }).click();
-    await page.getByRole('heading', { name: '项目库', exact: true }).waitFor();
+    await page.getByRole('heading', { name: '我的项目', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
-    await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'My projects', exact: true }).waitFor();
     assert.equal(await page.locator('html').getAttribute('lang'), 'en');
     await englishOnly(); await page.screenshot({ path: path.join(output, 'english-projects.png') });
   });
   await check('all main pages and every onboarding step are translated', async () => {
-    for (const name of ['Simulator', 'Official docs', 'Connect glasses', 'Build & upload', 'Connect AI tools', 'SDK updates', 'Logs & history', 'Settings', 'Getting started']) {
+    for (const name of ['Official docs', 'Connect glasses', 'Connect AI tools', 'SDK updates', 'Logs & history', 'Settings', 'Getting started']) {
       await page.locator('.sidebar').getByRole('button', { name, exact: true }).click();
-      await page.locator('main h1').waitFor(); await sleep(350);
+      await page.locator('main h1').first().waitFor(); await sleep(350);
       await englishOnly();
       assert.ok(await page.getByRole('group', { name: 'Language / 语言' }).isVisible());
     }
+    await page.getByRole('tab', { name: 'Install on glasses', exact: true }).click();
+    await page.getByRole('tab', { name: 'Wired connection', exact: true }).click();
     for (let i = 0; i < 4; i++) {
       await page.locator('.setup-steps button').nth(i).click(); await englishOnly();
     }
@@ -55,9 +57,9 @@ try {
   await check('project names remain unchanged and simulator controls are translated', async () => {
     project = await daemon.service.call('aiui_project_create', { directory: path.join(home, 'Project 中文 & spaces'), name: '用户项目 User project' });
     const preview = await daemon.service.call('aiui_preview_open', { projectId: project.id }, 'MCP');
-    await page.getByText('Preview running', { exact: true }).waitFor({ timeout: 30000 });
-    for (const name of ['Orientation', 'Motion', 'Input', 'Camera']) {
-      await page.locator('.control-tabs').getByRole('button', { name, exact: true }).click(); await englishOnly();
+    await page.getByText('App running', { exact: true }).waitFor({ timeout: 30000 });
+    for (const name of ['Temple', 'Head motion', 'Camera']) {
+      await page.locator('.glasses-input-tabs').getByRole('button', { name, exact: true }).click(); await englishOnly();
     }
     await page.getByRole('button', { name: 'Save screenshot', exact: true }).click();
     await page.getByRole('heading', { name: 'Current preview saved', exact: true }).waitFor();
@@ -65,7 +67,7 @@ try {
     await page.screenshot({ path: path.join(output, 'english-capture.png') });
     await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
     await page.getByRole('button', { name: '切换到中文', exact: true }).click();
-    await page.getByText('预览运行中', { exact: true }).waitFor();
+    await page.getByText('应用运行中', { exact: true }).waitFor();
     assert.equal((await daemon.service.call('aiui_preview_state', { sessionId: preview.id })).projectId, project.id);
     await page.getByRole('button', { name: 'Switch to English', exact: true }).click();
   });

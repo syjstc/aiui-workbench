@@ -5,22 +5,10 @@ import remarkGfm from 'remark-gfm';
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, ChevronRight, LoaderCircle, RefreshCw, Search, X } from 'lucide-react';
 import { MarkdownCode } from './code-block.jsx';
 import { documentLink } from '../core/document-links.mjs';
-import { documentHeadings, headingId, headingSlugger, plainHeading } from '../core/document-content.mjs';
+import { documentHeadings, headingId, plainHeading, remarkHeadingAnchors } from '../core/document-content.mjs';
 
 const api = window.workbench;
 const call = (tool, args) => api.call(tool, args);
-const headingText = node => typeof node?.value === 'string' ? node.value : (node?.children || []).map(headingText).join('');
-function remarkHeadingAnchors({ title, removedTitle }) {
-  return tree => {
-    const slug = headingSlugger();
-    if (removedTitle) slug(plainHeading(title));
-    function walk(node) {
-      if (node.type === 'heading') node.data = { ...node.data, hProperties: { id: slug(plainHeading(headingText(node))) } };
-      for (const child of node.children || []) walk(child);
-    }
-    walk(tree);
-  };
-}
 const headingComponents = Object.fromEntries(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map(tag => [tag, ({ node, children }) => React.createElement(tag, { id: node.properties.id }, children)]));
 const savedSort = () => { try { const value = localStorage.getItem('aiui-doc-sort'); return ['recommended', 'title', 'path'].includes(value) ? value : 'recommended'; } catch { return 'recommended'; } };
 function navigationLocations(nodes, parents = [], result = new Map()) {

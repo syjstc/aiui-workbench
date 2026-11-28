@@ -19,6 +19,7 @@ try {
   app = await electron.launch({ executablePath, args: [], cwd: ROOT, env });
   const page = await app.firstWindow(); page.on('pageerror', error => report.errors.push(error.message));
   await page.getByRole('button', { name: '切换到中文', exact: true }).click();
+  await page.locator('.sidebar').getByRole('button', { name: '连接眼镜', exact: true }).click();
   await page.getByRole('button', { name: '眼镜工具', exact: true }).click();
   await check('完整客户端在空 PATH 下读取真实眼镜与空间信息', async () => {
     await page.getByRole('heading', { name: '存储空间', exact: true }).waitFor({ timeout: 30000 });
